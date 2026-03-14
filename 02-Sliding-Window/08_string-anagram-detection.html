@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>String Anagram Detection — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+    --win-bg:rgba(33,150,243,0.09);   --win-border:#2196f3;
+    --match-bg:rgba(6,214,160,0.13);  --match-border:#06d6a0;
+    --miss-bg:rgba(230,57,70,0.09);   --miss-border:#e63946;
+    --slide-bg:rgba(255,209,102,0.12);--slide-border:#ffd166;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.2vw,1.25rem);font-weight:700;letter-spacing:-0.5px;}
+  .header .sub{font-size:0.75rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent3);color:#0a2e22;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;font-weight:700;white-space:nowrap;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:24px 32px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent3);}
+  .field input.wide{width:220px;}
+  .field input.med{width:130px;}
+  .btn{padding:7px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}
+  .btn-primary:hover{background:var(--accent3);color:#0a2e22;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:3px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  .section-label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ── PATTERN ROW ── */
+  .pattern-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;}
+  .pat-label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);width:52px;flex-shrink:0;}
+  .pat-blocks{display:flex;gap:4px;}
+  .pat-blk{
+    width:40px;height:40px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;
+    border-radius:6px;border:2px solid;
+    transition:all 0.3s;
+  }
+  .pat-sorted{font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);margin-left:8px;}
+  .pat-sorted span{color:var(--ink);font-weight:700;}
+
+  /* ── MAIN STRING ARRAY ── */
+  .array-outer{position:relative;padding-bottom:54px;margin-bottom:14px;overflow-x:auto;}
+  .array-blocks{display:flex;gap:5px;flex-wrap:nowrap;}
+  .blk{
+    position:relative;width:48px;height:48px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;
+    border-radius:8px;border:2px solid var(--border);
+    background:var(--surface);color:var(--muted);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .blk .bidx{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);}
+  .blk.in-window{background:var(--win-bg);border-color:var(--win-border);color:var(--accent2);transform:translateY(-3px);}
+  .blk.is-match {background:var(--match-bg);border-color:var(--match-border);color:#028a5b;transform:translateY(-6px);box-shadow:0 6px 18px rgba(6,214,160,0.2);}
+  .blk.is-found {background:var(--match-bg);border-color:var(--match-border);color:#028a5b;}
+  .blk.is-L{box-shadow:0 0 0 3px rgba(230,57,70,0.3);}
+  .blk.is-R{box-shadow:0 0 0 3px rgba(33,150,243,0.3);}
+
+  .ptr-labels{position:absolute;bottom:0;left:0;right:0;height:46px;pointer-events:none;}
+  .ptr{position:absolute;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;padding:2px 7px;border-radius:3px;transform:translateX(-50%);transition:left 0.35s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+  .ptr-L{background:var(--accent);color:white;top:4px;}
+  .ptr-R{background:var(--accent2);color:white;top:26px;}
+
+  /* ── FREQ COMPARE TABLE ── */
+  .freq-compare{margin-bottom:14px;}
+  .fc-table{width:100%;border-collapse:collapse;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
+  .fc-table th{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:7px 10px;background:rgba(0,0,0,0.03);border-bottom:1px solid var(--border);text-align:center;}
+  .fc-table td{font-family:'Space Mono',monospace;font-size:0.82rem;padding:6px 10px;text-align:center;border-bottom:1px solid rgba(0,0,0,0.04);transition:all 0.3s;}
+  .fc-table tr:last-child td{border-bottom:none;}
+  .fc-char{font-weight:700;font-size:1rem;}
+  .fc-need{color:var(--accent2);font-weight:700;}
+  .fc-have{font-weight:700;}
+  .fc-have.ok  {color:#028a5b;}
+  .fc-have.over{color:var(--accent);}
+  .fc-have.zero{color:var(--muted);}
+  .fc-status{font-size:0.7rem;font-weight:700;}
+  .fc-status.ok  {color:#028a5b;}
+  .fc-status.miss{color:var(--accent);}
+  .fc-status.over{color:var(--accent4);}
+
+  /* ── MATCH STATUS ── */
+  .match-status{display:flex;align-items:center;gap:12px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:14px;transition:all 0.3s;}
+  .match-status.is-match{border-color:var(--match-border);background:var(--match-bg);}
+  .match-status.is-miss {border-color:var(--miss-border); background:var(--miss-bg);}
+  .ms-icon{font-size:1.6rem;flex-shrink:0;}
+  .ms-text{flex:1;}
+  .ms-title{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;margin-bottom:2px;}
+  .ms-sub{font-size:0.72rem;color:var(--muted);}
+  .ms-formed{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;margin-left:auto;}
+  .ms-formed.ok{color:#028a5b;}
+  .ms-formed.miss{color:var(--accent);}
+
+  /* ── FOUND POSITIONS ── */
+  .found-section{margin-bottom:14px;}
+  .found-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .found-chip{font-family:'Space Mono',monospace;font-size:0.72rem;padding:4px 10px;border-radius:4px;border:1.5px solid var(--match-border);background:var(--match-bg);color:#028a5b;font-weight:700;animation:chipPop 0.3s ease;}
+  @keyframes chipPop{0%{transform:scale(0.8)}100%{transform:scale(1)}}
+  .found-none{font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);font-style:italic;}
+
+  /* ── STEP BOX ── */
+  .step-box{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent3);border-radius:8px;padding:12px 16px;margin-bottom:12px;min-height:68px;transition:border-color 0.3s,background 0.3s;}
+  .step-box.s-slide{border-left-color:var(--accent2);}
+  .step-box.s-match{border-left-color:var(--accent3);background:rgba(6,214,160,0.03);}
+  .step-box.s-miss {border-left-color:var(--accent);background:rgba(230,57,70,0.02);}
+  .step-box.s-done {border-left-color:var(--accent4);background:rgba(255,209,102,0.04);}
+  .step-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .step-desc{font-size:0.84rem;line-height:1.65;color:var(--ink);}
+  .step-desc strong{font-weight:700;}
+  .step-desc .grn{color:#028a5b;font-weight:600;}
+  .step-desc .yel{color:#7a5a00;font-weight:600;}
+  .step-desc .red{color:var(--accent);font-weight:600;}
+  .step-desc .blu{color:var(--accent2);font-weight:600;}
+
+  .progress-wrap{margin-bottom:10px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent3);color:#0a2e22;text-align:center;padding:9px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;animation:fadeUp 0.4s ease;}
+  .done-banner.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}
+  .state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:14px 14px 8px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.65rem;line-height:1.85;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.85em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-slide{background:rgba(33,150,243,0.16);border-left-color:#2196f3;color:#e2e8f0;}
+  .code-line.hl-match{background:rgba(6,214,160,0.16); border-left-color:#06d6a0;color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(255,209,102,0.18);border-left-color:#ffd166;color:#e2e8f0;}
+  .ck{color:#c084fc;} .cf{color:#67e8f9;} .cc{color:#374151;font-style:italic;} .cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 14px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 11px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);} .var-value.blu{color:#4fc3f7;}
+
+  /* FREQ MAP MINI */
+  .rfreq{margin-bottom:12px;}
+  .rfreq-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .rfreq-rows{display:flex;flex-direction:column;gap:3px;}
+  .rfreq-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;transition:all 0.3s;}
+  .rfreq-row.rf-ok  {border-color:rgba(6,214,160,0.4);background:rgba(6,214,160,0.06);}
+  .rfreq-row.rf-miss{border-color:rgba(230,57,70,0.4);background:rgba(230,57,70,0.06);}
+  .rfreq-row.rf-over{border-color:rgba(255,209,102,0.4);background:rgba(255,209,102,0.06);}
+  .rf-char{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;width:18px;}
+  .rf-need{font-family:'Space Mono',monospace;font-size:0.7rem;color:#6b6b8a;width:40px;}
+  .rf-bar-wrap{flex:1;height:4px;background:#2a2a3e;border-radius:2px;overflow:hidden;}
+  .rf-bar{height:100%;border-radius:2px;transition:width 0.4s;}
+  .rf-have{font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;width:16px;text-align:right;}
+
+  /* FOUND LOG */
+  .found-log{margin-bottom:12px;}
+  .fl-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .fl-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+  .fl-rows::-webkit-scrollbar{width:3px;}
+  .fl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .fl-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;background:rgba(6,214,160,0.08);border:1px solid rgba(6,214,160,0.3);font-family:'Space Mono',monospace;font-size:0.65rem;animation:rowPop 0.3s ease;}
+  @keyframes rowPop{0%{opacity:0;transform:translateX(-5px)}100%{opacity:1;transform:none}}
+  .fl-pos{color:var(--accent3);font-weight:700;}
+  .fl-win{color:var(--bg);flex:1;margin-left:4px;}
+
+  .best-box{margin:0 14px 12px;padding:9px 11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 14px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>String Anagram Detection</h1>
+    <div class="sub">Sliding Window · Family D · Fixed-size · Find All Anagrams</div>
+  </div>
+  <div class="family-badge">08 · Anagram</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>String s (search in)</label>
+        <input type="text" id="inputS" class="wide" value="cbaebabacd">
+      </div>
+      <div class="field">
+        <label>Pattern p (find anagrams)</label>
+        <input type="text" id="inputP" class="med" value="abc">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1400">0.5×</button>
+          <button class="speed-btn active" data-ms="800">1×</button>
+          <button class="speed-btn" data-ms="400">2×</button>
+          <button class="speed-btn" data-ms="160">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <!-- PATTERN DISPLAY -->
+    <div class="section-label">Pattern p</div>
+    <div class="pattern-row" id="patternRow">
+      <div class="pat-label">Pattern</div>
+      <div class="pat-blocks" id="patBlocks"></div>
+      <div class="pat-sorted">sorted: <span id="patSorted">—</span></div>
+    </div>
+
+    <!-- MAIN STRING -->
+    <div class="section-label">String s</div>
+    <div class="array-outer">
+      <div class="array-blocks" id="arrayBlocks"></div>
+      <div class="ptr-labels" id="ptrLabels"></div>
+    </div>
+
+    <!-- FREQ COMPARE TABLE -->
+    <div class="freq-compare">
+      <div class="section-label">Frequency comparison — window vs pattern</div>
+      <table class="fc-table">
+        <thead>
+          <tr>
+            <th>Char</th>
+            <th>Need (pattern)</th>
+            <th>Have (window)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="fcTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- MATCH STATUS -->
+    <div class="match-status" id="matchStatus">
+      <div class="ms-icon" id="msIcon">⏳</div>
+      <div class="ms-text">
+        <div class="ms-title" id="msTitle">Waiting...</div>
+        <div class="ms-sub" id="msSub">slide window to start</div>
+      </div>
+      <div class="ms-formed" id="msFormed">—</div>
+    </div>
+
+    <!-- FOUND POSITIONS -->
+    <div class="found-section">
+      <div class="section-label">Anagram start positions found</div>
+      <div class="found-chips" id="foundChips">
+        <span class="found-none">none yet</span>
+      </div>
+    </div>
+
+    <!-- STEP BOX -->
+    <div class="step-box" id="stepBox">
+      <div class="step-title">Status</div>
+      <div class="step-desc" id="stepDesc">Press <strong>RUN</strong> to start.</div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ ALL ANAGRAMS FOUND</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="state-panel">
+
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Executing Line</div>
+      <pre class="code-block">
+<span class="code-line" id="cl-sig">vector&lt;<span class="ck">int</span>&gt; <span class="cf">findAnagrams</span>(string s, string p){</span>
+<span class="code-line" id="cl-init">  map&lt;<span class="ck">char</span>,<span class="ck">int</span>&gt; need, have;</span>
+<span class="code-line" id="cl-build">  <span class="ck">for</span>(<span class="ck">char</span> c:p) need[c]++;</span>
+<span class="code-line" id="cl-vars">  <span class="ck">int</span> formed=<span class="cn">0</span>, req=need.size();</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span>(<span class="ck">int</span> R=<span class="cn">0</span>; R&lt;n; R++){</span>
+<span class="code-line" id="cl-add">    have[s[R]]++;</span>
+<span class="code-line" id="cl-chk">    <span class="ck">if</span>(need.count(s[R])&amp;&amp;</span>
+<span class="code-line" id="cl-chk2">      have[s[R]]==need[s[R]]) formed++;</span>
+<span class="code-line" id="cl-ifk">    <span class="ck">if</span>(R-L+<span class="cn">1</span> &gt; p.size()){</span>
+<span class="code-line" id="cl-rem">      <span class="ck">if</span>(need.count(s[L])&amp;&amp;</span>
+<span class="code-line" id="cl-rem2">        have[s[L]]==need[s[L]]) formed--;</span>
+<span class="code-line" id="cl-dec">      have[s[L]]--; L++;</span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-match">    <span class="ck">if</span>(formed==req) res.push_back(L);</span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> res; }</span></pre>
+    </div>
+
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+
+      <div class="var-grid">
+        <div class="var-card" id="vcL">
+          <div class="var-name">L</div>
+          <div class="var-value red" id="vL">—</div>
+        </div>
+        <div class="var-card" id="vcR">
+          <div class="var-name">R</div>
+          <div class="var-value blu" id="vR">—</div>
+        </div>
+        <div class="var-card" id="vcFormed">
+          <div class="var-name">formed</div>
+          <div class="var-value grn" id="vFormed">0</div>
+        </div>
+        <div class="var-card" id="vcReq">
+          <div class="var-name">required</div>
+          <div class="var-value yel" id="vReq">—</div>
+        </div>
+      </div>
+
+      <!-- FREQ MAP RIGHT -->
+      <div class="rfreq">
+        <div class="rfreq-title">need vs have</div>
+        <div class="rfreq-rows" id="rfreqRows"></div>
+      </div>
+
+      <!-- FOUND LOG -->
+      <div class="found-log">
+        <div class="fl-title">Anagrams found</div>
+        <div class="fl-rows" id="flRows"></div>
+      </div>
+
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Result</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta">start indices of all anagrams</div>
+      </div>
+    </div>
+
+    <div class="done-bar" id="doneBar">✓ O(N) · ALL ANAGRAMS FOUND</div>
+  </div>
+</div>
+
+<script>
+// colour per char
+const COLOURS=['#e63946','#2196f3','#06d6a0','#ffd166','#c084fc','#fb923c','#34d399','#f472b6','#60a5fa','#f87171'];
+let charCol={}, colIdx=0;
+function getCol(c){
+  if(!charCol[c]){charCol[c]=COLOURS[colIdx%COLOURS.length];colIdx++;}
+  return charCol[c];
+}
+
+// ── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-init','cl-build','cl-vars','cl-for'], cls:'hl-slide'},
+  slide:{ids:['cl-for','cl-add','cl-chk','cl-chk2','cl-ifk','cl-rem','cl-rem2','cl-dec'], cls:'hl-slide'},
+  match:{ids:['cl-match'],                                        cls:'hl-match'},
+  done: {ids:['cl-ret'],                                          cls:'hl-done' },
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── ALGORITHM ─────────────────────────────────────────────────────────────
+function computeSteps(s, p){
+  const n=s.length, m=p.length, steps=[];
+  const need={};
+  for(const c of p) need[c]=(need[c]||0)+1;
+  const req=Object.keys(need).length;
+  let have={}, formed=0, L=0, found=[];
+
+  const snap=(R,type,desc)=>steps.push({
+    L,R,have:{...have},need:{...need},formed,req,
+    found:[...found],type,desc,n,m
+  });
+
+  snap(-1,'init',
+    `🚀 <strong>Starting up.</strong> Pattern p="${p}" (length ${m}). Need map built. Required = <strong>${req}</strong> distinct chars satisfied. Fixed window size = ${m}. Slide across s="${s}".`);
+
+  for(let R=0;R<n;R++){
+    const rc=s[R];
+    have[rc]=(have[rc]||0)+1;
+    if(need[rc]!==undefined && have[rc]===need[rc]) formed++;
+
+    // slide out left if window too big
+    if(R-L+1>m){
+      const lc=s[L];
+      if(need[lc]!==undefined && have[lc]===need[lc]) formed--;
+      have[lc]--;
+      if(have[lc]===0) delete have[lc];
+      L++;
+    }
+
+    const isMatch=formed===req && R-L+1===m;
+    if(isMatch) found.push(L);
+
+    snap(R, isMatch?'match':'slide',
+      isMatch
+        ? `✅ <span class="grn"><strong>ANAGRAM FOUND</strong></span> at index <strong>${L}</strong>! Window "${s.slice(L,R+1)}" is an anagram of "${p}". formed=${formed}=req=${req}. Adding ${L} to result.`
+        : `➡️ R=${R} ('${rc}'). Window "${s.slice(L,R+1)}" [${L}..${R}]. formed=<span class="${formed===req?'grn':'red'}">${formed}</span>/${req}. ${formed===req?'✓ match!':'Not an anagram yet.'}`
+    );
+  }
+
+  snap(0,'done',
+    found.length>0
+      ? `🎉 <span class="grn"><strong>Done!</strong></span> Found <strong>${found.length}</strong> anagram${found.length>1?'s':''} of "${p}" in "${s}" at position${found.length>1?'s':''}: <span class="grn">[${found.join(', ')}]</span>. O(n) time.`
+      : `🔴 No anagrams of "${p}" found in "${s}".`
+  );
+
+  return steps;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let sArr=[], pArr=[], steps=[], currentStep=0, playing=false, timer=null, speed=800;
+
+function buildUI(){
+  charCol={}; colIdx=0;
+  const sStr=document.getElementById('inputS').value.trim();
+  const pStr=document.getElementById('inputP').value.trim();
+  sArr=[...sStr]; pArr=[...pStr];
+
+  // pre-assign colours
+  [...new Set([...sArr,...pArr])].forEach(c=>getCol(c));
+
+  steps=computeSteps(sArr,pArr);
+  currentStep=0;
+
+  // pattern blocks
+  const pb=document.getElementById('patBlocks');
+  pb.innerHTML='';
+  pArr.forEach(c=>{
+    const col=getCol(c);
+    pb.innerHTML+=`<div class="pat-blk" style="color:${col};border-color:${col};background:${col}18;">${c}</div>`;
+  });
+  document.getElementById('patSorted').textContent=[...pArr].sort().join('');
+
+  // string blocks
+  const ab=document.getElementById('arrayBlocks');
+  ab.innerHTML='';
+  sArr.forEach((c,i)=>{
+    const col=getCol(c);
+    ab.innerHTML+=`<div class="blk" id="blk-${i}" style="color:${col};border-color:${col}30;">${c}<span class="bidx">${i}</span></div>`;
+  });
+
+  // req
+  const need={};
+  for(const c of pArr) need[c]=(need[c]||0)+1;
+  document.getElementById('vReq').textContent=Object.keys(need).length;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('flRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const m=pArr.length;
+
+  // string blocks
+  sArr.forEach((_,i)=>{
+    const b=document.getElementById(`blk-${i}`);
+    if(!b)return;
+    const col=getCol(sArr[i]);
+    b.className='blk';
+    b.style.color=col;
+    b.style.borderColor=col+'30';
+    if(st.R>=0&&i>=st.L&&i<=st.R){
+      if(st.type==='match') b.classList.add('is-match');
+      else b.classList.add('in-window');
+      b.style.borderColor=col;
+    }
+    // highlight past found positions
+    if(st.found.includes(i)) b.classList.add('is-found');
+    if(i===st.L&&st.R>=0) b.classList.add('is-L');
+    if(i===st.R&&st.R>=0) b.classList.add('is-R');
+  });
+
+  // pointer labels
+  const BW=53;
+  const pl=document.getElementById('ptrLabels');
+  pl.innerHTML=st.R>=0?`
+    <span class="ptr ptr-L" style="left:${st.L*BW+24}px">L</span>
+    <span class="ptr ptr-R" style="left:${st.R*BW+24}px">R</span>`:'';
+
+  // freq compare table
+  const need=st.need, have=st.have;
+  const allChars=Object.keys(need);
+  const tbody=document.getElementById('fcTbody');
+  tbody.innerHTML='';
+  allChars.sort().forEach(c=>{
+    const n=need[c]||0, h=have[c]||0;
+    const col=getCol(c);
+    let status,statusCls;
+    if(h===n){status='✓ match';statusCls='ok';}
+    else if(h<n){status=`need ${n-h} more`;statusCls='miss';}
+    else{status=`${h-n} extra`;statusCls='over';}
+    const haveCls=h===0?'zero':h>=n?'ok':'over';
+    tbody.innerHTML+=`<tr>
+      <td><span class="fc-char" style="color:${col}">${c}</span></td>
+      <td><span class="fc-need">${n}</span></td>
+      <td><span class="fc-have ${haveCls}">${h}</span></td>
+      <td><span class="fc-status ${statusCls}">${status}</span></td>
+    </tr>`;
+  });
+
+  // match status
+  const ms=document.getElementById('matchStatus');
+  const isMatch=st.type==='match';
+  const winValid=st.R>=0&&st.R-st.L+1===m;
+  ms.className='match-status'+(isMatch?' is-match':winValid?' is-miss':'');
+  document.getElementById('msIcon').textContent=isMatch?'✅':winValid?'❌':'⏳';
+  document.getElementById('msTitle').textContent=
+    isMatch?`Anagram found at index ${st.L}!`:
+    winValid?`Not an anagram — ${st.req-st.formed} char(s) unsatisfied`:
+    `Building window (${st.R>=0?st.R-st.L+1:0}/${m})`;
+  document.getElementById('msSub').textContent=
+    st.R>=0?`window "${sArr.slice(st.L,st.R+1).join('')}" · formed=${st.formed}/${st.req}`:'waiting...';
+  const mf=document.getElementById('msFormed');
+  mf.textContent=`${st.formed}/${st.req}`;
+  mf.className='ms-formed '+(st.formed===st.req?'ok':'miss');
+
+  // found chips
+  const fc=document.getElementById('foundChips');
+  if(st.found.length===0){
+    fc.innerHTML='<span class="found-none">none yet</span>';
+  } else {
+    fc.innerHTML='';
+    st.found.forEach(pos=>{
+      fc.innerHTML+=`<div class="found-chip">idx ${pos}: "${sArr.slice(pos,pos+m).join('')}"</div>`;
+    });
+  }
+
+  // vars
+  setVar('vL','vcL',st.R>=0?st.L:'—');
+  setVar('vR','vcR',st.R>=0?st.R:'—');
+  setVar('vFormed','vcFormed',st.formed);
+
+  // freq map right
+  const rfr=document.getElementById('rfreqRows');
+  rfr.innerHTML='';
+  Object.keys(need).sort().forEach(c=>{
+    const n=need[c],h=have[c]||0,col=getCol(c);
+    const cls=h===n?'rf-ok':h<n?'rf-miss':'rf-over';
+    rfr.innerHTML+=`<div class="rfreq-row ${cls}">
+      <div class="rf-char" style="color:${col}">${c}</div>
+      <div class="rf-need" style="color:${col}aa">need=${n}</div>
+      <div class="rf-bar-wrap"><div class="rf-bar" style="width:${Math.min(h/n*100,100)}%;background:${col}"></div></div>
+      <div class="rf-have" style="color:${col}">${h}</div>
+    </div>`;
+  });
+
+  // found log right
+  const flr=document.getElementById('flRows');
+  flr.innerHTML='';
+  [...st.found].reverse().forEach(pos=>{
+    flr.innerHTML+=`<div class="fl-row">
+      <div class="fl-pos">idx ${pos}</div>
+      <div class="fl-win">"${sArr.slice(pos,pos+m).join('')}"</div>
+    </div>`;
+  });
+
+  // step box
+  const box=document.getElementById('stepBox');
+  const cls={init:'s-slide',slide:'s-slide',match:'s-match',done:'s-done'};
+  box.className='step-box '+(cls[st.type]||'s-slide');
+  document.getElementById('stepDesc').innerHTML=st.desc;
+  highlightCode(st.type==='match'?'match':st.type==='done'?'done':'slide');
+
+  // done
+  if(st.type==='done'){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.classList.add('show');
+    document.getElementById('bestVal').textContent=
+      st.found.length>0?`[${st.found.join(', ')}]`:'none';
+    document.getElementById('bestMeta').textContent=
+      `${st.found.length} anagram(s) of "${pArr.join('')}" found`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){
+  if(!playing)return;
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  renderStep(currentStep+1);
+  timer=setTimeout(tick,speed);
+}
+function stopPlay(){
+  playing=false;clearTimeout(timer);
+  document.getElementById('btnPause').textContent='▶ Resume';
+  document.getElementById('btnRun').disabled=false;
+}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');speed=parseInt(b.dataset.ms);
+  });
+});
+
+buildUI();
+</script>
+</body>
+</html>

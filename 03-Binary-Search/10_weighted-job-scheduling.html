@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search — Weighted Job Scheduling · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(6,214,160,0.2);border:1px solid var(--accent3);color:var(--accent3);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:18px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;width:260px;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent3);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#006d4e;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════
+     UNIQUE VISUAL 1: GANTT TIMELINE
+     Jobs as horizontal bars on a time axis.
+     Heights proportional to profit.
+  ══════════════════════════════════ */
+  .gantt-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 14px 10px;margin-bottom:14px;overflow-x:auto;}
+  .gantt-inner{position:relative;min-height:160px;}
+  /* time axis */
+  .gantt-axis{height:20px;position:relative;margin-bottom:4px;}
+  .gantt-tick{position:absolute;bottom:0;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);}
+  .gantt-tick-line{position:absolute;top:0;bottom:0;width:1px;background:var(--border);transform:translateX(-50%);}
+  /* job bars */
+  .gantt-rows{position:relative;}
+  .gantt-job{
+    position:absolute;border-radius:5px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;
+    border:2px solid;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    cursor:default;white-space:nowrap;overflow:hidden;
+  }
+  .gantt-job .gj-label{padding:0 6px;line-height:1.2;text-align:center;}
+  .gantt-job .gj-profit{font-size:0.52rem;opacity:0.8;}
+  /* job states */
+  .gj-idle    {background:rgba(180,170,155,0.15);border-color:var(--border);color:var(--muted);}
+  .gj-current {background:rgba(255,209,102,0.25);border-color:#ffd166;color:#7a5a00;transform:translateY(-3px);box-shadow:0 5px 16px rgba(255,209,102,0.3);}
+  .gj-selected{background:rgba(6,214,160,0.18);  border-color:#06d6a0;color:#014d3a;}
+  .gj-compat  {background:rgba(33,150,243,0.12);  border-color:#2196f3;color:var(--accent2);}
+  .gj-skip    {background:rgba(230,57,70,0.08);   border-color:#e63946;color:var(--accent);opacity:0.6;}
+  .gj-optimal {background:rgba(6,214,160,0.22);   border-color:#06d6a0;color:#014d3a;box-shadow:0 0 10px rgba(6,214,160,0.3);}
+  /* job index label above bar */
+  .gj-idx{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.5rem;color:var(--muted);}
+
+  /* ══════════════════════════════════
+     UNIQUE VISUAL 2: BINARY SEARCH for p(i)
+     Shows end-times array with lo/hi/mid
+  ══════════════════════════════════ */
+  .bs-section{margin-bottom:14px;}
+  .bs-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .bs-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .bs-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .bs-result{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;}
+  .bs-result.found{color:var(--accent3);}
+  .bs-result.none{color:var(--muted);}
+  /* end-times row + pointer row — SIBLING pattern */
+  .bs-container{position:relative;padding-bottom:26px;overflow-x:auto;}
+  .bs-blocks{display:flex;gap:5px;flex-wrap:nowrap;}
+  .bs-block{
+    position:relative;width:46px;height:40px;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;
+    border-radius:6px;border:2px solid var(--border);background:var(--surface);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .bs-block .bsb-idx{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.5rem;color:var(--muted);}
+  .bs-block.bsb-active{background:rgba(33,150,243,0.09);border-color:#2196f3;color:var(--accent2);}
+  .bs-block.bsb-mid   {background:rgba(255,209,102,0.22);border-color:#ffd166;color:#7a5a00;transform:translateY(-3px);}
+  .bs-block.bsb-dead  {background:rgba(0,0,0,0.03);border-color:var(--border);color:#ccc;}
+  .bs-block.bsb-found {background:rgba(6,214,160,0.18);border-color:#06d6a0;color:#014d3a;transform:translateY(-4px);}
+  /* pointer labels — SIBLING of bs-blocks */
+  .bs-ptrs{position:absolute;bottom:0;left:0;right:0;height:22px;pointer-events:none;}
+  .bs-ptr{position:absolute;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;padding:2px 6px;border-radius:3px;transform:translateX(-50%);transition:left 0.32s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+  .bp-lo {background:var(--accent); color:white;top:2px;}
+  .bp-mid{background:var(--accent4);color:#333; top:2px;}
+  .bp-hi {background:var(--accent2);color:white;top:2px;}
+
+  /* ══════════════════════════════════
+     UNIQUE VISUAL 3: DP TABLE
+     dp[0..n] cells with live updates
+  ══════════════════════════════════ */
+  .dp-section{margin-bottom:14px;}
+  .dp-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;}
+  .dp-cells{display:flex;gap:5px;flex-wrap:nowrap;margin-bottom:10px;}
+  .dp-cell{
+    width:46px;height:46px;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;border-radius:6px;border:2px solid var(--border);
+    background:var(--surface);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position:relative;
+  }
+  .dp-cell .dc-idx{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.46rem;color:var(--muted);}
+  .dp-cell .dc-val{font-size:0.82rem;font-weight:700;color:var(--muted);margin-top:6px;}
+  .dp-cell.dc-filled{background:rgba(33,150,243,0.08);border-color:#2196f3;}
+  .dp-cell.dc-filled .dc-val{color:var(--accent2);}
+  .dp-cell.dc-current{background:rgba(255,209,102,0.22);border-color:#ffd166;transform:translateY(-4px);box-shadow:0 5px 14px rgba(255,209,102,0.3);}
+  .dp-cell.dc-current .dc-val{color:#7a5a00;}
+  .dp-cell.dc-used{background:rgba(6,214,160,0.12);border-color:#06d6a0;}
+  .dp-cell.dc-used .dc-val{color:#028a5b;}
+  .dp-cell.dc-final{background:rgba(6,214,160,0.22);border-color:#06d6a0;transform:translateY(-4px);box-shadow:0 5px 14px rgba(6,214,160,0.3);}
+  .dp-cell.dc-final .dc-val{color:#014d3a;font-size:1rem;}
+  /* DP decision card — shows the two options */
+  .dp-decision{display:flex;gap:8px;align-items:stretch;}
+  .dp-opt{flex:1;border:1.5px solid var(--border);border-radius:7px;padding:8px 10px;background:var(--surface);transition:all 0.3s;font-family:'Space Mono',monospace;}
+  .dp-opt .dpo-label{font-size:0.56rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .dp-opt .dpo-val{font-size:0.88rem;font-weight:700;color:var(--muted);}
+  .dp-opt .dpo-expr{font-size:0.65rem;color:var(--muted);margin-top:2px;}
+  .dp-opt.opt-winner{border-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .dp-opt.opt-winner .dpo-val{color:#028a5b;}
+  .dp-opt.opt-loser {border-color:var(--border);opacity:0.6;}
+  .dp-opt.opt-equal {border-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .dp-opt.opt-equal .dpo-val{color:#7a5a00;}
+  .dp-vs{display:flex;align-items:center;font-family:'Space Mono',monospace;font-size:0.75rem;color:var(--muted);}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent3);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent3);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init{border-color:var(--accent3);}
+  .explain-panel.ep-sort{border-color:var(--accent2);}
+  .explain-panel.ep-bs  {border-color:var(--accent4);}
+  .explain-panel.ep-dp  {border-color:var(--accent3);}
+  .explain-panel.ep-done{border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent3);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-sort{border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-bs  {border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-dp  {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init{background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-sort{background:rgba(33,150,243,0.14);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-bs  {background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-dp  {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.blue{color:#4fc3f7;}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* DP TABLE (right panel mini) */
+  .mini-dp-wrap{margin-bottom:12px;overflow-x:auto;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .mini-dp{display:flex;gap:3px;}
+  .mini-dp-cell{min-width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all 0.22s;padding:0 3px;}
+  .mini-dp-cell.mdc-filled {background:rgba(33,150,243,0.2);border-color:#2196f3;color:#4fc3f7;}
+  .mini-dp-cell.mdc-current{background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .mini-dp-cell.mdc-final  {background:rgba(6,214,160,0.3); border-color:#06d6a0;color:#06d6a0;}
+
+  /* JOBS MINI LIST */
+  .jobs-mini-wrap{margin-bottom:12px;}
+  .jobs-mini{display:flex;flex-direction:column;gap:4px;}
+  .job-mini-row{display:flex;align-items:center;gap:7px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:4px;padding:5px 8px;transition:all 0.25s;}
+  .job-mini-row.jmr-current {border-color:#ffd166;background:rgba(255,209,102,0.08);}
+  .job-mini-row.jmr-selected{border-color:#06d6a0;background:rgba(6,214,160,0.07);}
+  .job-mini-row.jmr-optimal {border-color:#06d6a0;background:rgba(6,214,160,0.1);}
+  .jmr-idx{font-family:'Space Mono',monospace;font-size:0.6rem;color:#4a5568;width:20px;flex-shrink:0;}
+  .jmr-bar{flex:1;height:6px;border-radius:3px;background:#2a2a3e;overflow:hidden;}
+  .jmr-fill{height:100%;border-radius:3px;background:var(--accent2);transition:width 0.3s;}
+  .jmr-val{font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;color:#e2e8f0;min-width:26px;text-align:right;}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);letter-spacing:3px;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Weighted Job Scheduling</h1>
+    <div class="sub">Binary Search + DP · Last Non-Overlapping · Live Visualizer</div>
+  </div>
+  <div class="family-badge">03·06 · Interval</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Jobs  [start,end,profit] per line  (comma-separated rows)</label>
+      <input type="text" id="inputJobs" value="1,2,50;3,5,20;6,19,100;2,100,200">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.25);border-color:#ffd166"></div>Current Job</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.12);border-color:#2196f3"></div>Compatible (p(i))</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.18);border-color:#06d6a0"></div>Selected / Optimal</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.08);border-color:#e63946"></div>Skipped</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: GANTT TIMELINE -->
+  <div class="section-label">Job Timeline (sorted by end time)</div>
+  <div class="gantt-wrap">
+    <div class="gantt-inner" id="ganttInner">
+      <div class="gantt-axis" id="ganttAxis"></div>
+      <div class="gantt-rows" id="ganttRows"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: BINARY SEARCH for p(i) -->
+  <div class="bs-section">
+    <div class="section-label">Binary Search — last non-overlapping job p(i)</div>
+    <div class="bs-wrap">
+      <div class="bs-header">
+        <div class="bs-title">end-times array  (find largest end ≤ start[i])</div>
+        <div class="bs-result" id="bsResult">p(i) = —</div>
+      </div>
+      <div class="bs-container">
+        <div class="bs-blocks" id="bsBlocks"></div>
+        <div class="bs-ptrs"   id="bsPtrs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: DP TABLE -->
+  <div class="dp-section">
+    <div class="section-label">DP Table  dp[i] = max profit using jobs 1..i</div>
+    <div class="dp-wrap">
+      <div class="dp-cells"   id="dpCells"></div>
+      <div class="dp-decision" id="dpDecision">
+        <div class="dp-opt" id="dpOpt1">
+          <div class="dpo-label">Option A — skip job i</div>
+          <div class="dpo-val"  id="dpAVal">—</div>
+          <div class="dpo-expr" id="dpAExpr">dp[i-1]</div>
+        </div>
+        <div class="dp-vs">vs</div>
+        <div class="dp-opt" id="dpOpt2">
+          <div class="dpo-label">Option B — take job i</div>
+          <div class="dpo-val"  id="dpBVal">—</div>
+          <div class="dpo-expr" id="dpBExpr">profit[i] + dp[p(i)]</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given <strong id="probN">n</strong> jobs, each with a <strong>start time</strong>, <strong>end time</strong>, and <strong>profit</strong>,
+      find the <span class="prob-hi">maximum total profit</span> from a set of
+      <strong>non-overlapping jobs</strong> (jobs cannot share time — if one ends at time t, the next must start at t or later).
+      <br><br>
+      <strong>Approach:</strong> Sort by end time → binary search for last compatible job → DP.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sort">sort(jobs, <span class="cc">// by end time</span></span>
+<span class="code-line" id="cl-sort2">     [](a,b){<span class="ck">return</span> a[1]&lt;b[1];});</span>
+<span class="code-line" id="cl-dp0">dp[0]=0; <span class="cc">// base: no jobs</span></span>
+<span class="code-line" id="cl-for"><span class="ck">for</span>(<span class="ck">int</span> i=1; i&lt;=n; i++) {</span>
+<span class="code-line" id="cl-bs">  <span class="ck">int</span> p=<span class="cf">lastCompat</span>(ends,</span>
+<span class="code-line" id="cl-bs2">            jobs[i].start); <span class="cc">// binary search</span></span>
+<span class="code-line" id="cl-take">  <span class="ck">int</span> take=jobs[i].profit+dp[p];</span>
+<span class="code-line" id="cl-skip">  <span class="ck">int</span> skip=dp[i-1];</span>
+<span class="code-line" id="cl-max">  dp[i]=max(take, skip);</span>
+<span class="code-line" id="cl-for2">}</span>
+<span class="code-line" id="cl-ret"><span class="ck">return</span> dp[n];</span>
+<span class="code-line" id="cl-sep">── lastCompat(ends, s) ──</span>
+<span class="code-line" id="cl-fn1"><span class="ck">int</span> lo=1, hi=n, p=0;</span>
+<span class="code-line" id="cl-fn2"><span class="ck">while</span>(lo&lt;=hi) {</span>
+<span class="code-line" id="cl-fn3">  <span class="ck">int</span> m=lo+(hi-lo)/2;</span>
+<span class="code-line" id="cl-fn4">  <span class="ck">if</span>(ends[m]&lt;=s){p=m;lo=m+1;}</span>
+<span class="code-line" id="cl-fn5">  <span class="ck">else</span> hi=m-1;</span>
+<span class="code-line" id="cl-fn6">} <span class="ck">return</span> p;</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">   <div class="var-name">i (job)</div>      <div class="var-value yel"  id="vI">—</div></div>
+      <div class="var-card" id="vcP">   <div class="var-name">p(i) (compat)</div><div class="var-value blue" id="vP">—</div></div>
+      <div class="var-card" id="vcTake"><div class="var-name">take</div>          <div class="var-value grn"  id="vTake">—</div></div>
+      <div class="var-card" id="vcSkip"><div class="var-name">skip</div>          <div class="var-value"      id="vSkip" style="color:#e2e8f0;">—</div></div>
+      <div class="var-card" id="vcBsLo"><div class="var-name">bs.lo</div>         <div class="var-value red"  id="vBsLo">—</div></div>
+      <div class="var-card" id="vcBsHi"><div class="var-name">bs.hi</div>         <div class="var-value blue" id="vBsHi">—</div></div>
+      <div class="var-card" id="vcBsMid"><div class="var-name">bs.mid</div>       <div class="var-value yel"  id="vBsMid">—</div></div>
+      <div class="var-card" id="vcDpI"> <div class="var-name">dp[i]</div>         <div class="var-value grn"  id="vDpI">—</div></div>
+    </div>
+
+    <!-- MINI DP TABLE -->
+    <div class="mini-dp-wrap">
+      <div class="arr-state-title">dp[ ] array</div>
+      <div class="mini-dp" id="miniDp"></div>
+    </div>
+
+    <!-- MINI JOBS LIST -->
+    <div class="jobs-mini-wrap">
+      <div class="arr-state-title">Jobs (sorted by end)</div>
+      <div class="jobs-mini" id="jobsMini"></div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Max Profit</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(n,jobs)=>({
+    why:`<div class="ep-why-block why-init">We combine two ideas: (1) sort jobs by end time so earlier-ending jobs come first; (2) use DP where dp[i] = best profit from jobs 1..i. For each job i we use binary search to find p(i) — the last job that ends before job i starts. Then dp[i] = max(skip job i: dp[i-1], take job i: profit[i] + dp[p(i)]).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> ${n} jobs sorted by end time. dp[0]=0 (base case: no jobs selected). dp[i] will store max profit considering jobs 1..i.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The DP invariant:</strong> dp[i] = maximum profit achievable using any non-overlapping subset of jobs 1..i. This is always the correct optimal for the first i jobs.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why binary search?</strong> Since jobs are sorted by end time, the end-times array is sorted. We can binary search for the largest end time ≤ start[i] in O(log n) instead of O(n) linear scan.`},
+    ]
+  }),
+  sort:(jobs)=>({
+    why:`<div class="ep-why-block why-sort">Sorting by end time is the key preprocessing step. It gives us: (1) the end-times array is sorted → binary search works; (2) dp[i] depends only on dp[j] for j < i → no circular dependencies.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>After sort:</strong> jobs[1..n] ordered by end time. ends[i] = jobs[i].end. The end-times array is non-decreasing.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why not sort by start?</strong> Sorting by start doesn't guarantee the dp subproblems are independent. Sorting by end time ensures every compatible job j < i ends before i starts.`},
+    ]
+  }),
+  bs_step:(i,lo,hi,mid,ends,start,p)=>({
+    why:`<div class="ep-why-block why-bs">Finding p(${i}): largest j such that ends[j] ≤ start=${start}. Binary search on ends[lo..hi]. ends[${mid}]=${ends[mid]}${ends[mid]<=start?` ≤ ${start} → p≥${mid}, go right (lo=${mid+1})`:`> ${start} → too big, go left (hi=${mid-1})`}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>p invariant:</strong> At all times, p holds the best compatible job found so far (ends[p] ≤ start). Binary search narrows [lo..hi] to find the maximum such p.`},
+      {icon:ends[mid]<=start?'✅':'❌',cls:ends[mid]<=start?'':'inv-key',
+        text:ends[mid]<=start
+          ?`<strong>ends[${mid}]=${ends[mid]} ≤ start=${start}:</strong> Job ${mid} is compatible. Update p=${mid}, search right for even better.`
+          :`<strong>ends[${mid}]=${ends[mid]} > start=${start}:</strong> Job ${mid} overlaps. Search left.`},
+    ]
+  }),
+  dp_step:(i,job,p,take,skip,chosen,dp)=>({
+    why:`<div class="ep-why-block why-dp">dp[${i}]: job ${i} = [${job[0]},${job[1]}] profit=${job[2]}. p(${i})=${p} (last compatible). Option A skip: dp[${i-1}]=${skip}. Option B take: ${job[2]}+dp[${p}]=${take}. dp[${i}] = max(${skip},${take}) = <strong>${Math.max(skip,take)}</strong>.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[${i}] = ${Math.max(skip,take)}.</strong> ${chosen==='take'?`Taking job ${i} is better — profit ${job[2]} + dp[${p}]=${take} > skip=${skip}.`:`Skipping job ${i} is better — dp[${i-1}]=${skip} ≥ take=${take}.`}`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Optimal substructure:</strong> dp[${i}] correctly incorporates all jobs 1..${i}. Future jobs ${i+1}..n will build on this.`},
+    ]
+  }),
+  done:(ans,n)=>({
+    why:`<div class="ep-why-block why-done">dp[${n}] is the answer — it incorporates the optimal decision for every job. O(n log n) total: O(n log n) sort + n iterations each with O(log n) binary search + O(1) DP update.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> By induction — dp[0]=0 ✓. If dp[0..i-1] are correct, dp[i] = max(skip=dp[i-1], take=profit[i]+dp[p(i)]) is optimal for jobs 1..i.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n log n)</strong> — sorting + n binary searches. O(n) space for dp array. Compare: brute force O(2ⁿ), DP without binary search O(n²).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The hybrid pattern:</strong> Binary search makes the DP transition O(log n) instead of O(n). Any time a DP transition needs "find the latest/earliest X satisfying condition" in a sorted array, binary search gives the speedup.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',sort:'ep-sort',bs_step:'ep-bs',dp_step:'ep-dp',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:   {ids:['cl-dp0','cl-for'],            cls:'hl-init'},
+  sort:   {ids:['cl-sort','cl-sort2'],          cls:'hl-sort'},
+  bs_step:{ids:['cl-fn1','cl-fn2','cl-fn3','cl-fn4','cl-fn5','cl-fn6'], cls:'hl-bs'},
+  dp_step:{ids:['cl-bs','cl-bs2','cl-take','cl-skip','cl-max'],         cls:'hl-dp'},
+  done:   {ids:['cl-ret'],                      cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(rawJobs){
+  const steps=[];
+  const n=rawJobs.length;
+
+  // Sort by end time (1-indexed for dp clarity)
+  const jobs=[null,...rawJobs.slice().sort((a,b)=>a[1]-b[1])]; // jobs[1..n]
+  const ends=jobs.map(j=>j?j[1]:0);  // ends[1..n], ends[0]=0
+  const dp=new Array(n+1).fill(0);
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    jobs:[...jobs],ends:[...ends],dp:[...dp],n,desc,type,explain,
+    curI:null,bsLo:null,bsHi:null,bsMid:null,curP:null,
+    take:null,skip:null,result:null,...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} jobs. Sort by end time → binary search will work on end-times array. `
+    +`dp[0]=0 (base). For each job i: find p(i) via binary search, then dp[i]=max(skip, take).`,
+    'init', EXPLAIN.init(n,jobs)
+  );
+
+  // Sort step
+  snap(
+    `🔀 <strong>Sort</strong> ${n} jobs by end time. `
+    +`Sorted: ${jobs.slice(1).map((j,i)=>`J${i+1}[${j[0]},${j[1]},$${j[2]}]`).join(' → ')}`,
+    'sort', EXPLAIN.sort(jobs.slice(1))
+  );
+
+  for(let i=1;i<=n;i++){
+    const job=jobs[i];
+    const start=job[0];
+
+    // Binary search for p(i)
+    let lo=1,hi=i-1,p=0;
+    snap(
+      `🔢 <strong>Job ${i}</strong>: [${job[0]},${job[1]}] profit=${job[2]}. `
+      +`Binary search for last job with end ≤ start=${start}…`,
+      'dp_step',
+      EXPLAIN.dp_step(i,job,0,job[2]+0,dp[i-1],'?',dp),
+      {curI:i,bsLo:lo,bsHi:Math.max(hi,0),bsMid:null,curP:p,
+       take:job[2]+dp[0],skip:dp[i-1]}
+    );
+
+    while(lo<=hi){
+      const mid=lo+Math.floor((hi-lo)/2);
+      snap(
+        `🔍 BS for p(${i}): lo=${lo}, hi=${hi}, mid=${mid}. `
+        +`ends[${mid}]=${ends[mid]} vs start=${start}: `
+        +(ends[mid]<=start
+          ? `<span style="color:#028a5b;font-weight:700">${ends[mid]} ≤ ${start}</span> → p=${mid}, lo=${mid+1}`
+          : `<span style="color:var(--accent);font-weight:700">${ends[mid]} > ${start}</span> → hi=${mid-1}`),
+        'bs_step', EXPLAIN.bs_step(i,lo,hi,mid,ends,start,p),
+        {curI:i,bsLo:lo,bsHi:hi,bsMid:mid,curP:p,take:job[2]+dp[p],skip:dp[i-1]}
+      );
+      if(ends[mid]<=start){p=mid;lo=mid+1;}
+      else hi=mid-1;
+    }
+
+    const take=job[2]+dp[p];
+    const skip=dp[i-1];
+    dp[i]=Math.max(take,skip);
+    const chosen=take>=skip?'take':'skip';
+
+    snap(
+      `✅ <strong>dp[${i}]</strong>: p(${i})=${p}. `
+      +`Take = ${job[2]}+dp[${p}] = ${job[2]}+${dp[p]} = <span style="color:#028a5b;font-weight:700">${take}</span>. `
+      +`Skip = dp[${i-1}] = <span style="color:var(--accent2);font-weight:700">${skip}</span>. `
+      +`dp[${i}] = <span style="color:#028a5b;font-weight:700">${dp[i]}</span> (${chosen}).`,
+      'dp_step', EXPLAIN.dp_step(i,job,p,take,skip,chosen,dp),
+      {curI:i,bsLo:null,bsHi:null,bsMid:null,curP:p,take,skip}
+    );
+  }
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> dp[${n}] = <span style="color:#028a5b;font-weight:700">${dp[n]}</span>. `
+    +`Maximum profit from non-overlapping jobs = <strong>${dp[n]}</strong>.`,
+    'done', EXPLAIN.done(dp[n],n),
+    {curI:n,result:{ans:dp[n]}}
+  );
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let sortedJobs=[], nJobs=0;
+
+// ─────────────────────────────────────────────
+// PARSE
+// ─────────────────────────────────────────────
+function parseJobs(){
+  const raw=document.getElementById('inputJobs').value.trim();
+  const jobs=raw.split(';').map(r=>{
+    const p=r.split(',').map(x=>parseInt(x.trim()));
+    return p.length===3&&p.every(x=>!isNaN(x))?p:null;
+  }).filter(Boolean);
+  return jobs.length?jobs:null;
+}
+
+// ─────────────────────────────────────────────
+// BUILD GANTT
+// ─────────────────────────────────────────────
+function buildGantt(jobs){
+  const n=jobs.length;
+  const allTimes=[...jobs.flatMap(j=>[j[0],j[1]])];
+  const tMin=Math.min(...allTimes), tMax=Math.max(...allTimes);
+  const tRange=tMax-tMin||1;
+  const maxP=Math.max(...jobs.map(j=>j[2]));
+  const W=100; // percent
+
+  // Axis ticks
+  const axis=document.getElementById('ganttAxis');
+  axis.innerHTML='';
+  const ticks=new Set([tMin,tMax,...jobs.flatMap(j=>[j[0],j[1]])]);
+  [...ticks].sort((a,b)=>a-b).forEach(t=>{
+    const pct=((t-tMin)/tRange)*100;
+    const tick=document.createElement('div');
+    tick.className='gantt-tick';
+    tick.style.left=pct+'%';
+    tick.textContent=t;
+    axis.appendChild(tick);
+    const line=document.createElement('div');
+    line.className='gantt-tick-line';
+    line.style.left=pct+'%';
+    axis.appendChild(line);
+  });
+
+  // Job rows
+  const rows=document.getElementById('ganttRows');
+  rows.innerHTML='';
+  const rowH=34, rowGap=6;
+  rows.style.height=(n*(rowH+rowGap))+'px';
+  jobs.forEach((job,idx)=>{
+    const bar=document.createElement('div');
+    bar.className='gantt-job gj-idle';
+    bar.id=`gj-${idx+1}`;
+    const left=((job[0]-tMin)/tRange)*100;
+    const width=Math.max(((job[1]-job[0])/tRange)*100,2);
+    const top=idx*(rowH+rowGap);
+    bar.style.cssText=`left:${left}%;width:${width}%;top:${top}px;height:${rowH}px;`;
+    bar.innerHTML=`<div class="gj-label">J${idx+1}<br><span class="gj-profit">$${job[2]}</span></div>`;
+    // index label above
+    const idx_lbl=document.createElement('div');
+    idx_lbl.className='gj-idx';
+    idx_lbl.textContent=`J${idx+1}`;
+    bar.appendChild(idx_lbl);
+    rows.appendChild(bar);
+    // store tMin/tRange for later use
+    bar.dataset.tmin=tMin; bar.dataset.trange=tRange;
+  });
+
+  // Store for renderStep use
+  document.getElementById('ganttRows').dataset.tmin=tMin;
+  document.getElementById('ganttRows').dataset.trange=tRange;
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const rawJobs=parseJobs();
+  if(!rawJobs)return;
+  nJobs=rawJobs.length;
+
+  // Sort for display (same as algorithm)
+  sortedJobs=[null,...rawJobs.slice().sort((a,b)=>a[1]-b[1])];
+
+  steps=computeSteps(rawJobs);
+  currentStep=0;
+
+  // Gantt (sorted order)
+  buildGantt(sortedJobs.slice(1));
+
+  // Binary search blocks (end-times, 1-indexed)
+  const bsB=document.getElementById('bsBlocks');
+  bsB.innerHTML='';
+  sortedJobs.slice(1).forEach((job,i)=>{
+    const d=document.createElement('div');
+    d.className='bs-block'; d.id=`bsb-${i+1}`;
+    d.innerHTML=`${job[1]}<span class="bsb-idx">${i+1}</span>`;
+    bsB.appendChild(d);
+  });
+  document.getElementById('bsPtrs').innerHTML='';
+
+  // DP cells
+  const dpC=document.getElementById('dpCells');
+  dpC.innerHTML='';
+  for(let i=0;i<=nJobs;i++){
+    const d=document.createElement('div');
+    d.className='dp-cell'; d.id=`dpc-${i}`;
+    d.innerHTML=`<span class="dc-idx">dp[${i}]</span><span class="dc-val" id="dpv-${i}">0</span>`;
+    dpC.appendChild(d);
+  }
+
+  // Mini DP
+  const mDp=document.getElementById('miniDp');
+  mDp.innerHTML='';
+  for(let i=0;i<=nJobs;i++){
+    const d=document.createElement('div');
+    d.className='mini-dp-cell'; d.id=`mdpc-${i}`;
+    d.textContent='0';
+    mDp.appendChild(d);
+  }
+
+  // Mini jobs list
+  const jm=document.getElementById('jobsMini');
+  jm.innerHTML='';
+  const maxP=Math.max(...sortedJobs.slice(1).map(j=>j[2]));
+  sortedJobs.slice(1).forEach((job,i)=>{
+    const d=document.createElement('div');
+    d.className='job-mini-row'; d.id=`jmr-${i+1}`;
+    d.innerHTML=`<div class="jmr-idx">J${i+1}</div>`
+      +`<div class="jmr-bar"><div class="jmr-fill" id="jmf-${i+1}" style="width:${(job[2]/maxP)*100}%"></div></div>`
+      +`<div class="jmr-val">[${job[0]}-${job[1]}] $${job[2]}</div>`;
+    jm.appendChild(d);
+  });
+
+  // Problem example
+  const ans=steps[steps.length-1].result.ans;
+  document.getElementById('probN').textContent=nJobs;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">With these ${nJobs} jobs:</span>`
+    +sortedJobs.slice(1).map((j,i)=>`J${i+1}[${j[0]},${j[1]},$${j[2]}]`).join('  ')
+    +`<br>→ Maximum non-overlapping profit = <strong>${ans}</strong>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+const BW_BS=51; // block width 46 + gap 5
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Gantt bars
+  for(let i=1;i<=nJobs;i++){
+    const bar=document.getElementById(`gj-${i}`);
+    if(!bar)continue;
+    bar.className='gantt-job';
+    if(isFinal){
+      // Highlight optimal set (traceback dp to find selected jobs)
+      bar.classList.add('gj-optimal');
+    } else if(st.curI===i){
+      bar.classList.add('gj-current');
+    } else if(st.curI!==null&&st.curP===i){
+      bar.classList.add('gj-compat');
+    } else if(st.dp&&st.dp[i]>0&&i<(st.curI||999)){
+      bar.classList.add('gj-selected');
+    } else {
+      bar.classList.add('gj-idle');
+    }
+  }
+
+  // BS blocks + pointers (SIBLING pattern)
+  for(let i=1;i<=nJobs;i++){
+    const b=document.getElementById(`bsb-${i}`);
+    if(!b)continue;
+    b.className='bs-block';
+    if(st.type==='bs_step'&&st.bsLo!==null){
+      if(i<st.bsLo||i>st.bsHi)b.classList.add('bsb-dead');
+      else if(i===st.bsMid)b.classList.add('bsb-mid');
+      else b.classList.add('bsb-active');
+    } else if(st.curP!==null&&i===st.curP&&st.type==='dp_step'){
+      b.classList.add('bsb-found');
+    }
+  }
+  // Pointer labels
+  const ptrs=document.getElementById('bsPtrs');
+  ptrs.innerHTML='';
+  if(st.type==='bs_step'&&st.bsLo!==null&&st.bsHi>=st.bsLo){
+    const lx=(st.bsLo-1)*BW_BS+23, hx=(st.bsHi-1)*BW_BS+23;
+    ptrs.innerHTML=`<span class="bs-ptr bp-lo" style="left:${lx}px">lo=${st.bsLo}</span>`
+      +(st.bsMid!==null?`<span class="bs-ptr bp-mid" style="left:${(st.bsMid-1)*BW_BS+23}px">mid=${st.bsMid}</span>`:'')
+      +`<span class="bs-ptr bp-hi" style="left:${hx}px">hi=${st.bsHi}</span>`;
+  } else if(st.curP!==null&&st.curP>0&&st.type==='dp_step'){
+    const px=(st.curP-1)*BW_BS+23;
+    ptrs.innerHTML=`<span class="bs-ptr bp-hi" style="left:${px}px">p=${st.curP}</span>`;
+  }
+  document.getElementById('bsResult').className='bs-result '+(st.curP!==null&&st.type!=='init'?'found':'none');
+  document.getElementById('bsResult').textContent=`p(i) = ${st.curP!==null?st.curP:'—'}`;
+
+  // DP cells
+  for(let i=0;i<=nJobs;i++){
+    const cell=document.getElementById(`dpc-${i}`);
+    const val=document.getElementById(`dpv-${i}`);
+    const mini=document.getElementById(`mdpc-${i}`);
+    if(!cell||!val||!mini)continue;
+    cell.className='dp-cell';
+    mini.className='mini-dp-cell';
+    const v=st.dp[i];
+    val.textContent=v;
+    mini.textContent=v;
+    if(isFinal&&i===nJobs){cell.classList.add('dc-final');mini.classList.add('mdc-final');}
+    else if(st.curI===i&&st.type==='dp_step'){cell.classList.add('dc-current');mini.classList.add('mdc-current');}
+    else if(v>0||i===0){cell.classList.add('dc-filled');mini.classList.add('mdc-filled');}
+  }
+
+  // DP decision card
+  const opt1=document.getElementById('dpOpt1'), opt2=document.getElementById('dpOpt2');
+  opt1.className='dp-opt'; opt2.className='dp-opt';
+  if(st.take!==null&&st.skip!==null&&st.curI!==null){
+    document.getElementById('dpAVal').textContent=st.skip;
+    document.getElementById('dpAExpr').textContent=`dp[${st.curI-1}]`;
+    document.getElementById('dpBVal').textContent=st.take;
+    document.getElementById('dpBExpr').textContent=`profit+dp[${st.curP||0}]`;
+    if(st.take>st.skip){opt1.classList.add('opt-loser');opt2.classList.add('opt-winner');}
+    else if(st.skip>st.take){opt1.classList.add('opt-winner');opt2.classList.add('opt-loser');}
+    else{opt1.classList.add('opt-equal');opt2.classList.add('opt-equal');}
+  } else {
+    document.getElementById('dpAVal').textContent='—';
+    document.getElementById('dpBVal').textContent='—';
+    document.getElementById('dpAExpr').textContent='dp[i-1]';
+    document.getElementById('dpBExpr').textContent='profit[i]+dp[p(i)]';
+  }
+
+  // Mini jobs
+  for(let i=1;i<=nJobs;i++){
+    const row=document.getElementById(`jmr-${i}`);
+    if(!row)continue;
+    row.className='job-mini-row';
+    if(isFinal)row.classList.add('jmr-optimal');
+    else if(st.curI===i)row.classList.add('jmr-current');
+    else if(st.dp&&st.dp[i]>0)row.classList.add('jmr-selected');
+  }
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Variables
+  setVar('vI',    'vcI',    st.curI!==null?st.curI:'—');
+  setVar('vP',    'vcP',    st.curP!==null?st.curP:'—');
+  setVar('vTake', 'vcTake', st.take!==null?st.take:'—');
+  setVar('vSkip', 'vcSkip', st.skip!==null?st.skip:'—');
+  setVar('vBsLo', 'vcBsLo', st.bsLo!==null?st.bsLo:'—');
+  setVar('vBsHi', 'vcBsHi', st.bsHi!==null?st.bsHi:'—');
+  setVar('vBsMid','vcBsMid',st.bsMid!==null?st.bsMid:'—');
+  setVar('vDpI',  'vcDpI',  st.curI!==null?st.dp[st.curI]:'—');
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').className='done-banner show';
+    document.getElementById('doneBanner').textContent=`✓ MAX PROFIT = ${st.result.ans}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ ANS = ${st.result.ans} — O(N LOG N)`;
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.ans);
+    document.getElementById('bestMeta').textContent=`${nJobs} jobs · ${steps.length} steps · O(n log n)`;
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dutch National Flag — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --ink: #1a1a2e;
+    --surface: #fffdf7;
+    --border: #d4ccb8;
+    --accent:  #e63946;
+    --accent2: #2196f3;
+    --accent3: #06d6a0;
+    --accent4: #ffd166;
+    --muted:   #8a8070;
+    /* zone colours */
+    --red-bg:    rgba(230,57,70,0.13);
+    --red-border:#e63946;
+    --white-bg:  rgba(200,200,200,0.15);
+    --white-border:#aaa;
+    --blue-bg:   rgba(33,150,243,0.13);
+    --blue-border:#2196f3;
+    --unknown-bg:#fffdf7;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:var(--bg); color:var(--ink);
+    font-family:'DM Sans',sans-serif;
+    min-height:100vh; overflow-x:hidden;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none; z-index:9999; opacity:0.5;
+  }
+
+  /* HEADER */
+  .header {
+    background:var(--ink); color:var(--bg);
+    padding:24px 40px; display:flex; align-items:baseline; gap:20px;
+    border-bottom:3px solid var(--accent);
+  }
+  .header h1 { font-family:'Space Mono',monospace; font-size:clamp(1rem,3vw,1.4rem); font-weight:700; letter-spacing:-1px; }
+  .header .sub { font-size:0.78rem; color:#8a8a9a; letter-spacing:2px; text-transform:uppercase; }
+  .family-badge { margin-left:auto; background:var(--accent); color:white; font-family:'Space Mono',monospace; font-size:0.65rem; padding:4px 10px; border-radius:2px; letter-spacing:1px; }
+
+  /* LAYOUT */
+  .main { display:grid; grid-template-columns:1fr 360px; height:calc(100vh - 78px); overflow:hidden; }
+  .viz-panel { padding:32px 40px; border-right:1px solid var(--border); overflow-y:auto; }
+
+  /* CONTROLS */
+  .controls { display:flex; gap:12px; margin-bottom:28px; align-items:flex-end; flex-wrap:wrap; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-family:'Space Mono',monospace; font-size:0.63rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  .field input { background:var(--surface); border:1.5px solid var(--border); border-radius:4px; padding:7px 12px; font-family:'Space Mono',monospace; font-size:0.95rem; color:var(--ink); outline:none; width:260px; transition:border-color 0.2s; }
+  .field input:focus { border-color:var(--accent2); }
+  .btn { padding:8px 18px; border:none; border-radius:4px; font-family:'Space Mono',monospace; font-size:0.72rem; font-weight:700; letter-spacing:1px; cursor:pointer; transition:all 0.15s; }
+  .btn-primary { background:var(--ink); color:var(--bg); }
+  .btn-primary:hover { background:var(--accent); }
+  .btn-secondary { background:transparent; color:var(--ink); border:1.5px solid var(--border); }
+  .btn-secondary:hover { border-color:var(--ink); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .speed-wrap { display:flex; flex-direction:column; gap:6px; }
+  .speed-wrap label { font-family:'Space Mono',monospace; font-size:0.63rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+  .speed-btns { display:flex; gap:4px; }
+  .speed-btn { padding:7px 11px; border:1.5px solid var(--border); background:var(--surface); border-radius:4px; font-family:'Space Mono',monospace; font-size:0.68rem; cursor:pointer; transition:all 0.15s; color:var(--ink); }
+  .speed-btn.active { background:var(--ink); color:var(--bg); border-color:var(--ink); }
+
+  /* ZONE LEGEND */
+  .zone-legend { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .zone-item { display:flex; align-items:center; gap:7px; font-size:0.8rem; }
+  .zone-dot { width:14px; height:14px; border-radius:3px; border:2px solid; flex-shrink:0; }
+
+  /* ARRAY */
+  .section-label { font-family:'Space Mono',monospace; font-size:0.63rem; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; }
+  .array-container { position:relative; padding-bottom:52px; overflow-x:auto; margin-bottom:28px; }
+  .array-blocks { display:flex; gap:6px; flex-wrap:nowrap; }
+
+  .char-block {
+    position:relative; width:56px; height:56px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-size:1.5rem; font-weight:700;
+    border-radius:8px; border:2px solid var(--border);
+    background:var(--unknown-bg);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .char-block .idx {
+    position:absolute; bottom:-22px; left:50%; transform:translateX(-50%);
+    font-family:'Space Mono',monospace; font-size:0.58rem; color:var(--muted);
+  }
+  /* value states */
+  .char-block.val-0 { background:var(--red-bg);   border-color:var(--red-border);  color:var(--accent);  }
+  .char-block.val-1 { background:var(--white-bg);  border-color:var(--white-border);color:#555; }
+  .char-block.val-2 { background:var(--blue-bg);   border-color:var(--blue-border); color:var(--accent2); }
+  /* pointer highlights — lift the block */
+  .char-block.is-low  { transform:translateY(-6px); box-shadow:0 6px 16px rgba(230,57,70,0.25); }
+  .char-block.is-mid  { transform:translateY(-8px); box-shadow:0 8px 20px rgba(255,209,102,0.35); }
+  .char-block.is-high { transform:translateY(-6px); box-shadow:0 6px 16px rgba(33,150,243,0.25); }
+  .char-block.is-low.is-mid { transform:translateY(-10px); }
+  .char-block.done-sort { transition:background 0.5s; }
+
+  /* POINTER LABELS */
+  .pointer-labels { position:absolute; bottom:0; left:0; right:0; height:44px; pointer-events:none; }
+  .ptr-label {
+    position:absolute; font-family:'Space Mono',monospace; font-size:0.62rem; font-weight:700;
+    padding:2px 7px; border-radius:3px; transform:translateX(-50%);
+    transition:left 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    white-space:nowrap;
+  }
+  .ptr-low  { background:var(--accent);  color:white; top:2px; }
+  .ptr-mid  { background:var(--accent4); color:#333;  top:22px; }
+  .ptr-high { background:var(--accent2); color:white; top:2px; }
+
+  /* ZONE BANDS — shown below array */
+  .zone-bands { display:flex; gap:6px; margin-bottom:24px; }
+  .zone-band {
+    flex:1; height:10px; border-radius:4px;
+    transition:flex 0.4s ease;
+  }
+  .zb-red   { background:rgba(230,57,70,0.35);   border:1px solid var(--red-border); }
+  .zb-white { background:rgba(180,180,180,0.3);  border:1px solid var(--white-border); }
+  .zb-unkn  { background:rgba(255,209,102,0.25); border:1px solid var(--accent4); }
+  .zb-blue  { background:rgba(33,150,243,0.3);   border:1px solid var(--blue-border); }
+  .zone-band-labels { display:flex; gap:6px; margin-bottom:20px; font-size:0.68rem; color:var(--muted); font-family:'Space Mono',monospace; }
+  .zone-band-labels span { flex:1; text-align:center; transition:flex 0.4s ease; }
+
+  /* STATUS BOX */
+  .step-box {
+    background:var(--surface); border:1.5px solid var(--border);
+    border-left:4px solid var(--accent2); border-radius:8px;
+    padding:14px 18px; margin-bottom:20px; min-height:72px;
+    transition:border-color 0.3s, background 0.3s;
+  }
+  .step-box.step-swap-low  { border-left-color:var(--accent);  background:rgba(230,57,70,0.03); }
+  .step-box.step-swap-high { border-left-color:var(--accent2); background:rgba(33,150,243,0.03); }
+  .step-box.step-skip      { border-left-color:var(--accent4); background:rgba(255,209,102,0.05); }
+  .step-box.step-done      { border-left-color:var(--accent3); background:rgba(6,214,160,0.05); }
+  .step-title { font-family:'Space Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .step-desc { font-size:0.87rem; line-height:1.65; color:var(--ink); font-family:'DM Sans',sans-serif; }
+  .step-desc strong { color:var(--accent2); font-weight:700; }
+  .step-desc .red   { color:var(--accent); font-weight:600; }
+  .step-desc .grn   { color:#028a5b; font-weight:600; }
+  .step-desc .yel   { color:#b07d00; font-weight:600; }
+  .step-desc .blu   { color:var(--accent2); font-weight:600; }
+
+  /* PROGRESS */
+  .progress-wrap { margin-bottom:16px; }
+  .progress-label { display:flex; justify-content:space-between; font-family:'Space Mono',monospace; font-size:0.62rem; color:var(--muted); margin-bottom:5px; }
+  .progress-bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .progress-fill { height:100%; background:var(--accent2); border-radius:2px; transition:width 0.3s; }
+
+  /* DONE BANNER */
+  .done-banner { display:none; background:var(--accent3); color:var(--ink); text-align:center; padding:10px; font-family:'Space Mono',monospace; font-size:0.72rem; font-weight:700; letter-spacing:2px; border-radius:6px; margin-bottom:14px; animation:fadeUp 0.4s ease; }
+  .done-banner.show { display:block; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* PLAYBACK */
+  .playback { display:flex; gap:8px; }
+
+  /* RIGHT — CODE + STATE PANEL */
+  .state-panel {
+    background:var(--ink); color:var(--bg);
+    display:flex; flex-direction:column;
+    overflow-y:auto; height:calc(100vh - 78px);
+  }
+  .state-panel::-webkit-scrollbar { width:4px; }
+  .state-panel::-webkit-scrollbar-thumb { background:#2a2a3e; border-radius:2px; }
+
+  /* CODE */
+  .code-panel { flex-shrink:0; padding:16px 16px 10px; border-bottom:1px solid #2a2a3e; }
+  .code-panel-title { font-family:'Space Mono',monospace; font-size:0.58rem; letter-spacing:3px; text-transform:uppercase; color:#6b6b8a; margin-bottom:10px; }
+  pre.code-block {
+    font-family:'Space Mono',monospace; font-size:0.68rem; line-height:1.9;
+    background:#060610; border:1px solid #1e1e2e; border-radius:6px;
+    padding:8px 8px; overflow-x:auto;
+    max-height:calc(1.9em * 4 + 16px); overflow-y:auto;
+  }
+  pre.code-block::-webkit-scrollbar { width:3px; height:3px; }
+  pre.code-block::-webkit-scrollbar-thumb { background:#2a2a3e; border-radius:2px; }
+  .code-line { display:block; padding:0 6px; border-radius:3px; transition:background 0.2s,border-left-color 0.2s; white-space:pre; border-left:3px solid transparent; color:#6b7280; }
+  .code-line.hl-expand  { background:rgba(255,209,102,0.2); border-left-color:var(--accent4); color:#e2e8f0; }
+  .code-line.hl-swap-low  { background:rgba(230,57,70,0.2);  border-left-color:var(--accent);  color:#e2e8f0; }
+  .code-line.hl-swap-high { background:rgba(33,150,243,0.2); border-left-color:var(--accent2); color:#e2e8f0; }
+  .code-line.hl-done    { background:rgba(6,214,160,0.2);  border-left-color:var(--accent3); color:#e2e8f0; }
+  .ck { color:#c084fc; } .cf { color:#67e8f9; } .cc { color:#374151; font-style:italic; } .cn { color:#fda4af; }
+
+  /* VARS */
+  .vars-panel { flex-shrink:0; padding:14px 16px; }
+  .state-title { font-family:'Space Mono',monospace; font-size:0.63rem; letter-spacing:3px; text-transform:uppercase; color:#6b6b8a; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #2a2a3e; }
+  .var-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+  .var-card { background:#0d0d18; border:1px solid #2a2a3e; border-radius:6px; padding:10px 12px; transition:all 0.3s; }
+  .var-card.changed { border-color:var(--accent4); background:rgba(255,209,102,0.08); animation:vflash 0.4s ease; }
+  @keyframes vflash { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+  .var-name { font-family:'Space Mono',monospace; font-size:0.58rem; color:#6b6b8a; margin-bottom:4px; }
+  .var-value { font-family:'Space Mono',monospace; font-size:1.1rem; font-weight:700; color:var(--bg); }
+  .var-value.red  { color:#ff6b6b; }
+  .var-value.yel  { color:var(--accent4); }
+  .var-value.blue { color:#4fc3f7; }
+  .var-value.grn  { color:var(--accent3); }
+
+  /* ARRAY STATE TRACKER */
+  .arr-state { margin-bottom:14px; }
+  .arr-state-title { font-family:'Space Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:#6b6b8a; margin-bottom:8px; }
+  .arr-mini { display:flex; gap:3px; flex-wrap:wrap; }
+  .arr-mini-block {
+    width:28px; height:28px; border-radius:4px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-size:0.72rem; font-weight:700;
+    border:1px solid #2a2a3e; background:#0d0d18; color:#6b7280;
+    transition:all 0.3s;
+  }
+  .arr-mini-block.v0 { background:rgba(230,57,70,0.2);  border-color:#e63946; color:#ff6b6b; }
+  .arr-mini-block.v1 { background:rgba(180,180,180,0.1);border-color:#888;    color:#ccc; }
+  .arr-mini-block.v2 { background:rgba(33,150,243,0.2); border-color:#2196f3; color:#4fc3f7; }
+
+  /* ZONE COUNTS */
+  .zone-counts { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .zcount-row { display:flex; align-items:center; gap:8px; background:#0d0d18; border:1px solid #2a2a3e; border-radius:4px; padding:7px 10px; transition:all 0.3s; }
+  .zcount-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .zcount-label { font-family:'Space Mono',monospace; font-size:0.68rem; color:#6b6b8a; flex:1; }
+  .zcount-bar-wrap { width:80px; height:4px; background:#2a2a3e; border-radius:2px; overflow:hidden; }
+  .zcount-bar { height:100%; border-radius:2px; transition:width 0.4s; }
+  .zcount-num { font-family:'Space Mono',monospace; font-size:0.72rem; font-weight:700; width:18px; text-align:right; }
+
+  /* BEST */
+  .best-box { margin:0 16px 14px; padding:10px 12px; background:rgba(6,214,160,0.06); border:1px solid rgba(6,214,160,0.2); border-radius:5px; opacity:0.4; transition:opacity 0.4s; }
+  .best-box.show { opacity:1; }
+  .best-label { font-family:'Space Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:var(--accent3); margin-bottom:6px; }
+  .best-val { font-family:'Space Mono',monospace; font-size:1.1rem; font-weight:700; color:var(--bg); letter-spacing:6px; }
+  .best-meta { font-size:0.65rem; color:#6b6b8a; margin-top:3px; }
+
+  /* DONE bar */
+  .done-bar { display:none; margin:0 16px 10px; background:var(--accent3); color:#000; text-align:center; padding:8px; border-radius:4px; font-family:'Space Mono',monospace; font-size:0.68rem; font-weight:800; letter-spacing:2px; animation:fadeUp 0.4s ease; }
+  .done-bar.show { display:block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Dutch National Flag</h1>
+    <div class="sub">Three-way Partition · 3 Pointers · Live Visualizer</div>
+  </div>
+  <div class="family-badge">Family C · Writing</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Array (0s, 1s, 2s only)</label>
+        <input type="text" id="inputArr" value="2,0,1,2,0,1,0,2,1,0" maxlength="40">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1400">0.5×</button>
+          <button class="speed-btn active" data-ms="750">1×</button>
+          <button class="speed-btn" data-ms="370">2×</button>
+          <button class="speed-btn" data-ms="150">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <!-- ZONE LEGEND -->
+    <div class="zone-legend">
+      <div class="zone-item"><div class="zone-dot" style="background:var(--red-bg);border-color:var(--red-border)"></div> Zone 0 (reds — sorted)</div>
+      <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:var(--accent4)"></div> Unknown (being scanned)</div>
+      <div class="zone-item"><div class="zone-dot" style="background:var(--white-bg);border-color:var(--white-border)"></div> Zone 1 (whites — sorted)</div>
+      <div class="zone-item"><div class="zone-dot" style="background:var(--blue-bg);border-color:var(--blue-border)"></div> Zone 2 (blues — sorted)</div>
+    </div>
+
+    <!-- ARRAY -->
+    <div class="section-label">Array</div>
+    <div class="array-container">
+      <div class="array-blocks" id="arrayBlocks"></div>
+      <div class="pointer-labels" id="pointerLabels"></div>
+    </div>
+
+    <!-- ZONE BANDS -->
+    <div class="zone-bands" id="zoneBands">
+      <div class="zone-band zb-red"   id="zb-red"   style="flex:0"></div>
+      <div class="zone-band zb-white" id="zb-white" style="flex:0"></div>
+      <div class="zone-band zb-unkn"  id="zb-unkn"  style="flex:1"></div>
+      <div class="zone-band zb-blue"  id="zb-blue"  style="flex:0"></div>
+    </div>
+    <div class="zone-band-labels" id="zoneBandLabels">
+      <span id="zbl-red"   style="flex:0"></span>
+      <span id="zbl-white" style="flex:0"></span>
+      <span id="zbl-unkn"  style="flex:1">unknown</span>
+      <span id="zbl-blue"  style="flex:0"></span>
+    </div>
+
+    <!-- STATUS -->
+    <div class="step-box" id="stepBox">
+      <div class="step-title">Status</div>
+      <div class="step-desc" id="stepDesc">Press <strong>RUN</strong> to start the animation.</div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ ARRAY SORTED</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: CODE + STATE -->
+  <div class="state-panel">
+
+    <!-- CODE -->
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Executing Line</div>
+      <pre class="code-block" id="codeBlock"><span class="code-line" id="cl-sig"><span class="ck">void</span> <span class="cf">sortColors</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> low=<span class="cn">0</span>, mid=<span class="cn">0</span>, high=n<span class="cn">-1</span>;</span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (mid &lt;= high) {</span>
+<span class="code-line" id="cl-if0">    <span class="ck">if</span> (a[mid] == <span class="cn">0</span>) {</span>
+<span class="code-line" id="cl-sw0">      swap(a[low], a[mid]);</span>
+<span class="code-line" id="cl-inc0">      low++; mid++;</span>
+<span class="code-line" id="cl-if1">    } <span class="ck">else if</span> (a[mid] == <span class="cn">1</span>) {</span>
+<span class="code-line" id="cl-inc1">      mid++;     <span class="cc">// already in place</span></span>
+<span class="code-line" id="cl-if2">    } <span class="ck">else</span> {    <span class="cc">// a[mid] == 2</span></span>
+<span class="code-line" id="cl-sw2">      swap(a[mid], a[high]);</span>
+<span class="code-line" id="cl-dec2">      high--;    <span class="cc">// mid stays! unknown came back</span></span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-close">  }</span>
+<span class="code-line" id="cl-ret">} <span class="cc">// sorted in-place, O(n) time O(1) space</span></span></pre>
+    </div>
+
+    <!-- STATE -->
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+
+      <div class="var-grid">
+        <div class="var-card" id="vcLow">
+          <div class="var-name">low</div>
+          <div class="var-value red" id="vLow">—</div>
+        </div>
+        <div class="var-card" id="vcMid">
+          <div class="var-name">mid</div>
+          <div class="var-value yel" id="vMid">—</div>
+        </div>
+        <div class="var-card" id="vcHigh">
+          <div class="var-name">high</div>
+          <div class="var-value blue" id="vHigh">—</div>
+        </div>
+        <div class="var-card" id="vcVal">
+          <div class="var-name">a[mid]</div>
+          <div class="var-value" id="vVal">—</div>
+        </div>
+        <div class="var-card" id="vcSwaps">
+          <div class="var-name">swaps</div>
+          <div class="var-value grn" id="vSwaps">0</div>
+        </div>
+        <div class="var-card" id="vcN">
+          <div class="var-name">n</div>
+          <div class="var-value" id="vN">—</div>
+        </div>
+      </div>
+
+      <!-- MINI ARRAY -->
+      <div class="arr-state">
+        <div class="arr-state-title">Current Array State</div>
+        <div class="arr-mini" id="arrMini"></div>
+      </div>
+
+      <!-- ZONE COUNTS -->
+      <div class="arr-state-title" style="margin-bottom:8px">Zone Progress</div>
+      <div class="zone-counts">
+        <div class="zcount-row">
+          <div class="zcount-dot" style="background:var(--accent)"></div>
+          <div class="zcount-label">Zone 0 (reds)</div>
+          <div class="zcount-bar-wrap"><div class="zcount-bar" id="zbar0" style="width:0%;background:var(--accent)"></div></div>
+          <div class="zcount-num red" id="zcnt0">0</div>
+        </div>
+        <div class="zcount-row">
+          <div class="zcount-dot" style="background:#aaa"></div>
+          <div class="zcount-label">Zone 1 (whites)</div>
+          <div class="zcount-bar-wrap"><div class="zcount-bar" id="zbar1" style="width:0%;background:#aaa"></div></div>
+          <div class="zcount-num" style="color:#ccc" id="zcnt1">0</div>
+        </div>
+        <div class="zcount-row">
+          <div class="zcount-dot" style="background:var(--accent4)"></div>
+          <div class="zcount-label">Unknown</div>
+          <div class="zcount-bar-wrap"><div class="zcount-bar" id="zbarU" style="width:100%;background:var(--accent4)"></div></div>
+          <div class="zcount-num yel" id="zcntU">—</div>
+        </div>
+        <div class="zcount-row">
+          <div class="zcount-dot" style="background:var(--accent2)"></div>
+          <div class="zcount-label">Zone 2 (blues)</div>
+          <div class="zcount-bar-wrap"><div class="zcount-bar" id="zbar2" style="width:0%;background:var(--accent2)"></div></div>
+          <div class="zcount-num blue" id="zcnt2">0</div>
+        </div>
+      </div>
+
+      <!-- RESULT -->
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Sorted Result</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta">not yet complete</div>
+      </div>
+
+    </div>
+
+    <div class="done-bar" id="doneBar">✓ SORTED IN O(N)</div>
+
+  </div>
+</div>
+
+<script>
+// ─── CODE HIGHLIGHTING ────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init:      { ids:['cl-sig','cl-init','cl-whl'], cls:'hl-expand' },
+  check:     { ids:['cl-whl','cl-if0','cl-if1','cl-if2'], cls:'hl-expand' },
+  swap0:     { ids:['cl-if0','cl-sw0','cl-inc0'], cls:'hl-swap-low' },
+  skip1:     { ids:['cl-if1','cl-inc1'], cls:'hl-expand' },
+  swap2:     { ids:['cl-if2','cl-sw2','cl-dec2'], cls:'hl-swap-high' },
+  done:      { ids:['cl-close','cl-ret'], cls:'hl-done' },
+};
+
+function highlightCode(type) {
+  document.querySelectorAll('.code-line').forEach(el => el.className = 'code-line');
+  const e = TYPE_LINES[type]; if (!e) return;
+  e.ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add(e.cls);
+  });
+  const first = document.getElementById(e.ids[0]);
+  if (first) first.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+
+// ─── ALGORITHM ───────────────────────────────────────────────────────────────
+function computeSteps(arr) {
+  const steps = [], a = [...arr], n = a.length;
+  let low = 0, mid = 0, high = n - 1, swaps = 0;
+
+  const snap = (desc, type) => steps.push({
+    a: [...a], low, mid, high, swaps, desc, type, n
+  });
+
+  snap(
+    `🚀 <strong>Starting up.</strong> Array has ${n} elements — only 0s, 1s, and 2s. We use three pointers: <span class="red">low</span> (0-boundary), <span class="yel">mid</span> (scanner), <span class="blu">high</span> (2-boundary). mid scans left to right.`,
+    'init'
+  );
+
+  while (mid <= high) {
+    const val = a[mid];
+
+    if (val === 0) {
+      snap(
+        `🔴 <span class="red">a[mid]=${val}</span> — it's a <strong>0</strong>, belongs in the red zone. Swap <span class="red">a[mid]</span> with <span class="red">a[low]</span>. Then advance both <span class="red">low++</span> and <span class="yel">mid++</span> — we know what came back (it was a 1 or confirmed 0).`,
+        'swap0'
+      );
+      [a[low], a[mid]] = [a[mid], a[low]]; swaps++;
+      low++; mid++;
+      snap(
+        `✅ Swapped! <span class="red">low→${low}</span>, <span class="yel">mid→${mid}</span>. Red zone expanded by 1. Both pointers advance safely because whatever was at low was already confirmed.`,
+        'check'
+      );
+    } else if (val === 1) {
+      snap(
+        `⚪ <span class="yel">a[mid]=${val}</span> — it's a <strong>1</strong>, already in the right zone (middle). No swap needed. Just advance <span class="yel">mid++</span>.`,
+        'skip1'
+      );
+      mid++;
+      snap(
+        `➡️ mid advanced to ${mid}. White zone grows. No swap was needed — 1s stay put.`,
+        'check'
+      );
+    } else {
+      snap(
+        `🔵 <span class="blu">a[mid]=${val}</span> — it's a <strong>2</strong>, belongs in the blue zone. Swap <span class="blu">a[mid]</span> with <span class="blu">a[high]</span>. Then <span class="blu">high--</span>. ⚠️ <strong>mid does NOT advance</strong> — what came back from high is still unknown!`,
+        'swap2'
+      );
+      [a[mid], a[high]] = [a[high], a[mid]]; swaps++;
+      high--;
+      snap(
+        `✅ Swapped! <span class="blu">high→${high}</span>. Blue zone expanded by 1. <span class="yel">mid stays at ${mid}</span> — we must re-examine what just arrived from the right.`,
+        'check'
+      );
+    }
+  }
+
+  snap(
+    `🎉 <span class="grn"><strong>Done!</strong></span> mid (${mid}) has crossed high (${high}). All zones confirmed sorted. Total swaps: <strong>${swaps}</strong>. Result: ${a.join(', ')}.`,
+    'done'
+  );
+
+  return steps;
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+let steps = [], currentStep = 0, playing = false, timer = null, speed = 750;
+let n = 0;
+
+function parseArr() {
+  return document.getElementById('inputArr').value
+    .split(',').map(x => parseInt(x.trim()))
+    .filter(x => x === 0 || x === 1 || x === 2);
+}
+
+function buildUI() {
+  const arr = parseArr();
+  n = arr.length;
+  steps = computeSteps(arr);
+  currentStep = 0;
+
+  // array blocks
+  const ab = document.getElementById('arrayBlocks');
+  ab.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'char-block'; d.id = `blk-${i}`;
+    d.innerHTML = `${arr[i]}<span class="idx">${i}</span>`;
+    ab.appendChild(d);
+  }
+
+  // mini array
+  const ma = document.getElementById('arrMini');
+  ma.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'arr-mini-block'; d.id = `mini-${i}`;
+    d.textContent = arr[i];
+    ma.appendChild(d);
+  }
+
+  document.getElementById('vN').textContent = n;
+  document.getElementById('stepTotal').textContent = `/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+
+  renderStep(0);
+}
+
+let prevVals = {};
+function setVar(elId, cardId, val) {
+  const el = document.getElementById(elId);
+  const card = document.getElementById(cardId);
+  const s = String(val);
+  el.textContent = s;
+  if (prevVals[elId] !== undefined && prevVals[elId] !== s) {
+    card.classList.remove('changed'); void card.offsetWidth; card.classList.add('changed');
+    setTimeout(() => card.classList.remove('changed'), 500);
+  }
+  prevVals[elId] = s;
+}
+
+function renderStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
+  const st = steps[idx];
+  currentStep = idx;
+
+  // blocks
+  for (let i = 0; i < n; i++) {
+    const b = document.getElementById(`blk-${i}`);
+    const m = document.getElementById(`mini-${i}`);
+    if (!b || !m) continue;
+
+    // value class
+    b.className = `char-block val-${st.a[i]}`;
+    m.className = `arr-mini-block v${st.a[i]}`;
+    m.textContent = st.a[i];
+    b.childNodes[0].textContent = st.a[i];
+
+    // pointer highlight
+    if (i === st.low  && i === st.mid) b.classList.add('is-low','is-mid');
+    else if (i === st.low)  b.classList.add('is-low');
+    else if (i === st.mid)  b.classList.add('is-mid');
+    if (i === st.high) b.classList.add('is-high');
+  }
+
+  // pointer labels
+  const pl = document.getElementById('pointerLabels');
+  const BW = 62; // block width + gap
+  const lx  = st.low  * BW + 28;
+  const mx  = st.mid  * BW + 28;
+  const hx  = st.high * BW + 28;
+  pl.innerHTML = `
+    <span class="ptr-label ptr-low"  style="left:${lx}px">low</span>
+    <span class="ptr-label ptr-high" style="left:${hx}px">high</span>
+    <span class="ptr-label ptr-mid"  style="left:${mx}px">mid</span>
+  `;
+
+  // zone bands
+  const reds   = st.low;
+  const whites = Math.max(0, st.mid - st.low);
+  const unkn   = Math.max(0, st.high - st.mid + 1);
+  const blues  = Math.max(0, n - 1 - st.high);
+  const total  = n;
+
+  document.getElementById('zb-red').style.flex   = reds;
+  document.getElementById('zb-white').style.flex = whites;
+  document.getElementById('zb-unkn').style.flex  = Math.max(unkn, 0.01);
+  document.getElementById('zb-blue').style.flex  = blues;
+  document.getElementById('zbl-red').style.flex   = reds;
+  document.getElementById('zbl-white').style.flex = whites;
+  document.getElementById('zbl-unkn').style.flex  = Math.max(unkn, 0.01);
+  document.getElementById('zbl-blue').style.flex  = blues;
+  document.getElementById('zbl-red').textContent   = reds   > 0 ? `${reds} red`   : '';
+  document.getElementById('zbl-white').textContent = whites > 0 ? `${whites} wht` : '';
+  document.getElementById('zbl-unkn').textContent  = unkn   > 0 ? `${unkn} ?`     : '';
+  document.getElementById('zbl-blue').textContent  = blues  > 0 ? `${blues} blue` : '';
+
+  // variables
+  setVar('vLow',  'vcLow',  st.low);
+  setVar('vMid',  'vcMid',  st.mid);
+  setVar('vHigh', 'vcHigh', st.high);
+  setVar('vVal',  'vcVal',  st.mid <= st.high ? st.a[st.mid] : '—');
+  setVar('vSwaps','vcSwaps',st.swaps);
+
+  // zone counts
+  const cnt0 = st.a.filter(x=>x===0).length;
+  const cnt1 = st.a.filter(x=>x===1).length;
+  const cnt2 = st.a.filter(x=>x===2).length;
+  const cntU = Math.max(0, st.high - st.mid + 1);
+  document.getElementById('zcnt0').textContent = cnt0;
+  document.getElementById('zcnt1').textContent = cnt1;
+  document.getElementById('zcntU').textContent = cntU;
+  document.getElementById('zcnt2').textContent = cnt2;
+  document.getElementById('zbar0').style.width = (cnt0/total*100)+'%';
+  document.getElementById('zbar1').style.width = (cnt1/total*100)+'%';
+  document.getElementById('zbarU').style.width = (cntU/total*100)+'%';
+  document.getElementById('zbar2').style.width = (cnt2/total*100)+'%';
+
+  // status
+  const box = document.getElementById('stepBox');
+  box.className = 'step-box';
+  if (st.type==='swap0') box.classList.add('step-swap-low');
+  else if (st.type==='swap2') box.classList.add('step-swap-high');
+  else if (st.type==='skip1') box.classList.add('step-skip');
+  else if (st.type==='done') box.classList.add('step-done');
+  document.getElementById('stepDesc').innerHTML = st.desc;
+
+  // code highlight
+  highlightCode(st.type);
+
+  // done
+  if (st.type === 'done') {
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBar').classList.add('show');
+    const bb = document.getElementById('bestBox');
+    bb.classList.add('show');
+    document.getElementById('bestVal').textContent = st.a.join(' ');
+    document.getElementById('bestMeta').textContent = `${st.swaps} swaps · O(n) time · O(1) space`;
+  }
+
+  // progress
+  document.getElementById('stepCounter').textContent = `Step ${idx+1}`;
+  document.getElementById('progressFill').style.width = ((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+}
+
+// ─── PLAYBACK ────────────────────────────────────────────────────────────────
+function play() {
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  playing = true;
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnPause').textContent = '⏸ Pause';
+  document.getElementById('btnRun').disabled = true;
+  tick();
+}
+function tick() {
+  if (!playing) return;
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  renderStep(currentStep + 1);
+  timer = setTimeout(tick, speed);
+}
+function stopPlay() {
+  playing = false; clearTimeout(timer);
+  document.getElementById('btnPause').textContent = '▶ Resume';
+  document.getElementById('btnRun').disabled = false;
+}
+
+document.getElementById('btnRun').addEventListener('click', () => { buildUI(); setTimeout(play, 200); });
+document.getElementById('btnReset').addEventListener('click', () => { stopPlay(); buildUI(); });
+document.getElementById('btnPrev').addEventListener('click', () => { stopPlay(); renderStep(currentStep - 1); });
+document.getElementById('btnNext').addEventListener('click', () => { stopPlay(); renderStep(currentStep + 1); });
+document.getElementById('btnPause').addEventListener('click', () => playing ? stopPlay() : play());
+document.querySelectorAll('.speed-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.speed-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); speed = parseInt(b.dataset.ms);
+  });
+});
+
+// INIT
+buildUI();
+</script>
+</body>
+</html>

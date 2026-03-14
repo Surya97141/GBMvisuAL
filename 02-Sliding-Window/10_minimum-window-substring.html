@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimum Window Substring — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Clash+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --ink: #1a1a2e;
+    --surface: #fffdf7;
+    --border: #d4ccb8;
+    --accent: #e63946;
+    --accent2: #2196f3;
+    --accent3: #06d6a0;
+    --accent4: #ffd166;
+    --muted: #8a8070;
+    --window-bg: rgba(33,150,243,0.08);
+    --window-border: #2196f3;
+    --found-bg: rgba(6,214,160,0.12);
+    --found-border: #06d6a0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* GRAIN OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--ink);
+    color: var(--bg);
+    padding: 28px 40px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    border-bottom: 3px solid var(--accent);
+  }
+  .header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: -1px;
+  }
+  .header .sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    color: #8a8a9a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .family-badge {
+    margin-left: auto;
+    background: var(--accent);
+    color: white;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+    height: calc(100vh - 80px);
+    overflow: hidden;
+  }
+  .viz-panel { overflow-y: auto; }
+
+  /* LEFT — VISUALIZER */
+  .viz-panel {
+    padding: 40px;
+    border-right: 1px solid var(--border);
+  }
+
+  /* INPUT CONTROLS */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 36px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .field input {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    color: var(--ink);
+    outline: none;
+    width: 220px;
+    transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent2); }
+  .field input.small { width: 120px; }
+
+  .btn {
+    padding: 9px 20px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-secondary { background: transparent; color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--ink); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* SPEED CONTROL */
+  .speed-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .speed-wrap label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .speed-btns { display: flex; gap: 4px; }
+  .speed-btn {
+    padding: 8px 12px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--ink);
+  }
+  .speed-btn.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  /* ARRAY DISPLAY */
+  .array-section {
+    margin-bottom: 32px;
+  }
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .array-container {
+    position: relative;
+    padding-bottom: 36px;
+    overflow-x: auto;
+  }
+
+  .array-blocks {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .char-block {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    border-radius: 6px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: default;
+  }
+  .char-block .idx {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+  }
+
+  /* Block states */
+  .char-block.in-window {
+    background: var(--window-bg);
+    border-color: var(--window-border);
+    color: var(--accent2);
+  }
+  .char-block.is-left {
+    background: rgba(230,57,70,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-4px);
+  }
+  .char-block.is-right {
+    background: rgba(33,150,243,0.15);
+    border-color: var(--accent2);
+    color: var(--accent2);
+    transform: translateY(-4px);
+  }
+  .char-block.is-both {
+    background: rgba(255,209,102,0.2);
+    border-color: var(--accent4);
+    color: var(--ink);
+    transform: translateY(-4px);
+  }
+  .char-block.in-best {
+    background: var(--found-bg);
+    border-color: var(--found-border);
+    color: #028a5b;
+  }
+  .char-block.needed {
+    box-shadow: inset 0 0 0 2px var(--accent4);
+  }
+
+  /* POINTER LABELS */
+  .pointer-labels {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    pointer-events: none;
+  }
+  .ptr-label {
+    position: absolute;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transform: translateX(-50%);
+    transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+  }
+  .ptr-L { background: var(--accent); color: white; top: 2px; }
+  .ptr-R { background: var(--accent2); color: white; top: 2px; }
+
+  /* TARGET STRING */
+  .target-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+  }
+  .target-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .target-blocks { display: flex; gap: 6px; }
+  .target-block {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 6px;
+    border: 2px solid var(--accent4);
+    background: rgba(255,209,102,0.1);
+    color: var(--ink);
+    transition: all 0.3s;
+  }
+  .target-block.satisfied {
+    background: rgba(6,214,160,0.15);
+    border-color: var(--accent3);
+    color: #028a5b;
+  }
+
+  /* STEP EXPLANATION */
+  .step-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-left: 4px solid var(--accent2);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    min-height: 80px;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .step-box.step-found {
+    border-left-color: var(--accent3);
+    background: rgba(6,214,160,0.04);
+  }
+  .step-box.step-shrink {
+    border-left-color: var(--accent);
+    background: rgba(230,57,70,0.04);
+  }
+  .step-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .step-desc {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .step-desc strong { color: var(--accent2); font-weight: 700; }
+  .step-desc em { color: var(--muted); font-style: italic; }
+  .step-desc .red { color: var(--accent); font-weight: 600; }
+  .step-desc .green { color: #028a5b; font-weight: 600; }
+
+  /* PROGRESS BAR */
+  .progress-wrap {
+    margin-bottom: 24px;
+  }
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent2);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  /* PLAYBACK CONTROLS */
+  .playback {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+  }
+
+  /* RIGHT — STATE PANEL */
+  .state-panel {
+    background: var(--ink);
+    color: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    height: calc(100vh - 80px);
+  }
+  .state-panel::-webkit-scrollbar { width: 4px; }
+  .state-panel::-webkit-scrollbar-track { background: transparent; }
+  .state-panel::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 2px; }
+
+  /* CODE PANEL — 4 visible lines, scrolls to active */
+  .code-panel {
+    flex-shrink: 0;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #2a2a3e;
+  }
+  .code-panel-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #6b6b8a;
+    margin-bottom: 10px;
+  }
+  pre.code-block {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    line-height: 1.9;
+    background: #060610;
+    border: 1px solid #1e1e2e;
+    border-radius: 6px;
+    padding: 8px 8px;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(1.9em * 4 + 16px);
+  }
+  pre.code-block::-webkit-scrollbar { width: 3px; height: 3px; }
+  pre.code-block::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 2px; }
+  .code-line {
+    display: block;
+    padding: 0 6px;
+    border-radius: 3px;
+    transition: background 0.2s, border-left-color 0.2s;
+    white-space: pre;
+    border-left: 3px solid transparent;
+    color: #6b7280;
+  }
+  .code-line.hl-expand {
+    background: rgba(33,150,243,0.2);
+    border-left-color: #2196f3;
+    color: #e2e8f0;
+  }
+  .code-line.hl-found {
+    background: rgba(6,214,160,0.2);
+    border-left-color: #06d6a0;
+    color: #e2e8f0;
+  }
+  .code-line.hl-shrink {
+    background: rgba(230,57,70,0.2);
+    border-left-color: #e63946;
+    color: #e2e8f0;
+  }
+  /* syntax colors — always on, dimmed by parent color */
+  .ck  { color: #c084fc; }
+  .cf  { color: #67e8f9; }
+  .cc  { color: #374151; font-style:italic; }
+  .cs  { color: #86efac; }
+  .cn  { color: #fda4af; }
+
+  /* VARS SECTION */
+  .vars-panel {
+    flex-shrink: 0;
+    padding: 16px 16px;
+  }
+
+  .state-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #6b6b8a;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2a2a3e;
+  }
+
+  /* VARIABLE CARDS */
+  .var-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .var-card {
+    background: #16162a;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    padding: 12px;
+    transition: all 0.3s;
+  }
+  .var-card.changed {
+    border-color: var(--accent2);
+    background: rgba(33,150,243,0.1);
+    animation: pulse 0.4s ease;
+  }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+  }
+  .var-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    color: #6b6b8a;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .var-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--bg);
+  }
+  .var-card.highlight-red .var-value { color: #ff6b6b; }
+  .var-card.highlight-blue .var-value { color: #4fc3f7; }
+  .var-card.highlight-green .var-value { color: var(--accent3); }
+  .var-card.highlight-yellow .var-value { color: var(--accent4); }
+
+  /* MAPS */
+  .map-section {
+    margin-bottom: 20px;
+  }
+  .map-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #6b6b8a;
+    margin-bottom: 10px;
+  }
+  .map-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .map-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #16162a;
+    border: 1px solid #2a2a3e;
+    border-radius: 4px;
+    padding: 8px 10px;
+    transition: all 0.3s;
+  }
+  .map-row.satisfied {
+    border-color: var(--accent3);
+    background: rgba(6,214,160,0.08);
+  }
+  .map-row.deficit {
+    border-color: #ff6b6b;
+    background: rgba(255,107,107,0.06);
+  }
+  .map-char {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    width: 20px;
+    color: var(--accent4);
+  }
+  .map-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: #2a2a3e;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .map-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s, background 0.3s;
+    background: var(--accent2);
+  }
+  .map-bar.over { background: var(--accent3); }
+  .map-bar.under { background: #ff6b6b; }
+  .map-nums {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: #6b6b8a;
+    white-space: nowrap;
+  }
+  .map-nums .have { color: var(--bg); }
+  .map-nums .need { color: var(--accent4); }
+
+  /* BEST RESULT */
+  .best-section {
+    margin-top: 24px;
+    padding: 16px;
+    background: rgba(6,214,160,0.06);
+    border: 1px solid rgba(6,214,160,0.3);
+    border-radius: 6px;
+    transition: all 0.4s;
+  }
+  .best-section.empty { opacity: 0.4; }
+  .best-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent3);
+    margin-bottom: 8px;
+  }
+  .best-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--bg);
+    letter-spacing: 4px;
+  }
+  .best-meta {
+    font-size: 0.72rem;
+    color: #6b6b8a;
+    margin-top: 4px;
+  }
+
+  /* DONE STATE */
+  .done-banner {
+    display: none;
+    background: var(--accent3);
+    color: var(--ink);
+    text-align: center;
+    padding: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    animation: fadeUp 0.4s ease;
+  }
+  .done-banner.show { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .state-panel { border-top: 1px solid var(--border); }
+    .viz-panel { padding: 24px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Minimum Window Substring</h1>
+    <div class="sub">Variable Window · Minimize · Live Visualizer</div>
+  </div>
+  <div class="family-badge">Family B · Shrink on Valid</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT: VISUALIZER -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Source String (s)</label>
+        <input type="text" id="inputS" value="ADOBECODEBANC" maxlength="20">
+      </div>
+      <div class="field">
+        <label>Target String (t)</label>
+        <input type="text" id="inputT" value="ABC" class="small" maxlength="8">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1200">0.5×</button>
+          <button class="speed-btn active" data-ms="700">1×</button>
+          <button class="speed-btn" data-ms="350">2×</button>
+          <button class="speed-btn" data-ms="150">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <!-- TARGET -->
+    <div class="target-section">
+      <div class="target-label">Target t =</div>
+      <div class="target-blocks" id="targetBlocks"></div>
+      <div style="margin-left:8px;font-size:0.8rem;color:var(--muted)" id="formedLabel">formed: <strong id="formedVal">0</strong> / <strong id="requiredVal">?</strong></div>
+    </div>
+
+    <!-- ARRAY -->
+    <div class="array-section">
+      <div class="section-label">Source String s</div>
+      <div class="array-container">
+        <div class="array-blocks" id="arrayBlocks"></div>
+        <div class="pointer-labels" id="pointerLabels"></div>
+      </div>
+    </div>
+
+    <!-- STEP EXPLANATION -->
+    <div class="step-box" id="stepBox">
+      <div class="step-title">Status</div>
+      <div class="step-desc" id="stepDesc">Press <strong>RUN</strong> to start the animation.</div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ ALGORITHM COMPLETE</div>
+
+    <!-- PLAYBACK -->
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: CODE + STATE PANEL -->
+  <div class="state-panel">
+
+    <!-- TOP: LIVE CODE -->
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Executing Line</div>
+      <pre class="code-block" id="codeBlock"><span class="code-line" id="cl-sig"><span class="ck">string</span> <span class="cf">minWindow</span>(<span class="ck">string</span> s, <span class="ck">string</span> t) {</span>
+<span class="code-line" id="cl-map">  <span class="ck">unordered_map</span>&lt;<span class="ck">char</span>,<span class="ck">int</span>&gt; need, have;</span>
+<span class="code-line" id="cl-fill">  <span class="ck">for</span> (<span class="ck">char</span> c : t) need[c]++;</span>
+<span class="code-line" id="cl-req">  <span class="ck">int</span> required = need.<span class="cf">size</span>();</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> formed = 0, L = 0;</span>
+<span class="code-line" id="cl-best">  <span class="ck">int</span> bestLen = INT_MAX, bestL = 0;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> R = 0; R &lt; s.<span class="cf">size</span>(); R++) {</span>
+<span class="code-line" id="cl-add">    have[s[R]]++;</span>
+<span class="code-line" id="cl-chk">    <span class="ck">if</span> (need.count(s[R]) &amp;&amp;</span>
+<span class="code-line" id="cl-chk2">        have[s[R]] == need[s[R]])</span>
+<span class="code-line" id="cl-finc">      formed++;</span>
+<span class="code-line" id="cl-whl">    <span class="ck">while</span> (formed == required) {</span>
+<span class="code-line" id="cl-upd">      <span class="ck">if</span> (R-L+1 &lt; bestLen) {</span>
+<span class="code-line" id="cl-upd2">        bestLen=R-L+1; bestL=L; }</span>
+<span class="code-line" id="cl-rem">      have[s[L]]--;</span>
+<span class="code-line" id="cl-fdec">      <span class="ck">if</span> (need.count(s[L]) &amp;&amp;</span>
+<span class="code-line" id="cl-fdec2">          have[s[L]] &lt; need[s[L]])</span>
+<span class="code-line" id="cl-fdec3">        formed--;</span>
+<span class="code-line" id="cl-linc">      L++;</span>
+<span class="code-line" id="cl-wend">    } <span class="cc">// end while</span></span>
+<span class="code-line" id="cl-fend">  } <span class="cc">// end for</span></span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> bestLen==INT_MAX</span>
+<span class="code-line" id="cl-ret2">    ? <span class="cs">""</span> : s.<span class="cf">substr</span>(bestL, bestLen);</span>
+<span class="code-line" id="cl-close">}</span></pre>
+    </div>
+
+    <!-- BOTTOM: STATE -->
+    <div class="vars-panel">
+      <div class="state-title">Live State</div>
+
+      <div class="var-grid">
+        <div class="var-card highlight-red" id="varL">
+          <div class="var-name">L (left)</div>
+          <div class="var-value" id="valL">—</div>
+        </div>
+        <div class="var-card highlight-blue" id="varR">
+          <div class="var-name">R (right)</div>
+          <div class="var-value" id="valR">—</div>
+        </div>
+        <div class="var-card highlight-yellow" id="varFormed">
+          <div class="var-name">formed</div>
+          <div class="var-value" id="valFormed">—</div>
+        </div>
+        <div class="var-card highlight-yellow" id="varRequired">
+          <div class="var-name">required</div>
+          <div class="var-value" id="valRequired">—</div>
+        </div>
+        <div class="var-card highlight-green" id="varBestLen">
+          <div class="var-name">bestLen</div>
+          <div class="var-value" id="valBestLen">∞</div>
+        </div>
+        <div class="var-card" id="varBestL">
+          <div class="var-name">bestL</div>
+          <div class="var-value" id="valBestL">—</div>
+        </div>
+      </div>
+
+      <div class="map-section">
+        <div class="map-title">need[ ] vs have[ ]</div>
+        <div class="map-rows" id="mapRows"></div>
+      </div>
+
+      <div class="best-section empty" id="bestSection">
+        <div class="best-label">Best Window Found</div>
+        <div class="best-value" id="bestValue">—</div>
+        <div class="best-meta" id="bestMeta">none yet</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── ALGORITHM: pre-compute all steps ────────────────────────────────────────
+function computeSteps(s, t) {
+  const steps = [];
+  const n = s.length;
+  const need = {};
+  for (const c of t) need[c] = (need[c] || 0) + 1;
+  const required = Object.keys(need).length;
+  const have = {};
+  let formed = 0, L = 0, bestLen = Infinity, bestL = 0;
+
+  const snap = (desc, type, extra = {}) => {
+    steps.push({
+      L, R: extra.R ?? L,
+      formed, required,
+      have: { ...have },
+      need: { ...need },
+      bestLen: bestLen === Infinity ? null : bestLen,
+      bestL,
+      desc, type, ...extra
+    });
+  };
+
+  snap(
+    `🚀 <strong>Starting up.</strong> We need every character in t = "${t}". R will expand right to collect them.`,
+    'init', { R: 0 }
+  );
+
+  for (let R = 0; R < n; R++) {
+    const c = s[R];
+    have[c] = (have[c] || 0) + 1;
+
+    const prevFormed = formed;
+    if (need[c] && have[c] === need[c]) formed++;
+
+    if (formed > prevFormed) {
+      snap(
+        `➡️ R moves to <strong>"${c}"</strong> (index ${R}). `
+        + `We now have exactly enough <strong>${c}</strong>'s. `
+        + `<span class="green">Condition met for ${c}!</span> `
+        + `<strong>${formed} of ${required}</strong> target chars satisfied.`,
+        'formed', { R }
+      );
+    } else {
+      snap(
+        need[c]
+          ? `➡️ R moves to <strong>"${c}"</strong> (index ${R}). `
+            + `We have ${have[c]} of the ${need[c]} needed. `
+            + `Still collecting — not enough <strong>${c}</strong> yet.`
+          : `➡️ R moves to <strong>"${c}"</strong> (index ${R}). `
+            + `"${c}" is <em>not in target t</em> — just include it in window, keep moving.`,
+        'expand', { R }
+      );
+    }
+
+    while (formed === required) {
+      if (R - L + 1 < (bestLen || Infinity)) {
+        bestLen = R - L + 1;
+        bestL = L;
+        snap(
+          `✅ <span class="green"><strong>Valid window!</strong></span> `
+          + `"<strong>${s.slice(L, R+1)}</strong>" contains all of t. `
+          + `Length = ${bestLen} — this is our <strong>new best</strong>. `
+          + `Now try shrinking from the left to find something shorter.`,
+          'found', { R, isBest: true }
+        );
+      } else {
+        snap(
+          `🔍 Window "<strong>${s.slice(L,R+1)}</strong>" is valid but longer than our best (${bestLen}). `
+          + `Keep shrinking from the left.`,
+          'shrink_check', { R }
+        );
+      }
+
+      const rem = s[L];
+      have[rem]--;
+      if (need[rem] && have[rem] < need[rem]) {
+        formed--;
+        snap(
+          `⬅️ L moves right — drop <strong>"${rem}"</strong> from the left. `
+          + `Now we only have ${have[rem]} of the ${need[rem]} needed <strong>${rem}</strong>'s. `
+          + `<span class="red">Window is no longer valid.</span> Stop shrinking, expand R again.`,
+          'shrink', { R, removing: L }
+        );
+      } else {
+        snap(
+          `⬅️ L moves right — drop <strong>"${rem}"</strong> from the left. `
+          + (need[rem]
+            ? `Still have ${have[rem]} of ${need[rem]} needed — window stays valid. Keep shrinking!`
+            : `"${rem}" wasn't needed anyway — safe to drop. Window still valid. Keep shrinking!`),
+          'shrink_ok', { R, removing: L }
+        );
+      }
+      L++;
+    }
+  }
+
+  snap(
+    bestLen === Infinity
+      ? `❌ <span class="red"><strong>No valid window found.</strong></span> The string s doesn't contain all characters of t.`
+      : `🎉 <span class="green"><strong>Done!</strong></span> `
+        + `Shortest window = "<strong>${s.slice(bestL, bestL + bestLen)}</strong>" `
+        + `(length ${bestLen}, starts at index ${bestL}).`,
+    'done', { R: n - 1 }
+  );
+
+  return steps;
+}
+
+// ─── CODE HIGHLIGHTING ────────────────────────────────────────────────────────
+const TYPE_TO_LINES = {
+  init:         { ids: ['cl-sig','cl-map','cl-fill','cl-req','cl-init','cl-best','cl-for'], cls: 'hl-expand' },
+  expand:       { ids: ['cl-for','cl-add','cl-chk','cl-chk2'], cls: 'hl-expand' },
+  formed:       { ids: ['cl-chk','cl-chk2','cl-finc','cl-whl'], cls: 'hl-expand' },
+  found:        { ids: ['cl-whl','cl-upd','cl-upd2'], cls: 'hl-found' },
+  shrink_check: { ids: ['cl-whl'], cls: 'hl-expand' },
+  shrink:       { ids: ['cl-rem','cl-fdec','cl-fdec2','cl-fdec3','cl-linc'], cls: 'hl-shrink' },
+  shrink_ok:    { ids: ['cl-rem','cl-fdec','cl-fdec2','cl-linc'], cls: 'hl-shrink' },
+  done:         { ids: ['cl-fend','cl-ret','cl-ret2','cl-close'], cls: 'hl-found' },
+};
+
+function highlightCode(type) {
+  // Clear all
+  document.querySelectorAll('.code-line').forEach(el => {
+    el.className = 'code-line';
+  });
+  const entry = TYPE_TO_LINES[type];
+  if (!entry) return;
+  entry.ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add(entry.cls);
+  });
+  // Scroll active line into the 4-line window
+  const first = document.getElementById(entry.ids[0]);
+  if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+
+let steps = [], currentStep = 0, playing = false, timer = null, speed = 700;
+let s = '', t = '';
+
+function buildUI() {
+  s = document.getElementById('inputS').value.trim().toUpperCase() || 'ADOBECODEBANC';
+  t = document.getElementById('inputT').value.trim().toUpperCase() || 'ABC';
+  steps = computeSteps(s, t);
+  currentStep = 0;
+
+  // Array blocks
+  const ab = document.getElementById('arrayBlocks');
+  ab.innerHTML = '';
+  for (let i = 0; i < s.length; i++) {
+    const div = document.createElement('div');
+    div.className = 'char-block';
+    div.id = `block-${i}`;
+    div.innerHTML = `${s[i]}<span class="idx">${i}</span>`;
+    ab.appendChild(div);
+  }
+
+  // Target blocks
+  const tb = document.getElementById('targetBlocks');
+  tb.innerHTML = '';
+  const need = {};
+  for (const c of t) need[c] = (need[c] || 0) + 1;
+  for (const [c, cnt] of Object.entries(need)) {
+    for (let i = 0; i < cnt; i++) {
+      const div = document.createElement('div');
+      div.className = 'target-block';
+      div.textContent = c;
+      div.dataset.char = c;
+      tb.appendChild(div);
+    }
+  }
+
+  document.getElementById('requiredVal').textContent = Object.keys(need).length;
+
+  // Map rows
+  const mr = document.getElementById('mapRows');
+  mr.innerHTML = '';
+  for (const [c, cnt] of Object.entries(need)) {
+    const row = document.createElement('div');
+    row.className = 'map-row';
+    row.id = `maprow-${c}`;
+    row.innerHTML = `
+      <div class="map-char">${c}</div>
+      <div class="map-bar-wrap"><div class="map-bar" id="mapbar-${c}" style="width:0%"></div></div>
+      <div class="map-nums"><span class="have" id="maphave-${c}">0</span><span style="color:#2a2a3e"> / </span><span class="need">${cnt}</span></div>
+    `;
+    mr.appendChild(row);
+  }
+
+  document.getElementById('stepTotal').textContent = `/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+
+  renderStep(0);
+}
+
+function renderStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
+  const st = steps[idx];
+  const n = s.length;
+
+  // Blocks
+  for (let i = 0; i < n; i++) {
+    const b = document.getElementById(`block-${i}`);
+    b.className = 'char-block';
+    const inWindow = i >= st.L && i <= st.R;
+    if (inWindow) {
+      if (i === st.L && i === st.R) b.classList.add('is-both');
+      else if (i === st.L) b.classList.add('is-left');
+      else if (i === st.R) b.classList.add('is-right');
+      else b.classList.add('in-window');
+    }
+    if (st.isBest && st.bestLen) {
+      const bL = st.bestL, bR = st.bestL + st.bestLen - 1;
+      if (i >= bL && i <= bR && st.type === 'found') b.classList.add('in-best');
+    }
+  }
+
+  // Pointer labels — positioned over blocks
+  const ab = document.getElementById('arrayBlocks');
+  const pl = document.getElementById('pointerLabels');
+  pl.innerHTML = '';
+  const blockW = 58; // 52 + 6 gap
+  const lx = st.L * blockW + 26;
+  const rx = st.R * blockW + 26;
+  if (st.L !== st.R) {
+    pl.innerHTML = `
+      <span class="ptr-label ptr-L" style="left:${lx}px">L</span>
+      <span class="ptr-label ptr-R" style="left:${rx}px">R</span>
+    `;
+  } else {
+    pl.innerHTML = `<span class="ptr-label ptr-L" style="left:${lx}px;background:#9b59b6">L=R</span>`;
+  }
+
+  // Variables
+  setVar('valL', st.L, 'varL');
+  setVar('valR', st.R, 'varR');
+  setVar('valFormed', st.formed, 'varFormed');
+  setVar('valRequired', st.required, 'varRequired');
+  setVar('valBestLen', st.bestLen ?? '∞', 'varBestLen');
+  setVar('valBestL', st.bestLen ? st.bestL : '—', 'varBestL');
+
+  // formed label
+  document.getElementById('formedVal').textContent = st.formed;
+  document.getElementById('requiredVal').textContent = st.required;
+
+  // Map
+  const need = st.need;
+  const have = st.have;
+  for (const [c, cnt] of Object.entries(need)) {
+    const h = have[c] || 0;
+    const bar = document.getElementById(`mapbar-${c}`);
+    const haveEl = document.getElementById(`maphave-${c}`);
+    const row = document.getElementById(`maprow-${c}`);
+    if (!bar) continue;
+    const pct = Math.min(100, (h / cnt) * 100);
+    bar.style.width = pct + '%';
+    bar.className = 'map-bar' + (h >= cnt ? ' over' : ' under');
+    haveEl.textContent = h;
+    row.className = 'map-row' + (h >= cnt ? ' satisfied' : ' deficit');
+  }
+
+  // Target block satisfaction
+  document.querySelectorAll('.target-block').forEach(tb => {
+    const c = tb.dataset.char;
+    const h = have[c] || 0;
+    const n = need[c] || 0;
+    tb.classList.toggle('satisfied', h >= n);
+  });
+
+  // Step box
+  const box = document.getElementById('stepBox');
+  const desc = document.getElementById('stepDesc');
+  box.className = 'step-box';
+  if (st.type === 'found') box.classList.add('step-found');
+  else if (st.type === 'shrink' || st.type === 'shrink_ok') box.classList.add('step-shrink');
+  desc.innerHTML = st.desc;
+
+  // Code highlight
+  highlightCode(st.type);
+
+  // Best result
+  const bs = document.getElementById('bestSection');
+  const bv = document.getElementById('bestValue');
+  const bm = document.getElementById('bestMeta');
+  if (st.bestLen) {
+    bs.classList.remove('empty');
+    bv.textContent = s.slice(st.bestL, st.bestL + st.bestLen);
+    bm.textContent = `indices [${st.bestL}, ${st.bestL + st.bestLen - 1}] · length ${st.bestLen}`;
+  } else {
+    bs.classList.add('empty');
+    bv.textContent = '—';
+    bm.textContent = 'none yet';
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent = `Step ${idx + 1}`;
+  document.getElementById('progressFill').style.width = ((idx + 1) / steps.length * 100) + '%';
+
+  // Done
+  if (st.type === 'done') {
+    document.getElementById('doneBanner').classList.add('show');
+  }
+
+  // Nav buttons
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+
+  currentStep = idx;
+}
+
+let prevVals = {};
+function setVar(elId, val, cardId) {
+  const el = document.getElementById(elId);
+  const card = document.getElementById(cardId);
+  const strVal = String(val);
+  el.textContent = strVal;
+  if (prevVals[elId] !== undefined && prevVals[elId] !== strVal) {
+    card.classList.remove('changed');
+    void card.offsetWidth;
+    card.classList.add('changed');
+    setTimeout(() => card.classList.remove('changed'), 500);
+  }
+  prevVals[elId] = strVal;
+}
+
+function play() {
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  playing = true;
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnPause').textContent = '⏸ Pause';
+  document.getElementById('btnRun').disabled = true;
+  tick();
+}
+
+function tick() {
+  if (!playing) return;
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  renderStep(currentStep + 1);
+  timer = setTimeout(tick, speed);
+}
+
+function stopPlay() {
+  playing = false;
+  clearTimeout(timer);
+  document.getElementById('btnPause').textContent = '▶ Resume';
+  document.getElementById('btnRun').disabled = false;
+}
+
+// CONTROLS
+document.getElementById('btnRun').addEventListener('click', () => {
+  buildUI();
+  setTimeout(play, 200);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  stopPlay();
+  buildUI();
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => {
+  stopPlay();
+  renderStep(currentStep - 1);
+});
+
+document.getElementById('btnNext').addEventListener('click', () => {
+  stopPlay();
+  renderStep(currentStep + 1);
+});
+
+document.getElementById('btnPause').addEventListener('click', () => {
+  if (playing) stopPlay();
+  else play();
+});
+
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    speed = parseInt(btn.dataset.ms);
+  });
+});
+
+// INIT
+buildUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search — Capacity to Ship Packages · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:24px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(6,214,160,0.25);border:1px solid var(--accent3);color:var(--accent3);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 78px);overflow:hidden;}
+  .viz-panel{padding:26px 34px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:12px;margin-bottom:22px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.95rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent3);}
+  .field input.wide{width:260px;}
+  .field input.small{width:80px;}
+  .btn{padding:8px 18px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#006d4e;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:6px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:7px 11px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:7px;font-size:0.78rem;}
+  .zone-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+  /* ══════════════════════════════
+     PACKAGES ROW — the weight blocks
+  ══════════════════════════════ */
+  .section-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+  .packages-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:16px 16px 20px;margin-bottom:16px;overflow-x:auto;}
+  .packages-row{display:flex;gap:5px;flex-wrap:nowrap;align-items:flex-end;}
+  .pkg-block{
+    flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    border-radius:6px 6px 4px 4px;border:2px solid var(--border);background:var(--surface);
+    font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--muted);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position:relative;min-width:44px;
+  }
+  .pkg-block .pkg-w{padding:4px 6px 3px;line-height:1;}
+  .pkg-block .pkg-idx{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:0.52rem;color:var(--muted);}
+  /* package states */
+  .pkg-block.pkg-done    {background:rgba(6,214,160,0.1);  border-color:var(--accent3);color:#028a5b;}
+  .pkg-block.pkg-loading {background:rgba(255,209,102,0.2);border-color:var(--accent4);color:#7a5a00;transform:translateY(-4px);}
+  .pkg-block.pkg-overflow{background:rgba(230,57,70,0.1);  border-color:var(--accent);  color:var(--accent);}
+  .pkg-block.pkg-waiting {background:rgba(33,150,243,0.07);border-color:var(--accent2); color:var(--accent2);}
+  .pkg-block.pkg-ans     {background:rgba(6,214,160,0.15); border-color:var(--accent3);color:#028a5b;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 1: CAPACITY SEARCH BAR
+     Binary search on capacity space, not index.
+     Shows lo/mid/hi as positions on a number line.
+  ══════════════════════════════ */
+  .cap-search-section{margin-bottom:16px;}
+  .cap-search-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .cap-bar-wrap{
+    background:var(--surface);border:1.5px solid var(--border);
+    border-radius:10px;padding:18px 18px 28px;position:relative;
+  }
+  .cap-track{height:8px;background:#e8e2d4;border-radius:4px;position:relative;margin-bottom:6px;}
+  .cap-fill-lo{position:absolute;left:0;top:0;height:100%;background:rgba(230,57,70,0.25);border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .cap-fill-active{position:absolute;top:0;height:100%;background:rgba(255,209,102,0.4);transition:left 0.4s,width 0.4s;}
+  .cap-fill-hi{position:absolute;right:0;top:0;height:100%;background:rgba(33,150,243,0.2);border-radius:0 4px 4px 0;transition:width 0.4s;}
+  .cap-fill-ans{position:absolute;top:-2px;width:4px;height:12px;background:var(--accent3);border-radius:2px;transition:left 0.4s;z-index:2;}
+  /* pointer ticks */
+  .cap-ptr{position:absolute;bottom:-22px;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;transition:left 0.4s cubic-bezier(0.34,1.56,0.64,1);}
+  .cap-ptr-lo {background:var(--accent); color:white;}
+  .cap-ptr-mid{background:var(--accent4);color:#333;}
+  .cap-ptr-hi {background:var(--accent2);color:white;}
+  .cap-ptr-ans{background:var(--accent3);color:#014d3a;}
+  /* endpoint labels */
+  .cap-endpoints{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-top:28px;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 2: LOADING SIMULATION
+     Shows the greedy canShip(mid) day-by-day.
+     Packages stack into truck rows.
+  ══════════════════════════════ */
+  .sim-section{margin-bottom:16px;}
+  .sim-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .sim-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;}
+  .sim-capacity-bar{margin-bottom:12px;}
+  .sim-cap-label{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between;}
+  .sim-cap-track{height:14px;background:#e8e2d4;border-radius:6px;overflow:hidden;position:relative;}
+  .sim-cap-fill{height:100%;border-radius:6px;transition:width 0.4s,background 0.3s;background:var(--accent3);}
+  .sim-cap-fill.overflow{background:var(--accent);}
+  .sim-days-wrap{display:flex;flex-direction:column;gap:6px;}
+  .sim-day{
+    display:flex;align-items:center;gap:8px;
+    background:#f8f5ee;border:1.5px solid var(--border);
+    border-radius:7px;padding:7px 10px;transition:all 0.3s;
+  }
+  .sim-day.day-active{border-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .sim-day.day-done  {border-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .sim-day.day-over  {border-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .sim-day-label{font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;color:var(--muted);width:40px;flex-shrink:0;}
+  .sim-day-pkgs{display:flex;gap:4px;flex-wrap:wrap;flex:1;}
+  .sim-pkg{
+    font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:700;
+    padding:2px 7px;border-radius:4px;
+    background:rgba(6,214,160,0.12);border:1px solid var(--accent3);color:#028a5b;
+  }
+  .sim-pkg.pkg-cur{background:rgba(255,209,102,0.2);border-color:var(--accent4);color:#7a5a00;}
+  .sim-pkg.pkg-over{background:rgba(230,57,70,0.1);border-color:var(--accent);color:var(--accent);}
+  .sim-day-sum{font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--muted);white-space:nowrap;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 3: FEASIBILITY VERDICT
+  ══════════════════════════════ */
+  .verdict-row{display:flex;gap:10px;margin-bottom:16px;}
+  .verd-card{
+    flex:1;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 13px;background:var(--surface);transition:all 0.3s;
+    font-family:'Space Mono',monospace;
+  }
+  .verd-card .vc-label{font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .verd-card .vc-val{font-size:1rem;font-weight:700;color:var(--muted);}
+  .verd-card.feasible{border-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .verd-card.feasible .vc-val{color:#028a5b;}
+  .verd-card.infeasible{border-color:var(--accent);background:rgba(230,57,70,0.05);}
+  .verd-card.infeasible .vc-val{color:var(--accent);}
+  .verd-decision{
+    flex:2;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 13px;background:var(--surface);transition:all 0.3s;
+  }
+  .verd-decision .vc-label{font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .verd-decision .vc-val{font-size:0.82rem;line-height:1.5;color:var(--ink);}
+  .verd-decision.dec-left {border-color:var(--accent3);background:rgba(6,214,160,0.04);}
+  .verd-decision.dec-right{border-color:var(--accent); background:rgba(230,57,70,0.04);}
+  .verd-decision.dec-done {border-color:var(--accent3);background:rgba(6,214,160,0.08);}
+
+  /* 3-TAB EXPLANATION PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init    {border-color:var(--accent3);}
+  .explain-panel.ep-feasible{border-color:var(--accent3);}
+  .explain-panel.ep-infeas  {border-color:var(--accent);}
+  .explain-panel.ep-sim     {border-color:var(--accent4);}
+  .explain-panel.ep-done    {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent3);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:13px 17px;min-height:84px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init   {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-feasible{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-infeas {border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-done   {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:16px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);margin-bottom:5px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:14px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:10px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.6rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 78px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:16px 16px 10px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.66rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.9em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init  {background:rgba(6,214,160,0.15); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-mid   {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-sim   {background:rgba(255,209,102,0.12);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-feasible{background:rgba(6,214,160,0.18);border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-infeas{background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-done  {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:14px 16px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:10px 12px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.57rem;color:#6b6b8a;margin-bottom:4px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.blue{color:#4fc3f7;}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* MINI PACKAGES (right panel) */
+  .arr-state{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  .arr-mini{display:flex;gap:3px;flex-wrap:wrap;}
+  .arr-mini-block{height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all 0.25s;padding:0 6px;}
+  .arr-mini-block.pkg-done   {background:rgba(6,214,160,0.2); border-color:#06d6a0;color:#06d6a0;}
+  .arr-mini-block.pkg-cur    {background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .arr-mini-block.pkg-over   {background:rgba(230,57,70,0.2); border-color:#e63946;color:#ff6b6b;}
+  .arr-mini-block.pkg-waiting{background:rgba(33,150,243,0.15);border-color:#2196f3;color:#4fc3f7;}
+  .arr-mini-block.pkg-ans    {background:rgba(6,214,160,0.25);border-color:#06d6a0;color:#06d6a0;}
+
+  /* CAPACITY RANGE BAR (right panel) */
+  .range-track{margin-bottom:12px;}
+  .range-bar-wrap{height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden;position:relative;margin-top:6px;}
+  .range-bar-dead-l{position:absolute;left:0;top:0;height:100%;background:#2a2a3e;border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .range-bar-active{position:absolute;top:0;height:100%;background:var(--accent4);opacity:0.7;transition:left 0.4s,width 0.4s;}
+  .range-bar-dead-r{position:absolute;right:0;top:0;height:100%;background:#2a2a3e;border-radius:0 4px 4px 0;transition:width 0.4s;}
+
+  /* RESULT */
+  .best-box{margin:0 0 14px;padding:12px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);letter-spacing:4px;}
+  .best-meta{font-size:0.65rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 16px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+
+  /* PROBLEM STATEMENT CARD */
+  .problem-card{
+    background:var(--surface);border:1.5px solid var(--border);
+    border-left:4px solid var(--accent3);border-radius:8px;
+    padding:14px 18px;margin-bottom:16px;
+  }
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;
+    text-transform:uppercase;letter-spacing:1.5px;color:var(--accent3);margin-bottom:8px;}
+  .prob-body{font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .prob-body strong{font-weight:700;color:var(--ink);}
+  .prob-body em{font-style:italic;color:var(--muted);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:10px;background:rgba(6,214,160,0.06);
+    border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:9px 12px;
+    font-family:'Space Mono',monospace;font-size:0.72rem;line-height:1.7;color:var(--ink);}
+  .prob-example .ex-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;
+    color:var(--muted);display:block;margin-bottom:4px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Capacity to Ship Packages Within D Days</h1>
+    <div class="sub">Binary Search · Feasibility Check · Live Visualizer</div>
+  </div>
+  <div class="family-badge">03·04 · Answer Space</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════════ LEFT ════════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Package Weights</label>
+      <input type="text" id="inputWeights" value="1,2,3,4,5,6,7,8,9,10" class="wide">
+    </div>
+    <div class="field">
+      <label>Days (D)</label>
+      <input type="text" id="inputDays" value="5" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.1);border-color:#06d6a0"></div>Shipped</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>Being Loaded</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.1);border-color:#e63946"></div>Overflow (new day)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.07);border-color:#2196f3"></div>Waiting</div>
+  </div>
+
+  <!-- PACKAGES ROW -->
+  <div class="section-label">Packages</div>
+  <div class="packages-wrap">
+    <div class="packages-row" id="packagesRow"></div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: CAPACITY SEARCH BAR -->
+  <div class="cap-search-section">
+    <div class="cap-search-label">Capacity Search Space  [max(w) … sum(w)]</div>
+    <div class="cap-bar-wrap" id="capBarWrap">
+      <div class="cap-track" id="capTrack">
+        <div class="cap-fill-lo"     id="capFillLo"  style="width:0%"></div>
+        <div class="cap-fill-active" id="capFillAct" style="left:0%;width:100%"></div>
+        <div class="cap-fill-hi"     id="capFillHi"  style="width:0%"></div>
+        <div class="cap-fill-ans"    id="capFillAns" style="left:0%;display:none"></div>
+      </div>
+      <!-- pointer labels positioned inside -->
+      <div class="cap-ptr cap-ptr-lo"  id="capPtrLo"  style="left:0%">lo</div>
+      <div class="cap-ptr cap-ptr-mid" id="capPtrMid" style="left:50%;display:none">mid</div>
+      <div class="cap-ptr cap-ptr-hi"  id="capPtrHi"  style="left:100%">hi</div>
+      <div class="cap-ptr cap-ptr-ans" id="capPtrAns" style="left:0%;display:none">ans</div>
+      <div class="cap-endpoints" id="capEndpoints">
+        <span id="capMin">—</span>
+        <span id="capMax">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: LOADING SIMULATION -->
+  <div class="sim-section">
+    <div class="sim-label">Greedy Simulation — canShip(mid capacity)</div>
+    <div class="sim-wrap" id="simWrap">
+      <div class="sim-capacity-bar">
+        <div class="sim-cap-label">
+          <span>Current day load</span>
+          <span id="simCapText">— / —</span>
+        </div>
+        <div class="sim-cap-track">
+          <div class="sim-cap-fill" id="simCapFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="sim-days-wrap" id="simDays">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);text-align:center;padding:10px 0;">
+          Press RUN to see simulation
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: FEASIBILITY VERDICT -->
+  <div class="verdict-row" id="verdictRow">
+    <div class="verd-card" id="verdDays">
+      <div class="vc-label">Days needed</div>
+      <div class="vc-val" id="verdDaysVal">—</div>
+    </div>
+    <div class="verd-card" id="verdCap">
+      <div class="vc-label">Capacity (mid)</div>
+      <div class="vc-val" id="verdCapVal">—</div>
+    </div>
+    <div class="verd-decision" id="verdDecision">
+      <div class="vc-label">Verdict → Action</div>
+      <div class="vc-val" id="verdDecVal">waiting…</div>
+    </div>
+  </div>
+
+  <!-- PROBLEM STATEMENT CARD — always visible, updates with current inputs -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      You have <strong id="probN">—</strong> packages on a conveyor belt with weights
+      <strong id="probWeightsList">—</strong>. A ship makes <strong>one trip per day</strong>,
+      loading packages <em>in order</em> (no reordering allowed) up to its capacity limit per trip.
+      <br><br>
+      <strong>Find the minimum ship capacity</strong> so that all packages are delivered within
+      <span class="prob-hi" id="probD">D</span> days.
+      <br><br>
+      <strong>Key constraints:</strong> capacity ≥ max(weights) (heaviest package must fit),
+      capacity ≤ sum(weights) (worst case: ship everything in one day).
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION PANEL -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════════ RIGHT ════════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">shipWithinDays</span>(</span>
+<span class="code-line" id="cl-sig2">    vector&lt;<span class="ck">int</span>&gt;&amp; w, <span class="ck">int</span> D) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> lo=*max_element(w.begin(),w.end());</span>
+<span class="code-line" id="cl-init2">  <span class="ck">int</span> hi=accumulate(w.begin(),w.end(),<span class="cn">0</span>);</span>
+<span class="code-line" id="cl-ans">  <span class="ck">int</span> ans=hi;  <span class="cc">// worst case: all in 1 day</span></span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (lo &lt;= hi) {</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid = lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-can">    <span class="ck">if</span> (<span class="cf">canShip</span>(w, mid, D)) {</span>
+<span class="code-line" id="cl-upd">      ans = mid;  <span class="cc">// feasible → record</span></span>
+<span class="code-line" id="cl-gohi">      hi = mid-<span class="cn">1</span>; <span class="cc">// try smaller capacity</span></span>
+<span class="code-line" id="cl-golo">    } <span class="ck">else</span> lo=mid+<span class="cn">1</span>; <span class="cc">// need more capacity</span></span>
+<span class="code-line" id="cl-wend">  } <span class="ck">return</span> ans;</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-fn"><span class="ck">bool</span> <span class="cf">canShip</span>(w, cap, D) {</span>
+<span class="code-line" id="cl-fninit">  <span class="ck">int</span> days=<span class="cn">1</span>, load=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-fnloop">  <span class="ck">for</span> (<span class="ck">int</span> x : w) {</span>
+<span class="code-line" id="cl-fnadd">    load += x;</span>
+<span class="code-line" id="cl-fnover">    <span class="ck">if</span> (load &gt; cap)</span>
+<span class="code-line" id="cl-fnnewday">      { days++; load=x; }</span>
+<span class="code-line" id="cl-fnend">  }</span>
+<span class="code-line" id="cl-fnret">  <span class="ck">return</span> days &lt;= D;</span>
+<span class="code-line" id="cl-fnclose">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo">  <div class="var-name">lo (cap)</div>    <div class="var-value red"  id="vLo">—</div></div>
+      <div class="var-card" id="vcHi">  <div class="var-name">hi (cap)</div>    <div class="var-value blue" id="vHi">—</div></div>
+      <div class="var-card" id="vcMid"> <div class="var-name">mid (cap)</div>   <div class="var-value yel"  id="vMid">—</div></div>
+      <div class="var-card" id="vcAns"> <div class="var-name">ans (best)</div>  <div class="var-value grn"  id="vAns">—</div></div>
+      <div class="var-card" id="vcDays"><div class="var-name">days (sim)</div>  <div class="var-value pur"  id="vDays">—</div></div>
+      <div class="var-card" id="vcLoad"><div class="var-name">load (sim)</div>  <div class="var-value yel"  id="vLoad">—</div></div>
+      <div class="var-card" id="vcD" style="grid-column:1/3"><div class="var-name">D (max days allowed)</div><div class="var-value" id="vD" style="color:#e2e8f0;">—</div></div>
+    </div>
+
+    <!-- MINI PACKAGES -->
+    <div class="arr-state">
+      <div class="arr-state-title">Package Weights</div>
+      <div class="arr-mini" id="arrMini"></div>
+    </div>
+
+    <!-- CAPACITY RANGE BAR -->
+    <div class="range-track">
+      <div class="arr-state-title">Capacity Search Space</div>
+      <div class="range-bar-wrap">
+        <div class="range-bar-dead-l" id="rbl" style="width:0%"></div>
+        <div class="range-bar-active" id="rba" style="left:0%;width:100%"></div>
+        <div class="range-bar-dead-r" id="rbr" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Minimum Capacity</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// canShip helper — returns {days, dayLoads}
+// ─────────────────────────────────────────────
+function canShip(weights, cap, D){
+  let days=1, load=0;
+  const dayLoads=[[]]; // array of arrays per day
+  for(const w of weights){
+    if(load+w>cap){days++;load=0;dayLoads.push([]);}
+    load+=w;
+    dayLoads[dayLoads.length-1].push(w);
+  }
+  return{days,feasible:days<=D,dayLoads};
+}
+
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(lo,hi,D,n)=>({
+    why:`<div class="ep-why-block why-init">We binary search on the <strong>answer space</strong> — the set of possible capacities. The minimum possible capacity is max(weights) (we must carry the heaviest package). The maximum is sum(weights) (ship everything in one day). For each candidate mid, we run a greedy simulation in O(n) to check if D days suffice. Total: O(n log(sum−max)).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> lo=${lo} (max weight), hi=${hi} (total weight), ans=${hi}. D=${D} days allowed. ${n} packages.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The monotonicity invariant:</strong> If capacity C is feasible (canShip returns true), then any C' > C is also feasible. If C is infeasible, any C' < C is also infeasible. This monotone structure makes binary search valid.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why binary search on answer space?</strong> We can't binary search the packages directly — there's no sorted order to exploit. But the answer space [max..sum] IS monotone: feasibility is a step function that goes false→true at exactly one threshold.`},
+    ]
+  }),
+  calc_mid:(lo,hi,mid)=>({
+    why:`<div class="ep-why-block why-init">mid = ${lo}+(${hi}−${lo})/2 = ${mid}. This is the candidate ship capacity. We will now run canShip(weights, ${mid}, D) to see if ${mid} is enough capacity to ship all packages in ≤ D days.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant holds:</strong> lo=${lo} ≤ mid=${mid} ≤ hi=${hi}. Search space = ${hi-lo+1} distinct capacities.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Candidate capacity:</strong> If mid is feasible, the true answer is ≤ mid. If infeasible, the true answer is > mid. Either way we halve the space.`},
+    ]
+  }),
+  sim_step:(pkg,day,load,cap,isOver)=>({
+    why:`<div class="ep-why-block why-init">${isOver?`Package weight ${pkg} would push load to ${load+pkg} > capacity ${cap}. Start a NEW DAY — reset load to ${pkg}.`:`Add package weight ${pkg} to current day. New load = ${load+pkg} ≤ capacity ${cap}. Stays on same day.`}</div>`,
+    inv:[
+      {icon:isOver?'📦':'➕',cls:isOver?'inv-key':'',text:isOver?`<strong>Overflow triggered:</strong> ${load}+${pkg}=${load+pkg} > cap=${cap}. days++, load=${pkg}.`:`<strong>Package fits:</strong> ${load}+${pkg}=${load+pkg} ≤ cap=${cap}. Same day.`},
+    ]
+  }),
+  feasible:(mid,days,D,ans)=>({
+    why:`<div class="ep-why-block why-feasible">canShip(${mid}) returned true — needs only ${days} days ≤ D=${D}. Capacity ${mid} works! Record ans=${mid}, then try <strong>smaller</strong>: hi = mid−1. We want the <em>minimum</em> feasible capacity.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Feasible:</strong> ${days} days needed ≤ D=${D}. ans updated to ${ans}. Any capacity > ${mid} is also feasible — they're not the minimum.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Go left (hi = mid−1):</strong> The answer is in [lo..mid−1]. The current mid is a valid answer, but maybe something smaller also works.`},
+    ]
+  }),
+  infeasible:(mid,days,D)=>({
+    why:`<div class="ep-why-block why-infeas">canShip(${mid}) returned false — needs ${days} days > D=${D}. Capacity ${mid} is too small. We must <strong>increase</strong> the capacity: lo = mid+1.</div>`,
+    inv:[
+      {icon:'❌',cls:'inv-key',text:`<strong>Infeasible:</strong> ${days} days needed > D=${D}. Capacity ${mid} can't ship all packages in time.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Go right (lo = mid+1):</strong> The answer is in [mid+1..hi]. By monotonicity, all capacities ≤ mid are also infeasible.`},
+    ]
+  }),
+  done:(ans,D,n)=>({
+    why:`<div class="ep-why-block why-done">lo crossed hi — every candidate capacity was checked. ans holds the minimum capacity that lets all ${n} packages ship within ${D} days. O(n log(sum−max)) total — log iterations, each O(n) for the greedy simulation.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> Every time canShip returned true, we recorded ans and moved hi down. When it returned false, we moved lo up. The final ans is the smallest capacity where canShip is true.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n · log(sum−max))</strong> — the search space is [max..sum] of size sum−max. Each iteration runs the O(n) greedy simulation. This is much better than the O(n²) brute force.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The feasibility check pattern:</strong> Any time you can write a canX(threshold) function that is monotone (false for small, true for large, or vice versa), you can binary search for the exact threshold in O(log range) iterations.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',calc_mid:'ep-sim',sim_step:'ep-sim',
+    feasible:'ep-feasible',infeasible:'ep-infeas',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:      {ids:['cl-sig','cl-sig2','cl-init','cl-init2','cl-ans','cl-whl'],cls:'hl-init'},
+  calc_mid:  {ids:['cl-mid','cl-can'],                                         cls:'hl-mid'},
+  sim_step:  {ids:['cl-fnloop','cl-fnadd','cl-fnover','cl-fnnewday'],          cls:'hl-sim'},
+  feasible:  {ids:['cl-can','cl-upd','cl-gohi'],                               cls:'hl-feasible'},
+  infeasible:{ids:['cl-can','cl-golo'],                                        cls:'hl-infeas'},
+  done:      {ids:['cl-wend'],                                                 cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// ALGORITHM — computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(weights, D){
+  const steps=[];
+  const n=weights.length;
+  const loInit=Math.max(...weights);
+  const hiInit=weights.reduce((a,b)=>a+b,0);
+  let lo=loInit, hi=hiInit, ans=hiInit;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    lo,hi,ans,D,n,weights:[...weights],desc,type,explain,...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} packages, D=${D} days allowed. `
+    +`Capacity must be in [<span style="color:#e63946;font-weight:700">${loInit}</span>&thinsp;…&thinsp;<span style="color:#2196f3;font-weight:700">${hiInit}</span>] `
+    +`(lo = max weight, hi = total weight). `
+    +`Instead of checking every possible capacity, we binary search this range: `
+    +`for each candidate <span style="color:#7a5a00;font-weight:700">mid</span>, we simulate loading packages greedily and count days. `
+    +`If days ≤ D → feasible, record <span style="color:#028a5b;font-weight:700">ans = mid</span> and try smaller. `
+    +`If days &gt; D → too small, go larger.`,
+    'init', EXPLAIN.init(loInit,hiInit,D,n)
+  );
+
+  while(lo<=hi){
+    const mid=lo+Math.floor((hi-lo)/2);
+    snap(
+      `🔢 <strong>Compute mid.</strong> lo=${lo}, hi=${hi} → capacity candidate = <span style="color:#7a5a00;font-weight:700">${mid}</span>. Running canShip(${mid})…`,
+      'calc_mid', EXPLAIN.calc_mid(lo,hi,mid),
+      {mid, simDays:null, simLoad:null, simPkgIdx:-1}
+    );
+
+    // Simulate canShip step by step
+    const {days,feasible,dayLoads}=canShip(weights,mid,D);
+
+    // Push one sim step per package for visualization
+    let simDays=1, simLoad=0;
+    for(let i=0;i<n;i++){
+      const w=weights[i];
+      const willOver=simLoad+w>mid;
+      if(willOver){simDays++;simLoad=0;}
+      simLoad+=w;
+      snap(
+        willOver
+          ? `📦 pkg[${i}]=${w} would overflow (${simLoad-w}+${w}=${simLoad-w+w}>${mid}). <span style="color:var(--accent);font-weight:700">New day ${simDays}.</span> Load reset to ${w}.`
+          : `➕ pkg[${i}]=${w} fits. Load = ${simLoad} ≤ ${mid}. Staying on day ${simDays}.`,
+        'sim_step', EXPLAIN.sim_step(w,simDays,willOver?simLoad-w:simLoad-w,mid,willOver),
+        {mid, simDays, simLoad, simPkgIdx:i, simDayLoads:JSON.parse(JSON.stringify(dayLoads)),
+         simWillOver:willOver, simTotalDays:days, simFeasible:feasible}
+      );
+    }
+
+    // Verdict step
+    const improved=mid<ans;
+    if(improved) ans=mid;
+    snap(
+      feasible
+        ? `✅ <span style="color:#028a5b;font-weight:700">FEASIBLE</span> — canShip(${mid}) needs ${days} days ≤ D=${D}. `
+          +(improved?`ans updated to <span style="color:#028a5b;font-weight:700">${ans}</span>. `:`ans stays ${ans}. `)
+          +`Try smaller: <strong>hi = mid−1 = ${mid-1}</strong>.`
+        : `❌ <span style="color:var(--accent);font-weight:700">INFEASIBLE</span> — canShip(${mid}) needs ${days} days > D=${D}. Too small. <strong>lo = mid+1 = ${mid+1}</strong>.`,
+      feasible?'feasible':'infeasible',
+      feasible?EXPLAIN.feasible(mid,days,D,ans):EXPLAIN.infeasible(mid,days,D),
+      {mid, simDays:days, simLoad:null, simPkgIdx:-1,
+       simDayLoads:dayLoads, simTotalDays:days, simFeasible:feasible}
+    );
+
+    if(feasible) hi=mid-1; else lo=mid+1;
+  }
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> Minimum ship capacity = <span style="color:#028a5b;font-weight:700">${ans}</span>. All ${n} packages ship within D=${D} days.`,
+    'done', EXPLAIN.done(ans,D,n),
+    {mid:null,result:{ans}}
+  );
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let weightsVal=[], DVal=0, loInit=0, hiInit=0;
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  weightsVal=document.getElementById('inputWeights').value.split(',')
+    .map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>0);
+  DVal=parseInt(document.getElementById('inputDays').value.trim());
+  if(!weightsVal.length||isNaN(DVal)||DVal<1)return;
+  loInit=Math.max(...weightsVal);
+  hiInit=weightsVal.reduce((a,b)=>a+b,0);
+
+  steps=computeSteps(weightsVal,DVal);
+  currentStep=0;
+
+  // Populate problem statement card
+  document.getElementById('probN').textContent=weightsVal.length;
+  document.getElementById('probWeightsList').textContent=`[${weightsVal.join(', ')}]`;
+  document.getElementById('probD').textContent=DVal;
+  // Build worked example: show what canShip(ans) looks like
+  const ansVal=steps[steps.length-1].ans;
+  const {days:ansDays,dayLoads:ansLoads}=canShip(weightsVal,ansVal,DVal);
+  const exDays=ansLoads.map((pkgs,i)=>`Day ${i+1}: [${pkgs.join(',')}] = ${pkgs.reduce((a,b)=>a+b,0)}`).join(' | ');
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">Example with optimal capacity = ${ansVal}</span>`
+    +`${exDays}<br>→ ${ansDays} day${ansDays>1?'s':''} needed ≤ D=${DVal} ✓`;
+
+  // Package blocks — height proportional to weight
+  const maxW=Math.max(...weightsVal);
+  const pr=document.getElementById('packagesRow');
+  pr.innerHTML='';
+  weightsVal.forEach((w,i)=>{
+    const d=document.createElement('div');
+    d.className='pkg-block pkg-waiting';
+    d.id=`pkg-${i}`;
+    const h=Math.round(24+((w/maxW)*36));
+    d.style.height=h+'px';
+    d.innerHTML=`<div class="pkg-w">${w}</div><span class="pkg-idx">${i}</span>`;
+    pr.appendChild(d);
+  });
+
+  // Mini packages
+  const ma=document.getElementById('arrMini');
+  ma.innerHTML='';
+  weightsVal.forEach((w,i)=>{
+    const d=document.createElement('div');
+    d.className='arr-mini-block pkg-waiting';d.id=`mini-${i}`;
+    d.textContent=w;ma.appendChild(d);
+  });
+
+  // Capacity endpoints
+  document.getElementById('capMin').textContent=`lo=${loInit}`;
+  document.getElementById('capMax').textContent=`hi=${hiInit}`;
+  document.getElementById('vD').textContent=DVal;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('simDays').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);text-align:center;padding:10px 0;">Press RUN to see simulation</div>`;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+// Map capacity value → percentage in [loInit..hiInit]
+function capPct(c){
+  if(hiInit===loInit)return 0;
+  return Math.max(0,Math.min(100,((c-loInit)/(hiInit-loInit))*100));
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const mid=st.mid;
+
+  // Package blocks state
+  weightsVal.forEach((_,i)=>{
+    const b=document.getElementById(`pkg-${i}`);
+    const m=document.getElementById(`mini-${i}`);
+    if(!b||!m)return;
+    let cls='pkg-block', mcls='arr-mini-block';
+    if(isFinal){cls+=' pkg-ans';mcls+=' pkg-ans';}
+    else if(st.type==='sim_step'){
+      if(i<st.simPkgIdx){cls+=' pkg-done';mcls+=' pkg-done';}
+      else if(i===st.simPkgIdx){
+        cls+=(st.simWillOver?' pkg-overflow':' pkg-loading');
+        mcls+=(st.simWillOver?' pkg-over':' pkg-cur');
+      } else {cls+=' pkg-waiting';mcls+=' pkg-waiting';}
+    } else if(st.type==='feasible'||st.type==='infeasible'){
+      cls+=(st.simFeasible?' pkg-done':' pkg-overflow');
+      mcls+=(st.simFeasible?' pkg-done':' pkg-over');
+    } else {cls+=' pkg-waiting';mcls+=' pkg-waiting';}
+    b.className=cls; m.className=mcls;
+  });
+
+  // Capacity search bar
+  const loPct=capPct(st.lo), hiPct=capPct(st.hi);
+  const actW=Math.max(hiPct-loPct,0.5);
+  document.getElementById('capFillLo').style.width=loPct+'%';
+  document.getElementById('capFillAct').style.left=loPct+'%';
+  document.getElementById('capFillAct').style.width=actW+'%';
+  document.getElementById('capFillHi').style.width=(100-hiPct)+'%';
+
+  // Pointer positions
+  const pLo=document.getElementById('capPtrLo');
+  const pMid=document.getElementById('capPtrMid');
+  const pHi=document.getElementById('capPtrHi');
+  const pAns=document.getElementById('capPtrAns');
+  pLo.style.left=loPct+'%'; pLo.textContent=`lo=${st.lo}`;
+  pHi.style.left=hiPct+'%'; pHi.textContent=`hi=${st.hi}`;
+  if(mid!=null&&mid>=0){
+    const mp=capPct(mid);
+    pMid.style.left=mp+'%'; pMid.textContent=`mid=${mid}`; pMid.style.display='';
+    document.getElementById('capFillAns').style.display='none';
+    pAns.style.display='none';
+  } else {
+    pMid.style.display='none';
+  }
+  if(st.ans<hiInit||isFinal){
+    const ap=capPct(st.ans);
+    document.getElementById('capFillAns').style.left=ap+'%';
+    document.getElementById('capFillAns').style.display='';
+    pAns.style.left=ap+'%'; pAns.textContent=`ans=${st.ans}`; pAns.style.display='';
+  }
+
+  // Loading simulation display
+  if(st.simDayLoads&&(st.type==='sim_step'||st.type==='feasible'||st.type==='infeasible')){
+    renderSimulation(st);
+  } else if(st.type==='init'||st.type==='calc_mid'){
+    const sd=document.getElementById('simDays');
+    sd.innerHTML=mid!=null
+      ? `<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);text-align:center;padding:8px 0;">Simulating capacity ${mid}…</div>`
+      : `<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);text-align:center;padding:8px 0;">Waiting for mid computation…</div>`;
+  }
+
+  // Capacity bar fill on sim step
+  if(st.type==='sim_step'&&mid!=null){
+    const pct=Math.min(100,(st.simLoad/mid)*100);
+    const fill=document.getElementById('simCapFill');
+    fill.style.width=pct+'%';
+    fill.className='sim-cap-fill'+(st.simWillOver?' overflow':'');
+    document.getElementById('simCapText').textContent=`${st.simLoad} / ${mid}`;
+  } else if(mid!=null){
+    document.getElementById('simCapFill').style.width='0%';
+    document.getElementById('simCapFill').className='sim-cap-fill';
+    document.getElementById('simCapText').textContent=`— / ${mid}`;
+  }
+
+  // Verdict row
+  const vDays=document.getElementById('verdDays');
+  const vCap=document.getElementById('verdCap');
+  const vDec=document.getElementById('verdDecision');
+  vDays.className='verd-card'; vCap.className='verd-card'; vDec.className='verd-decision';
+  if(st.type==='feasible'){
+    document.getElementById('verdDaysVal').textContent=`${st.simTotalDays} ≤ D=${DVal} ✓`;
+    document.getElementById('verdCapVal').textContent=mid;
+    document.getElementById('verdDecVal').textContent=`Feasible → record ans=${st.ans}, hi=mid−1`;
+    vDays.classList.add('feasible'); vCap.classList.add('feasible'); vDec.classList.add('dec-left');
+  } else if(st.type==='infeasible'){
+    document.getElementById('verdDaysVal').textContent=`${st.simTotalDays} > D=${DVal} ✗`;
+    document.getElementById('verdCapVal').textContent=mid;
+    document.getElementById('verdDecVal').textContent=`Infeasible → lo=mid+1`;
+    vDays.classList.add('infeasible'); vCap.classList.add('infeasible'); vDec.classList.add('dec-right');
+  } else if(isFinal){
+    document.getElementById('verdDaysVal').textContent=`—`;
+    document.getElementById('verdCapVal').textContent=`ans=${st.ans}`;
+    document.getElementById('verdDecVal').textContent=`✓ Minimum capacity = ${st.ans}`;
+    vDec.classList.add('dec-done');
+  } else if(st.type==='sim_step'){
+    document.getElementById('verdDaysVal').textContent=`day ${st.simDays}…`;
+    document.getElementById('verdCapVal').textContent=mid;
+    document.getElementById('verdDecVal').textContent=`Simulating pkg[${st.simPkgIdx}]=${weightsVal[st.simPkgIdx]}…`;
+  } else {
+    document.getElementById('verdDaysVal').textContent='—';
+    document.getElementById('verdCapVal').textContent=mid!=null?mid:'—';
+    document.getElementById('verdDecVal').textContent='waiting…';
+  }
+
+  // 3-tab explanation
+  updateExplain(st);
+
+  // Code highlight
+  highlightCode(st.type);
+
+  // Variables
+  setVar('vLo',  'vcLo',  st.lo);
+  setVar('vHi',  'vcHi',  st.hi);
+  setVar('vMid', 'vcMid', mid!=null?mid:'—');
+  setVar('vAns', 'vcAns', st.ans);
+  setVar('vDays','vcDays',st.simDays!=null?st.simDays:'—');
+  setVar('vLoad','vcLoad',st.simLoad!=null?st.simLoad:'—');
+
+  // Range bar (right panel)
+  const pL=((st.lo-loInit)/(hiInit-loInit+1))*100;
+  const pR=((hiInit-st.hi)/(hiInit-loInit+1))*100;
+  document.getElementById('rbl').style.width=pL+'%';
+  document.getElementById('rba').style.left=pL+'%';
+  document.getElementById('rba').style.width=Math.max(100-pL-pR,0)+'%';
+  document.getElementById('rbr').style.width=pR+'%';
+
+  // Done
+  if(isFinal){
+    const db=document.getElementById('doneBanner');
+    db.className='done-banner show';
+    db.textContent=`✓ MINIMUM CAPACITY = ${st.result.ans}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ ANS = ${st.result.ans} — O(N LOG SUM)`;
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.ans);
+    document.getElementById('bestMeta').textContent=`D=${DVal} days · ${steps.length} steps · O(n·log(sum−max))`;
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+function renderSimulation(st){
+  const sd=document.getElementById('simDays');
+  sd.innerHTML='';
+  if(!st.simDayLoads)return;
+  const cap=st.mid;
+  const isPkgStep=st.type==='sim_step';
+  st.simDayLoads.forEach((pkgs,di)=>{
+    const sum=pkgs.reduce((a,b)=>a+b,0);
+    const isActive=isPkgStep&&di===st.simDayLoads.length-1;
+    const isOver=isActive&&st.simWillOver;
+    const row=document.createElement('div');
+    row.className='sim-day'+(isOver?' day-over':isActive?' day-active':' day-done');
+    const label=document.createElement('div');
+    label.className='sim-day-label'; label.textContent=`Day ${di+1}`;
+    const pkgWrap=document.createElement('div');
+    pkgWrap.className='sim-day-pkgs';
+    pkgs.forEach((w,pi)=>{
+      const sp=document.createElement('span');
+      const isLastPkg=isActive&&pi===pkgs.length-1;
+      sp.className='sim-pkg'+(isOver&&isLastPkg?' pkg-over':isLastPkg?' pkg-cur':'');
+      sp.textContent=w;
+      pkgWrap.appendChild(sp);
+    });
+    const sumSpan=document.createElement('div');
+    sumSpan.className='sim-day-sum';
+    sumSpan.textContent=`${sum}/${cap}`;
+    row.appendChild(label);row.appendChild(pkgWrap);row.appendChild(sumSpan);
+    sd.appendChild(row);
+  });
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

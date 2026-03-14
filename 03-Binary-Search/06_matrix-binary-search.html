@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search — Search a 2D Matrix · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:24px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent2);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,3vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent2);color:white;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 78px);overflow:hidden;}
+  .viz-panel{padding:28px 36px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:12px;margin-bottom:24px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent2);}
+  .field input.wide{width:340px;}
+  .field input.small{width:90px;}
+  .btn{padding:8px 18px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent2);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:6px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:7px 11px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:7px;font-size:0.78rem;}
+  .zone-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: 2D MATRIX GRID
+     The entire main visualization is a matrix.
+     Each cell = one element. Cells highlight
+     in-range / mid / dead / found states.
+  ══════════════════════════════════════ */
+  .section-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+
+  .matrix-wrap{
+    background:var(--surface);border:1.5px solid var(--border);
+    border-radius:10px;padding:18px;margin-bottom:18px;
+    overflow-x:auto;
+  }
+  .matrix-grid{
+    display:inline-grid;
+    gap:5px;
+  }
+  .cell{
+    width:54px;height:54px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;
+    border-radius:7px;border:2px solid var(--border);background:var(--surface);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position:relative;cursor:default;
+  }
+  .cell .cell-idx{
+    position:absolute;top:3px;right:5px;
+    font-family:'Space Mono',monospace;font-size:0.46rem;color:var(--muted);opacity:0.7;
+    letter-spacing:0;
+  }
+  .cell .cell-coord{
+    position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+    font-family:'Space Mono',monospace;font-size:0.44rem;color:var(--muted);opacity:0;
+    white-space:nowrap;transition:opacity 0.2s;
+  }
+  /* cell states */
+  .cell.in-range {background:rgba(33,150,243,0.08); border-color:#2196f3;color:var(--accent2);}
+  .cell.is-mid   {background:rgba(255,209,102,0.25);border-color:#ffd166;color:#5a3e00;transform:translateY(-5px) scale(1.05);box-shadow:0 8px 20px rgba(255,209,102,0.35);}
+  .cell.is-mid .cell-coord{opacity:1;color:#7a5a00;}
+  .cell.is-found {background:rgba(6,214,160,0.2);  border-color:#06d6a0;color:#014d3a;transform:translateY(-5px) scale(1.08);box-shadow:0 8px 24px rgba(6,214,160,0.35);}
+  .cell.is-found .cell-coord{opacity:1;color:#028a5b;}
+  .cell.is-dead  {background:rgba(0,0,0,0.03);      border-color:rgba(0,0,0,0.08);color:#ccc;transform:scale(0.95);}
+  /* row/col header labels */
+  .row-header{
+    font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);
+    display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+    height:54px;
+  }
+  .col-header{
+    font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);
+    display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;
+    width:54px;
+  }
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: VIRTUAL INDEX MAPPER
+     Shows flat_idx ↔ (row, col) in real time
+  ══════════════════════════════════════ */
+  .idx-mapper{
+    display:flex;gap:10px;margin-bottom:16px;align-items:stretch;
+  }
+  .idx-box{
+    flex:1;background:var(--surface);border:1.5px solid var(--border);
+    border-radius:8px;padding:10px 14px;transition:border-color 0.3s,background 0.3s;
+  }
+  .idx-box.active{border-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .idx-box .ib-label{font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;}
+  .idx-box .ib-formula{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);margin-bottom:6px;}
+  .idx-box .ib-val{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--accent4);}
+  .idx-arrow{display:flex;align-items:center;font-size:1.2rem;color:var(--muted);}
+
+  /* SEARCH SPACE BANDS (flat index view) */
+  .space-bands{display:flex;gap:6px;margin-bottom:8px;}
+  .sp-band{height:10px;border-radius:4px;transition:flex 0.4s ease;min-width:2px;}
+  .spb-dead-l{background:rgba(0,0,0,0.07);border:1px solid var(--border);}
+  .spb-active{background:rgba(255,209,102,0.3);border:1px solid var(--accent4);}
+  .spb-dead-r{background:rgba(0,0,0,0.07);border:1px solid var(--border);}
+  .space-band-labels{display:flex;gap:6px;margin-bottom:18px;font-size:0.68rem;color:var(--muted);font-family:'Space Mono',monospace;}
+  .space-band-labels span{text-align:center;transition:flex 0.4s ease;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: COMPARISON CARD
+     Shows the live comparison at each step
+  ══════════════════════════════════════ */
+  .comparison-row{display:flex;gap:10px;margin-bottom:16px;}
+  .cmp-card{
+    flex:1;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 14px;background:var(--surface);transition:all 0.3s;
+    font-family:'Space Mono',monospace;
+  }
+  .cmp-card .cmp-label{font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;}
+  .cmp-card .cmp-val{font-size:1.2rem;font-weight:700;color:var(--ink);}
+  .cmp-card.cmp-mid  {border-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .cmp-card.cmp-mid  .cmp-val{color:#7a5a00;}
+  .cmp-card.cmp-tgt  {border-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .cmp-card.cmp-tgt  .cmp-val{color:#028a5b;}
+  .cmp-result{
+    flex:2;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 14px;background:var(--surface);transition:all 0.3s;
+  }
+  .cmp-result .cmp-label{font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;}
+  .cmp-result .cmp-val{font-size:0.85rem;line-height:1.5;color:var(--ink);}
+  .cmp-result.res-go-right{border-color:var(--accent2);background:rgba(33,150,243,0.04);}
+  .cmp-result.res-go-left {border-color:var(--accent); background:rgba(230,57,70,0.04);}
+  .cmp-result.res-found   {border-color:var(--accent3);background:rgba(6,214,160,0.08);}
+  .cmp-result.res-dead    {border-color:var(--accent); background:rgba(230,57,70,0.04);}
+
+  /* 3-TAB EXPLANATION PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-expand{border-color:var(--accent2);}
+  .explain-panel.ep-found {border-color:var(--accent3);}
+  .explain-panel.ep-shrink{border-color:var(--accent4);}
+  .explain-panel.ep-dead  {border-color:var(--accent);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent2);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:#c084fc;}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:13px 17px;min-height:84px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:#7a3fc0;font-weight:600;}
+  .ep-why-block{border-left:3px solid #c084fc;border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-expand{border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-right {border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-left  {border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-found {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-why-block.why-dead  {border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:#7a3fc0;}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:16px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);margin-bottom:5px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent2);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:14px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  .done-banner.found{background:var(--accent3);color:var(--ink);}
+  .done-banner.not-found{background:var(--accent);color:white;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:10px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.6rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 78px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:16px 16px 10px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.67rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.9em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init  {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-mid   {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-found {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-right {background:rgba(33,150,243,0.18);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-left  {background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-dead  {background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:14px 16px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:10px 12px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.56rem;color:#6b6b8a;margin-bottom:4px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.blue{color:#4fc3f7;}.var-value.grn{color:var(--accent3);}.var-value.pur{color:#c084fc;}
+
+  /* MINI MATRIX (right panel) */
+  .mini-matrix-wrap{margin-bottom:14px;}
+  .mini-matrix{display:inline-grid;gap:3px;}
+  .mini-cell{width:22px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all 0.25s;}
+  .mini-cell.in-range{background:rgba(33,150,243,0.2);border-color:#2196f3;color:#4fc3f7;}
+  .mini-cell.is-mid  {background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .mini-cell.is-found{background:rgba(6,214,160,0.3);  border-color:#06d6a0;color:#06d6a0;}
+  .mini-cell.is-dead {background:rgba(0,0,0,0.3);      border-color:#111;   color:#222;}
+
+  /* RANGE BAR */
+  .range-track{margin-bottom:14px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  .range-bar-wrap{height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden;position:relative;margin-top:6px;}
+  .range-bar-dead-l{position:absolute;left:0;top:0;height:100%;background:#2a2a3e;border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .range-bar-active{position:absolute;top:0;height:100%;background:var(--accent4);opacity:0.7;transition:left 0.4s,width 0.4s;}
+  .range-bar-dead-r{position:absolute;right:0;top:0;height:100%;background:#2a2a3e;border-radius:0 4px 4px 0;transition:width 0.4s;}
+
+  /* RESULT */
+  .best-box{margin:0 0 14px;padding:12px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-box.not-found-box{background:rgba(230,57,70,0.06);border-color:rgba(230,57,70,0.2);}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:6px;}
+  .best-box.not-found-box .best-label{color:var(--accent);}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);letter-spacing:2px;}
+  .best-box.not-found-box .best-val{color:#ff6b6b;}
+  .best-meta{font-size:0.65rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 16px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+  .done-bar.found{background:var(--accent3);color:#000;}
+  .done-bar.not-found{background:var(--accent);color:white;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Binary Search — Search a 2D Matrix</h1>
+    <div class="sub">Binary Search · 2D Flatten · Live Visualizer</div>
+  </div>
+  <div class="family-badge">03·02 · Matrix</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════════ LEFT ════════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Matrix rows (semicolon-separated)</label>
+      <input type="text" id="inputMatrix" value="1,3,5,7;10,11,16,20;23,30,34,60" class="wide">
+    </div>
+    <div class="field">
+      <label>Target</label>
+      <input type="text" id="inputTarget" value="3" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.08);border-color:#2196f3"></div>Search Range</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.25);border-color:#ffd166"></div>Current Mid</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.2);border-color:#06d6a0"></div>Target Found</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(0,0,0,0.03);border-color:#ccc"></div>Eliminated</div>
+  </div>
+
+  <!-- MATRIX GRID -->
+  <div class="section-label">Matrix</div>
+  <div class="matrix-wrap">
+    <div class="matrix-grid" id="matrixGrid"></div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: VIRTUAL INDEX MAPPER -->
+  <div class="idx-mapper" id="idxMapper">
+    <div class="idx-box" id="idxFlatBox">
+      <div class="ib-label">Flat Index (mid)</div>
+      <div class="ib-formula" id="idxFormula">lo + (hi−lo)/2</div>
+      <div class="ib-val" id="idxFlatVal">—</div>
+    </div>
+    <div class="idx-arrow">→</div>
+    <div class="idx-box" id="idxRowBox">
+      <div class="ib-label">Row</div>
+      <div class="ib-formula">mid ÷ cols</div>
+      <div class="ib-val" id="idxRowVal">—</div>
+    </div>
+    <div class="idx-arrow">·</div>
+    <div class="idx-box" id="idxColBox">
+      <div class="ib-label">Col</div>
+      <div class="ib-formula">mid % cols</div>
+      <div class="ib-val" id="idxColVal">—</div>
+    </div>
+    <div class="idx-arrow">→</div>
+    <div class="idx-box" id="idxValBox">
+      <div class="ib-label">matrix[row][col]</div>
+      <div class="ib-formula">&nbsp;</div>
+      <div class="ib-val" id="idxValVal">—</div>
+    </div>
+  </div>
+
+  <!-- SEARCH SPACE BANDS -->
+  <div class="space-bands">
+    <div class="sp-band spb-dead-l" id="spb-dead-l" style="flex:0;min-width:2px"></div>
+    <div class="sp-band spb-active" id="spb-active" style="flex:1"></div>
+    <div class="sp-band spb-dead-r" id="spb-dead-r" style="flex:0;min-width:2px"></div>
+  </div>
+  <div class="space-band-labels">
+    <span id="sbl-dead-l" style="flex:0"></span>
+    <span id="sbl-active" style="flex:1;color:var(--accent4)">search space</span>
+    <span id="sbl-dead-r" style="flex:0"></span>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: LIVE COMPARISON CARD -->
+  <div class="comparison-row" id="comparisonRow">
+    <div class="cmp-card cmp-mid">
+      <div class="cmp-label">matrix[mid]</div>
+      <div class="cmp-val" id="cmpMidVal">—</div>
+    </div>
+    <div class="cmp-card cmp-tgt">
+      <div class="cmp-label">target</div>
+      <div class="cmp-val" id="cmpTgtVal">—</div>
+    </div>
+    <div class="cmp-result" id="cmpResult">
+      <div class="cmp-label">Decision</div>
+      <div class="cmp-val" id="cmpResultVal">waiting…</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION PANEL -->
+  <div class="explain-panel ep-expand" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════════ RIGHT ════════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">bool</span> <span class="cf">searchMatrix</span>(vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; m,</span>
+<span class="code-line" id="cl-sig2">                   <span class="ck">int</span> target) {</span>
+<span class="code-line" id="cl-dim">  <span class="ck">int</span> rows=m.size(), cols=m[0].size();</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> lo=<span class="cn">0</span>, hi=rows*cols-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (lo &lt;= hi) {</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid = lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-conv">    <span class="ck">int</span> val = m[mid/cols][mid%cols];</span>
+<span class="code-line" id="cl-chk">    <span class="ck">if</span> (val == target)</span>
+<span class="code-line" id="cl-ret">      <span class="ck">return true</span>;   <span class="cc">// found!</span></span>
+<span class="code-line" id="cl-lo">    <span class="ck">else if</span> (val &lt; target)</span>
+<span class="code-line" id="cl-loinc">      lo = mid + <span class="cn">1</span>;  <span class="cc">// go right</span></span>
+<span class="code-line" id="cl-hi">    <span class="ck">else</span></span>
+<span class="code-line" id="cl-hidec">      hi = mid - <span class="cn">1</span>;  <span class="cc">// go left</span></span>
+<span class="code-line" id="cl-wend">  }</span>
+<span class="code-line" id="cl-nf">  <span class="ck">return false</span>;    <span class="cc">// not found</span></span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo">  <div class="var-name">lo</div>         <div class="var-value red"  id="vLo">—</div></div>
+      <div class="var-card" id="vcMid"> <div class="var-name">mid</div>        <div class="var-value yel"  id="vMid">—</div></div>
+      <div class="var-card" id="vcHi">  <div class="var-name">hi</div>         <div class="var-value blue" id="vHi">—</div></div>
+      <div class="var-card" id="vcRow"> <div class="var-name">row (mid÷cols)</div><div class="var-value pur" id="vRow">—</div></div>
+      <div class="var-card" id="vcCol"> <div class="var-name">col (mid%cols)</div><div class="var-value pur" id="vCol">—</div></div>
+      <div class="var-card" id="vcVal"> <div class="var-name">m[row][col]</div><div class="var-value yel"  id="vVal">—</div></div>
+      <div class="var-card" id="vcTgt" style="grid-column:1/3"><div class="var-name">target</div><div class="var-value grn" id="vTgt">—</div></div>
+      <div class="var-card" id="vcSpc"><div class="var-name">space</div>       <div class="var-value pur" id="vSpc">—</div></div>
+    </div>
+
+    <!-- MINI MATRIX -->
+    <div class="mini-matrix-wrap">
+      <div class="arr-state-title">Matrix State</div>
+      <div class="mini-matrix" id="miniMatrix"></div>
+    </div>
+
+    <!-- RANGE BAR -->
+    <div class="range-track">
+      <div class="arr-state-title">Flat Index Search Space</div>
+      <div class="range-bar-wrap">
+        <div class="range-bar-dead-l" id="rbl" style="width:0%"></div>
+        <div class="range-bar-active" id="rba" style="left:0%;width:100%"></div>
+        <div class="range-bar-dead-r" id="rbr" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN = {
+  init: (rows, cols, total, target) => ({
+    why: `<div class="ep-why-block why-expand">The key insight: this matrix is row-sorted AND the first element of each row is greater than the last of the previous row. That means if we read it left-to-right, top-to-bottom, it forms a single sorted sequence of ${total} numbers. We can run plain binary search on a <em>virtual flat array</em> of size ${rows}×${cols}=${total}.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Starting state:</strong> lo=0, hi=${total-1}. The entire ${rows}×${cols} matrix (${total} elements) is the search space. Target=${target}.`},
+      {icon:'🗺️', cls:'inv-warn', text:`<strong>The flatten invariant:</strong> For flat index i, row = i÷${cols}, col = i%${cols}. This mapping is bijective — every (row,col) pair corresponds to exactly one flat index.`},
+      {icon:'🔑', cls:'inv-pur', text:`<strong>Why this works:</strong> matrix[i÷cols][i%cols] is strictly increasing as i goes 0→${total-1}. Binary search requires a sorted sequence — this IS one.`},
+    ]
+  }),
+  calc_mid: (lo, hi, mid, row, col, val, cols) => ({
+    why: `<div class="ep-why-block why-expand">mid = ${lo}+(${hi}−${lo})/2 = ${mid}. Convert: row = ${mid}÷${cols} = ${row}, col = ${mid}%${cols} = ${col}. matrix[${row}][${col}] = ${val}.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Invariant holds:</strong> lo=${lo} ≤ mid=${mid} ≤ hi=${hi}. Search space = ${hi-lo+1} elements.`},
+      {icon:'💡', cls:'inv-warn', text:`<strong>The conversion is O(1):</strong> Integer division and modulo. No iteration needed to find the right row/col.`},
+    ]
+  }),
+  found: (mid, row, col, val) => ({
+    why: `<div class="ep-why-block why-found">matrix[${row}][${col}] = ${val} equals target. Direct hit at flat index ${mid}. Return true.</div>`,
+    inv: [
+      {icon:'✅', cls:'', text:`<strong>Found at [${row}][${col}]</strong> (flat index ${mid}). The invariant held throughout — target was always within the active flat range [lo..hi].`},
+    ]
+  }),
+  go_right: (mid, lo, val, target) => ({
+    why: `<div class="ep-why-block why-right">matrix value ${val} &lt; target ${target}. The target must be to the <strong>right</strong> (higher flat index). Eliminate everything ≤ mid: lo = mid+1 = ${lo}.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Safe to eliminate left:</strong> The flat array is sorted. If value at mid is less than target, all indices 0..mid are also ≤ value < target. None can equal target.`},
+      {icon:'🎯', cls:'inv-warn', text:`<strong>New lo = ${lo}.</strong> Search space halved. Target is in [${lo}..hi] if it exists.`},
+    ]
+  }),
+  go_left: (mid, hi, val, target) => ({
+    why: `<div class="ep-why-block why-left">matrix value ${val} &gt; target ${target}. The target must be to the <strong>left</strong> (lower flat index). Eliminate everything ≥ mid: hi = mid−1 = ${hi}.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Safe to eliminate right:</strong> If value at mid is greater than target, all indices mid..end are also ≥ value > target. None can equal target.`},
+      {icon:'🎯', cls:'inv-warn', text:`<strong>New hi = ${hi}.</strong> Search space halved. Target is in [lo..${hi}] if it exists.`},
+    ]
+  }),
+  not_found: (target) => ({
+    why: `<div class="ep-why-block why-dead">lo > hi — the flat search space is empty. Every element was considered and eliminated. Target ${target} is not in the matrix. Return false.</div>`,
+    inv: [
+      {icon:'✅', cls:'', text:`<strong>Proof of correctness:</strong> By the invariant, if target existed, it would be in [lo..hi]. lo > hi means the space is empty.`},
+      {icon:'📐', cls:'inv-warn', text:`<strong>O(log(m·n))</strong> — each iteration halves the flat search space of size m×n. Exactly the same complexity as binary search on a 1D array of the same size.`},
+    ]
+  }),
+  done_found: (row, col, val, rows, cols) => ({
+    why: `<div class="ep-why-block why-found">By flattening the 2D matrix into a virtual 1D array, we reduced the problem to standard binary search. No extra space, no row-by-row scanning.</div>`,
+    inv: [
+      {icon:'✅', cls:'', text:`<strong>Result:</strong> Found at matrix[${row}][${col}] = ${val}.`},
+      {icon:'📐', cls:'inv-warn', text:`<strong>O(log(${rows}×${cols})) = O(log ${rows*cols})</strong>. Compare: brute force O(${rows*cols}), row-binary-search O(log(${rows}) + log(${cols})) = O(log(${rows*cols})). All equivalent here, but flattening is the simplest code.`},
+      {icon:'🔑', cls:'inv-pur', text:`<strong>Key constraint:</strong> This ONLY works because each row's first element > previous row's last element. Without that, the flat sequence isn't sorted and binary search fails. For the weaker constraint (only rows/cols sorted), use the top-right corner approach instead.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-expand',calc_mid:'ep-shrink',found:'ep-found',
+    go_right:'ep-shrink',go_left:'ep-shrink',not_found:'ep-dead',done:'ep-found'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-expand');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'<em style="color:var(--muted)">No explanation.</em>';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:      {ids:['cl-sig','cl-sig2','cl-dim','cl-init','cl-whl'], cls:'hl-init'},
+  calc_mid:  {ids:['cl-whl','cl-mid','cl-conv'],                    cls:'hl-mid'},
+  found:     {ids:['cl-chk','cl-ret'],                              cls:'hl-found'},
+  go_right:  {ids:['cl-lo','cl-loinc'],                             cls:'hl-right'},
+  go_left:   {ids:['cl-hi','cl-hidec'],                             cls:'hl-left'},
+  not_found: {ids:['cl-wend','cl-nf'],                              cls:'hl-dead'},
+  done:      {ids:['cl-ret','cl-close'],                            cls:'hl-found'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// ALGORITHM — computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(matrix, target){
+  const steps=[];
+  const rows=matrix.length, cols=matrix[0].length, total=rows*cols;
+  let lo=0, hi=total-1;
+
+  const snap=(desc,type,explain,mid)=>steps.push({
+    lo, hi, mid:mid??-1, rows, cols, total, target, desc, type, explain,
+    midRow: mid!=null ? Math.floor(mid/cols) : -1,
+    midCol: mid!=null ? mid%cols : -1,
+    midVal: mid!=null ? matrix[Math.floor(mid/cols)][mid%cols] : null,
+  });
+
+  snap(
+    `🚀 <strong>Starting.</strong> ${rows}×${cols} matrix (${total} elements). The matrix is globally sorted when read row-by-row. We treat it as a <span style="color:#7a3fc0;font-weight:700">flat array of ${total} elements</span> and run standard binary search. Target = <span style="color:#028a5b;font-weight:700">${target}</span>.`,
+    'init', EXPLAIN.init(rows,cols,total,target)
+  );
+
+  while(lo<=hi){
+    const mid=lo+Math.floor((hi-lo)/2);
+    const row=Math.floor(mid/cols), col=mid%cols;
+    const val=matrix[row][col];
+
+    snap(
+      `🔢 <strong>Compute mid.</strong> lo=${lo}, hi=${hi} → mid=<span style="color:#7a5a00;font-weight:700">${mid}</span>. Convert: row=${mid}÷${cols}=<span style="color:#7a3fc0;font-weight:700">${row}</span>, col=${mid}%${cols}=<span style="color:#7a3fc0;font-weight:700">${col}</span>. matrix[${row}][${col}] = <span style="color:#7a5a00;font-weight:700">${val}</span>.`,
+      'calc_mid', EXPLAIN.calc_mid(lo,hi,mid,row,col,val,cols), mid
+    );
+
+    if(val===target){
+      snap(
+        `🎉 <span style="color:#028a5b;font-weight:700">Target found!</span> matrix[<span style="color:#7a3fc0;font-weight:700">${row}</span>][<span style="color:#7a3fc0;font-weight:700">${col}</span>] = ${val} == target ${target}. Return <strong>true</strong>.`,
+        'found', EXPLAIN.found(mid,row,col,val), mid
+      );
+      steps[steps.length-1].result={found:true,row,col,val};
+      return steps;
+    } else if(val<target){
+      snap(
+        `➡️ matrix[${row}][${col}]=${val} <span style="color:#028a5b;font-weight:700">&lt;</span> target ${target} → eliminate left half. <strong>lo = mid+1 = ${mid+1}.</strong>`,
+        'go_right', EXPLAIN.go_right(mid,mid+1,val,target)
+      );
+      lo=mid+1;
+    } else {
+      snap(
+        `⬅️ matrix[${row}][${col}]=${val} <span style="color:var(--accent);font-weight:700">&gt;</span> target ${target} → eliminate right half. <strong>hi = mid−1 = ${mid-1}.</strong>`,
+        'go_left', EXPLAIN.go_left(mid,mid-1,val,target)
+      );
+      hi=mid-1;
+    }
+  }
+
+  snap(
+    `❌ <span style="color:var(--accent);font-weight:700">Not found.</span> Search space exhausted (lo=${lo} > hi=${hi}). Target ${target} is not in the matrix. Return <strong>false</strong>.`,
+    'not_found', EXPLAIN.not_found(target)
+  );
+  steps[steps.length-1].result={found:false};
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let matrixVal=[], targetVal=0, rowsVal=0, colsVal=0, totalVal=0;
+
+// ─────────────────────────────────────────────
+// PARSE INPUT
+// ─────────────────────────────────────────────
+function parseInput(){
+  const raw=document.getElementById('inputMatrix').value.trim();
+  const matrix=raw.split(';').map(row=>row.split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x))).filter(r=>r.length>0);
+  const target=parseInt(document.getElementById('inputTarget').value.trim());
+  if(matrix.length===0||isNaN(target))return null;
+  const cols=matrix[0].length;
+  if(!matrix.every(r=>r.length===cols))return null;
+  return{matrix,target};
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput();
+  if(!parsed)return;
+  matrixVal=parsed.matrix; targetVal=parsed.target;
+  rowsVal=matrixVal.length; colsVal=matrixVal[0].length; totalVal=rowsVal*colsVal;
+
+  steps=computeSteps(matrixVal,targetVal);
+  currentStep=0;
+
+  // Build matrix grid
+  const grid=document.getElementById('matrixGrid');
+  grid.style.gridTemplateColumns=`repeat(${colsVal},54px)`;
+  grid.innerHTML='';
+  for(let r=0;r<rowsVal;r++){
+    for(let c=0;c<colsVal;c++){
+      const flat=r*colsVal+c;
+      const d=document.createElement('div');
+      d.className='cell'; d.id=`cell-${r}-${c}`;
+      d.innerHTML=`${matrixVal[r][c]}<span class="cell-idx">${flat}</span><span class="cell-coord">[${r},${c}]</span>`;
+      grid.appendChild(d);
+    }
+  }
+
+  // Build mini matrix
+  const mm=document.getElementById('miniMatrix');
+  mm.style.gridTemplateColumns=`repeat(${colsVal},22px)`;
+  mm.innerHTML='';
+  for(let r=0;r<rowsVal;r++){
+    for(let c=0;c<colsVal;c++){
+      const d=document.createElement('div');
+      d.className='mini-cell'; d.id=`mini-${r}-${c}`;
+      d.textContent=matrixVal[r][c];
+      mm.appendChild(d);
+    }
+  }
+
+  document.getElementById('vTgt').textContent=targetVal;
+  document.getElementById('cmpTgtVal').textContent=targetVal;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show','not-found-box');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId);
+  const card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+
+  // Matrix cells
+  for(let r=0;r<rowsVal;r++){
+    for(let c=0;c<colsVal;c++){
+      const flat=r*colsVal+c;
+      const cell=document.getElementById(`cell-${r}-${c}`);
+      const mini=document.getElementById(`mini-${r}-${c}`);
+      if(!cell||!mini)continue;
+      cell.className='cell'; mini.className='mini-cell';
+
+      const isFoundStep=st.type==='found'&&st.midRow===r&&st.midCol===c;
+      const isMid=st.mid===flat;
+      const inRange=flat>=st.lo&&flat<=st.hi;
+      const isDead=flat<st.lo||flat>st.hi;
+
+      if(isFoundStep||( st.result&&st.result.found&&st.result.row===r&&st.result.col===c)){
+        cell.classList.add('is-found'); mini.classList.add('is-found');
+      } else if(st.type==='not_found'){
+        cell.classList.add('is-dead'); mini.classList.add('is-dead');
+      } else if(isDead){
+        cell.classList.add('is-dead'); mini.classList.add('is-dead');
+      } else if(isMid){
+        cell.classList.add('is-mid'); mini.classList.add('is-mid');
+      } else if(inRange){
+        cell.classList.add('in-range'); mini.classList.add('in-range');
+      }
+    }
+  }
+
+  // Virtual index mapper
+  const hasM=st.mid>=0;
+  document.getElementById('idxFlatBox').classList.toggle('active',hasM);
+  document.getElementById('idxRowBox').classList.toggle('active',hasM);
+  document.getElementById('idxColBox').classList.toggle('active',hasM);
+  document.getElementById('idxValBox').classList.toggle('active',hasM);
+  document.getElementById('idxFlatVal').textContent=hasM?st.mid:'—';
+  document.getElementById('idxRowVal').textContent=hasM?st.midRow:'—';
+  document.getElementById('idxColVal').textContent=hasM?st.midCol:'—';
+  document.getElementById('idxValVal').textContent=hasM&&st.midVal!=null?st.midVal:'—';
+  document.getElementById('idxFormula').textContent=hasM?`${st.lo}+(${st.hi}−${st.lo})/2`:'lo+(hi−lo)/2';
+
+  // Space bands
+  const dL=st.lo, act=Math.max(st.hi-st.lo+1,0), dR=Math.max(totalVal-1-st.hi,0);
+  document.getElementById('spb-dead-l').style.flex=dL;
+  document.getElementById('spb-active').style.flex=Math.max(act,0.01);
+  document.getElementById('spb-dead-r').style.flex=dR;
+  document.getElementById('sbl-dead-l').style.flex=dL;
+  document.getElementById('sbl-active').style.flex=Math.max(act,0.01);
+  document.getElementById('sbl-dead-r').style.flex=dR;
+  document.getElementById('sbl-dead-l').textContent=dL>0?`${dL} cut`:'';
+  document.getElementById('sbl-active').textContent=act>0?`${act} left`:'';
+  document.getElementById('sbl-dead-r').textContent=dR>0?`${dR} cut`:'';
+
+  // Comparison card
+  const cr=document.getElementById('cmpResult');
+  document.getElementById('cmpMidVal').textContent=hasM&&st.midVal!=null?st.midVal:'—';
+  cr.className='cmp-result';
+  if(st.type==='found'){
+    cr.classList.add('res-found');
+    document.getElementById('cmpResultVal').textContent=`${st.midVal} == ${targetVal} ✓ return true`;
+  } else if(st.type==='go_right'){
+    cr.classList.add('res-go-right');
+    document.getElementById('cmpResultVal').textContent=`${st.midVal} < ${targetVal} → go right, lo=mid+1`;
+  } else if(st.type==='go_left'){
+    cr.classList.add('res-go-left');
+    document.getElementById('cmpResultVal').textContent=`${st.midVal} > ${targetVal} → go left, hi=mid−1`;
+  } else if(st.type==='not_found'){
+    cr.classList.add('res-dead');
+    document.getElementById('cmpResultVal').textContent=`lo > hi → return false`;
+  } else {
+    document.getElementById('cmpResultVal').textContent='waiting…';
+  }
+
+  // 3-tab explanation
+  updateExplain(st);
+
+  // Code highlight
+  highlightCode(st.type);
+
+  // Variables
+  setVar('vLo',  'vcLo',  st.lo);
+  setVar('vMid', 'vcMid', hasM?st.mid:'—');
+  setVar('vHi',  'vcHi',  st.hi);
+  setVar('vRow', 'vcRow', hasM?st.midRow:'—');
+  setVar('vCol', 'vcCol', hasM?st.midCol:'—');
+  setVar('vVal', 'vcVal', hasM&&st.midVal!=null?st.midVal:'—');
+  setVar('vSpc', 'vcSpc', Math.max(st.hi-st.lo+1,0));
+
+  // Range bar
+  const pL=(st.lo/totalVal)*100;
+  const pR=((totalVal-1-st.hi)/totalVal)*100;
+  document.getElementById('rbl').style.width=pL+'%';
+  document.getElementById('rba').style.left=pL+'%';
+  document.getElementById('rba').style.width=Math.max(100-pL-pR,0)+'%';
+  document.getElementById('rbr').style.width=pR+'%';
+
+  // Done / result
+  if(st.result){
+    const found=st.result.found;
+    const db=document.getElementById('doneBanner');
+    const dbar=document.getElementById('doneBar');
+    db.className='done-banner show '+(found?'found':'not-found');
+    db.textContent=found?`✓ FOUND AT [${st.result.row}][${st.result.col}]`:'✗ TARGET NOT IN MATRIX';
+    dbar.className='done-bar show '+(found?'found':'not-found');
+    dbar.textContent=found?'✓ FOUND — O(LOG M·N)':'✗ NOT FOUND — O(LOG M·N)';
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show'+(found?'':' not-found-box');
+    document.getElementById('bestVal').textContent=found?`[${st.result.row}][${st.result.col}] = ${st.result.val}`:'false';
+    document.getElementById('bestMeta').textContent=found
+      ?`flat index ${st.result.row*colsVal+st.result.col} · ${steps.length} steps · O(log ${totalVal})`
+      :`target ${targetVal} absent · ${steps.length} steps · O(log ${totalVal})`;
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

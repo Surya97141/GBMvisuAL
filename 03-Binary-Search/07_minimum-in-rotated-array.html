@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search — Find Minimum in Rotated Array · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:24px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,3vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--pur-dark);color:white;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 78px);overflow:hidden;}
+  .viz-panel{padding:28px 36px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:12px;margin-bottom:24px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.95rem;color:var(--ink);outline:none;width:300px;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--pur);}
+  .btn{padding:8px 18px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:6px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:7px 11px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:7px;font-size:0.78rem;}
+  .zone-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+  /* ARRAY */
+  .section-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+  .array-container{position:relative;padding-bottom:52px;overflow-x:auto;margin-bottom:18px;}
+  .array-blocks{display:flex;gap:6px;flex-wrap:nowrap;}
+  .char-block{
+    position:relative;width:56px;height:56px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;
+    border-radius:8px;border:2px solid var(--border);background:var(--surface);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .char-block .idx{position:absolute;bottom:-22px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);}
+  .char-block.in-range {background:rgba(33,150,243,0.09); border-color:#2196f3;color:var(--accent2);}
+  .char-block.is-mid   {background:rgba(255,209,102,0.22);border-color:#ffd166;color:#7a5a00;transform:translateY(-6px);box-shadow:0 6px 18px rgba(255,209,102,0.3);}
+  .char-block.is-dead  {background:rgba(0,0,0,0.04);      border-color:var(--border);color:#ccc;}
+  .char-block.is-ans   {background:rgba(192,84,252,0.15); border-color:var(--pur);color:var(--pur-dark);transform:translateY(-6px);box-shadow:0 6px 20px rgba(192,84,252,0.3);}
+  .char-block.is-ans.is-mid{background:rgba(6,214,160,0.2);border-color:#06d6a0;color:#014d3a;box-shadow:0 6px 20px rgba(6,214,160,0.3);}
+
+  /* Pointer labels — SIBLING row (proven DNF/rotated pattern) */
+  .pointer-labels{position:absolute;bottom:0;left:0;right:0;height:44px;pointer-events:none;}
+  .ptr-label{
+    position:absolute;font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;
+    padding:2px 7px;border-radius:3px;transform:translateX(-50%);
+    transition:left 0.35s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;
+  }
+  .ptr-lo  {background:var(--accent); color:white;top:4px;}
+  .ptr-mid {background:var(--accent4);color:#333; top:4px;}
+  .ptr-hi  {background:var(--accent2);color:white;top:4px;}
+  .ptr-ans {background:var(--pur);    color:white;top:26px;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 1: ROTATION PROFILE CHART
+     Bar chart of values. Purple dashed line
+     marks current ans. Pivot dip is visible.
+  ══════════════════════════════ */
+  .rotation-section{margin-bottom:16px;}
+  .rotation-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .rotation-chart{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 14px 10px;}
+  .rc-svg{width:100%;display:block;}
+
+  /* SEARCH SPACE BANDS */
+  .space-bands{display:flex;gap:6px;margin-bottom:8px;}
+  .sp-band{height:10px;border-radius:4px;transition:flex 0.4s ease;min-width:2px;}
+  .spb-dead-l{background:rgba(0,0,0,0.07);border:1px solid var(--border);}
+  .spb-active{background:rgba(255,209,102,0.3);border:1px solid var(--accent4);}
+  .spb-dead-r{background:rgba(0,0,0,0.07);border:1px solid var(--border);}
+  .space-band-labels{display:flex;gap:6px;margin-bottom:16px;font-size:0.68rem;color:var(--muted);font-family:'Space Mono',monospace;}
+  .space-band-labels span{text-align:center;transition:flex 0.4s ease;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 2: MINIMUM TRACKER
+     Large prominent card showing ans live.
+     Pulses purple every time ans improves.
+  ══════════════════════════════ */
+  .min-tracker{
+    background:var(--surface);border:1.5px solid var(--border);
+    border-radius:10px;padding:16px 20px;margin-bottom:16px;
+    display:flex;align-items:center;gap:20px;transition:all 0.3s;
+  }
+  .min-tracker.updated{border-color:var(--pur);background:rgba(192,84,252,0.06);animation:minpulse 0.5s ease;}
+  .min-tracker.final  {border-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  @keyframes minpulse{0%{transform:scale(1)}35%{transform:scale(1.02);box-shadow:0 0 22px rgba(192,84,252,0.3)}100%{transform:scale(1)}}
+  .mt-label{font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;}
+  .mt-val{font-family:'Space Mono',monospace;font-size:2.2rem;font-weight:700;color:var(--pur-dark);line-height:1;}
+  .min-tracker.final .mt-val{color:var(--accent3);}
+  .mt-idx{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);margin-top:4px;}
+  .mt-divider{width:1px;height:56px;background:var(--border);}
+  .mt-right{flex:1;}
+  .mt-right-label{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .mt-right-val{font-size:0.82rem;color:var(--ink);line-height:1.6;}
+
+  /* ══════════════════════════════
+     UNIQUE VISUAL 3: HALF-DECISION INDICATOR
+     Shows which half contains the minimum
+     and why — the core of this algorithm.
+  ══════════════════════════════ */
+  .decision-row{display:flex;gap:10px;margin-bottom:16px;}
+  .dec-card{
+    flex:1;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 12px;background:var(--surface);transition:all 0.3s;
+    font-family:'Space Mono',monospace;
+  }
+  .dec-card .dc-label{font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .dec-card .dc-val{font-size:0.8rem;font-weight:700;color:var(--muted);}
+  .dec-card.sorted-half{border-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .dec-card.sorted-half .dc-val{color:#028a5b;}
+  .dec-card.min-half{border-color:var(--pur);background:rgba(192,84,252,0.05);}
+  .dec-card.min-half .dc-val{color:var(--pur-dark);}
+  .dec-result{
+    flex:2;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 12px;background:var(--surface);transition:all 0.3s;
+  }
+  .dec-result .dc-label{font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .dec-result .dc-val{font-size:0.82rem;line-height:1.5;color:var(--ink);}
+  .dec-result.go-right{border-color:var(--accent2);background:rgba(33,150,243,0.04);}
+  .dec-result.go-left {border-color:var(--pur);    background:rgba(192,84,252,0.04);}
+  .dec-result.done    {border-color:var(--accent3);background:rgba(6,214,160,0.07);}
+
+  /* 3-TAB EXPLANATION PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init  {border-color:var(--pur);}
+  .explain-panel.ep-right {border-color:var(--accent2);}
+  .explain-panel.ep-left  {border-color:var(--pur);}
+  .explain-panel.ep-done  {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--pur);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:13px 17px;min-height:84px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-right{border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-left {border-left-color:var(--pur);   background:rgba(192,84,252,0.05);}
+  .ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:16px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);margin-bottom:5px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:14px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:10px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.6rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 78px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:16px 16px 10px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.67rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.9em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(192,84,252,0.15);border-left-color:var(--pur);color:#e2e8f0;}
+  .code-line.hl-mid  {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-right{background:rgba(33,150,243,0.18); border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-left {background:rgba(192,84,252,0.18); border-left-color:var(--pur);    color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(6,214,160,0.2);   border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:14px 16px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:10px 12px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.58rem;color:#6b6b8a;margin-bottom:4px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.blue{color:#4fc3f7;}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* MINI ARRAY */
+  .arr-state{margin-bottom:14px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  .arr-mini{display:flex;gap:3px;flex-wrap:wrap;}
+  .arr-mini-block{width:26px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all 0.25s;}
+  .arr-mini-block.in-range{background:rgba(33,150,243,0.2);border-color:#2196f3;color:#4fc3f7;}
+  .arr-mini-block.is-mid  {background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .arr-mini-block.is-ans  {background:rgba(192,84,252,0.3); border-color:var(--pur);color:var(--pur);}
+  .arr-mini-block.is-dead {background:rgba(0,0,0,0.3);      border-color:#111;color:#222;}
+  .arr-mini-block.is-final{background:rgba(6,214,160,0.3);  border-color:#06d6a0;color:#06d6a0;}
+
+  /* RANGE BAR */
+  .range-track{margin-bottom:14px;}
+  .range-bar-wrap{height:8px;background:#1a1a2e;border-radius:4px;overflow:hidden;position:relative;margin-top:6px;}
+  .range-bar-dead-l{position:absolute;left:0;top:0;height:100%;background:#2a2a3e;border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .range-bar-active{position:absolute;top:0;height:100%;background:var(--accent4);opacity:0.7;transition:left 0.4s,width 0.4s;}
+  .range-bar-dead-r{position:absolute;right:0;top:0;height:100%;background:#2a2a3e;border-radius:0 4px 4px 0;transition:width 0.4s;}
+
+  /* RESULT BOX */
+  .best-box{margin:0 0 14px;padding:12px;background:rgba(192,84,252,0.06);border:1px solid rgba(192,84,252,0.25);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-box.final{background:rgba(6,214,160,0.06);border-color:rgba(6,214,160,0.3);}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:6px;}
+  .best-box.final .best-label{color:var(--accent3);}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);letter-spacing:4px;}
+  .best-meta{font-size:0.65rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 16px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Find Minimum in Rotated Sorted Array</h1>
+    <div class="sub">Binary Search · Pivot Hunt · Live Visualizer</div>
+  </div>
+  <div class="family-badge">03·03 · Array</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════════ LEFT ════════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Rotated Sorted Array</label>
+      <input type="text" id="inputArr" value="3,4,5,1,2">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.09);border-color:#2196f3"></div>Search Range</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.22);border-color:#ffd166"></div>Current Mid</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(192,84,252,0.15);border-color:#c084fc"></div>Current Minimum (ans)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.2);border-color:#06d6a0"></div>Final Answer</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(0,0,0,0.04);border-color:#ccc"></div>Eliminated</div>
+  </div>
+
+  <!-- ARRAY -->
+  <div class="section-label">Array</div>
+  <div class="array-container">
+    <div class="array-blocks"   id="arrayBlocks"></div>
+    <div class="pointer-labels" id="pointerLabels"></div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: ROTATION PROFILE CHART -->
+  <div class="rotation-section">
+    <div class="rotation-label">Rotation Profile — ans pointer tracks the minimum</div>
+    <div class="rotation-chart">
+      <svg class="rc-svg" id="rcSvg" viewBox="0 0 600 90" preserveAspectRatio="none"></svg>
+    </div>
+  </div>
+
+  <!-- SEARCH SPACE BANDS -->
+  <div class="space-bands">
+    <div class="sp-band spb-dead-l" id="spb-dead-l" style="flex:0;min-width:2px"></div>
+    <div class="sp-band spb-active" id="spb-active" style="flex:1"></div>
+    <div class="sp-band spb-dead-r" id="spb-dead-r" style="flex:0;min-width:2px"></div>
+  </div>
+  <div class="space-band-labels">
+    <span id="sbl-dead-l" style="flex:0"></span>
+    <span id="sbl-active" style="flex:1;color:var(--accent4)">search space</span>
+    <span id="sbl-dead-r" style="flex:0"></span>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: MINIMUM TRACKER -->
+  <div class="min-tracker" id="minTracker">
+    <div>
+      <div class="mt-label">Current Minimum (ans)</div>
+      <div class="mt-val" id="mtVal">∞</div>
+      <div class="mt-idx" id="mtIdx">not yet found</div>
+    </div>
+    <div class="mt-divider"></div>
+    <div class="mt-right">
+      <div class="mt-right-label">This step</div>
+      <div class="mt-right-val" id="mtReason">Initialising…</div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: HALF-DECISION INDICATOR -->
+  <div class="decision-row" id="decisionRow">
+    <div class="dec-card" id="decLeft">
+      <div class="dc-label">Left Half</div>
+      <div class="dc-val" id="decLeftVal">—</div>
+    </div>
+    <div class="dec-card" id="decRight">
+      <div class="dc-label">Right Half</div>
+      <div class="dc-val" id="decRightVal">—</div>
+    </div>
+    <div class="dec-result" id="decResult">
+      <div class="dc-label">Decision</div>
+      <div class="dc-val" id="decResultVal">waiting…</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION PANEL -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════════ RIGHT ════════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">findMin</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> lo=<span class="cn">0</span>, hi=a.size()-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-ans">  <span class="ck">int</span> ans = a[<span class="cn">0</span>];   <span class="cc">// start: first elem</span></span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (lo &lt;= hi) {</span>
+<span class="code-line" id="cl-sorted">    <span class="ck">if</span> (a[lo] &lt;= a[hi]) { <span class="cc">// subarray sorted</span></span>
+<span class="code-line" id="cl-sortedans">      ans = min(ans, a[lo]);</span>
+<span class="code-line" id="cl-sortedbrk">      <span class="ck">break</span>;          <span class="cc">// a[lo] is min here</span></span>
+<span class="code-line" id="cl-mid">    } <span class="ck">int</span> mid = lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-updans">    ans = min(ans, a[mid]);</span>
+<span class="code-line" id="cl-lsrt">    <span class="ck">if</span> (a[lo] &lt;= a[mid]) { <span class="cc">// left sorted</span></span>
+<span class="code-line" id="cl-lgo">      lo = mid + <span class="cn">1</span>;  <span class="cc">// min in right half</span></span>
+<span class="code-line" id="cl-rsrt">    } <span class="ck">else</span> {             <span class="cc">// right sorted</span></span>
+<span class="code-line" id="cl-rgo">      hi = mid - <span class="cn">1</span>;  <span class="cc">// min in left half</span></span>
+<span class="code-line" id="cl-wend">    }</span>
+<span class="code-line" id="cl-close">  } <span class="ck">return</span> ans;</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo">  <div class="var-name">lo</div>        <div class="var-value red"  id="vLo">—</div></div>
+      <div class="var-card" id="vcMid"> <div class="var-name">mid</div>       <div class="var-value yel"  id="vMid">—</div></div>
+      <div class="var-card" id="vcHi">  <div class="var-name">hi</div>        <div class="var-value blue" id="vHi">—</div></div>
+      <div class="var-card" id="vcAlo"> <div class="var-name">a[lo]</div>     <div class="var-value red"  id="vAlo">—</div></div>
+      <div class="var-card" id="vcAmid"><div class="var-name">a[mid]</div>    <div class="var-value yel"  id="vAmid">—</div></div>
+      <div class="var-card" id="vcAhi"> <div class="var-name">a[hi]</div>     <div class="var-value blue" id="vAhi">—</div></div>
+      <div class="var-card" id="vcAns" style="grid-column:1/3">
+        <div class="var-name">ans (current min)</div>
+        <div class="var-value pur" id="vAns">∞</div>
+      </div>
+      <div class="var-card" id="vcSpc"><div class="var-name">space</div>      <div class="var-value pur" id="vSpc">—</div></div>
+    </div>
+
+    <!-- MINI ARRAY -->
+    <div class="arr-state">
+      <div class="arr-state-title">Array State</div>
+      <div class="arr-mini" id="arrMini"></div>
+    </div>
+
+    <!-- RANGE BAR -->
+    <div class="range-track">
+      <div class="arr-state-title">Search Space</div>
+      <div class="range-bar-wrap">
+        <div class="range-bar-dead-l" id="rbl" style="width:0%"></div>
+        <div class="range-bar-active" id="rba" style="left:0%;width:100%"></div>
+        <div class="range-bar-dead-r" id="rbr" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Minimum Found</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN = {
+  init: (n, first) => ({
+    why: `<div class="ep-why-block">The minimum of a rotated sorted array is always at the <strong>inflection point</strong> — the one place where a[i] &gt; a[i+1]. The key insight: one of the two halves around mid is always sorted. If the left half is sorted, it contains no inflection point — the minimum must be in the right half. If the right half is sorted, the inflection is in the left half.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Starting state:</strong> lo=0, hi=${n-1}, ans=a[0]=${first}. The minimum is guaranteed to exist somewhere in [0..${n-1}].`},
+      {icon:'🗺️', cls:'inv-pur', text:`<strong>The core invariant:</strong> ans always holds the smallest value seen so far. At every step, if a[lo] ≤ a[hi], the subarray is sorted and a[lo] is the local minimum.`},
+      {icon:'🔑', cls:'inv-pur', text:`<strong>The rotation invariant:</strong> In any subarray [lo..hi], either the left half [lo..mid] or the right half [mid..hi] is contiguous and sorted. The inflection point is in the unsorted half.`},
+    ]
+  }),
+  sorted_subarray: (lo, hi, alo, ahi, ans) => ({
+    why: `<div class="ep-why-block why-done">a[lo]=${alo} ≤ a[hi]=${ahi} means the entire current subarray [${lo}..${hi}] is already sorted. Its minimum is a[lo]=${alo}. We update ans = min(ans, ${alo}) = ${Math.min(ans,alo)} and break — no further searching needed in this range.</div>`,
+    inv: [
+      {icon:'✅', cls:'', text:`<strong>Sorted subarray detected:</strong> a[lo] ≤ a[hi] means [lo..hi] has no inflection point. a[lo] is its minimum.`},
+      {icon:'🎯', cls:'inv-warn', text:`<strong>Why break?</strong> The inflection point isn't here — we've already eliminated all other possibilities via previous iterations. a[lo] is the global minimum candidate.`},
+    ]
+  }),
+  left_sorted_go_right: (lo, mid, hi, alo, amid, ahi, ans) => ({
+    why: `<div class="ep-why-block why-right">a[lo]=${alo} ≤ a[mid]=${amid} → the left half [${lo}..${mid}] is sorted. In a sorted segment, a[lo] is the smallest. But the inflection point (where the value drops) is NOT in [lo..mid] — it must be in [mid+1..${hi}]. Move lo = mid+1. We already recorded ans = min(ans, ${amid}) = ${Math.min(ans,amid)}.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Left sorted invariant:</strong> a[lo]=${alo} ≤ a[mid]=${amid} → [lo..mid] is monotonically increasing. No drop = no inflection = no global minimum here.`},
+      {icon:'🎯', cls:'inv-warn', text:`<strong>Safe to eliminate left:</strong> The minimum of [lo..mid] is a[lo], which we've already captured in ans. The unseen inflection must be to the right.`},
+    ]
+  }),
+  right_sorted_go_left: (lo, mid, hi, alo, amid, ahi, ans) => ({
+    why: `<div class="ep-why-block why-left">a[lo]=${alo} &gt; a[mid]=${amid} → the left half is NOT fully sorted — the inflection point is somewhere in [${lo}..${mid}]. The right half [${mid}..${hi}] is sorted and its minimum is a[mid]=${amid} (already in ans). Move hi = mid-1 to search the left half for the real inflection.</div>`,
+    inv: [
+      {icon:'🔒', cls:'', text:`<strong>Right sorted invariant:</strong> a[lo]=${alo} &gt; a[mid]=${amid} → the drop happens in [lo..mid]. The inflection point is there.`},
+      {icon:'🎯', cls:'inv-pur', text:`<strong>Safe to eliminate right:</strong> The minimum of [mid..hi] is a[mid]=${amid}, already captured. The global minimum is somewhere in [lo..mid-1].`},
+    ]
+  }),
+  done: (ans, idx, n) => ({
+    why: `<div class="ep-why-block why-done">lo crossed hi — the search space is empty. Every segment either triggered the sorted-subarray shortcut (capturing its minimum) or was halved by the pivot detection. ans = ${ans} is the global minimum.</div>`,
+    inv: [
+      {icon:'✅', cls:'', text:`<strong>Completeness:</strong> Every element was either directly compared (as a[mid] or a[lo] in a sorted segment) or safely eliminated because its segment's minimum was already captured.`},
+      {icon:'📐', cls:'inv-warn', text:`<strong>O(log n)</strong> — each iteration eliminates exactly half the search space. At most ⌈log₂${n}⌉ = ${Math.ceil(Math.log2(n))} iterations. O(1) extra space.`},
+      {icon:'🔑', cls:'inv-pur', text:`<strong>Key insight:</strong> We never need to find the exact pivot index. We just need to always go toward the half that COULD contain a smaller value — and that's always the unsorted half.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',sorted_sub:'ep-done',go_right:'ep-right',go_left:'ep-left',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'<em style="color:var(--muted)">No explanation.</em>';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:      {ids:['cl-sig','cl-init','cl-ans','cl-whl'],    cls:'hl-init'},
+  sorted_sub:{ids:['cl-sorted','cl-sortedans','cl-sortedbrk'],cls:'hl-done'},
+  calc_mid:  {ids:['cl-mid','cl-updans'],                    cls:'hl-mid'},
+  go_right:  {ids:['cl-lsrt','cl-lgo'],                     cls:'hl-right'},
+  go_left:   {ids:['cl-rsrt','cl-rgo'],                     cls:'hl-left'},
+  done:      {ids:['cl-wend','cl-close'],                    cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// ALGORITHM — computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(a){
+  const steps=[], n=a.length;
+  let lo=0, hi=n-1, ans=a[0], ansIdx=0;
+
+  const snap=(desc,type,explain,mid,reason)=>steps.push({
+    lo, hi, mid:mid??-1, ans, ansIdx, n, desc, type, explain,
+    midVal: mid!=null ? a[mid] : null,
+    reason: reason||''
+  });
+
+  snap(
+    `🚀 <strong>Starting.</strong> Array of ${n} elements rotated at some unknown pivot. We hunt the <span style="color:var(--pur-dark);font-weight:700">inflection point</span> — where the sequence dips. ans = a[0] = <span style="color:var(--pur-dark);font-weight:700">${a[0]}</span>.`,
+    'init', EXPLAIN.init(n, a[0])
+  );
+
+  while(lo<=hi){
+    // Sorted subarray shortcut
+    if(a[lo]<=a[hi]){
+      const newAns=Math.min(ans,a[lo]);
+      const improved=newAns<ans;
+      if(improved){ans=newAns;ansIdx=lo;}
+      snap(
+        `✅ a[lo]=${a[lo]} ≤ a[hi]=${a[hi]} → <span style="color:#028a5b;font-weight:700">subarray [${lo}..${hi}] is sorted!</span> Minimum here = a[lo]=${a[lo]}. `
+        +(improved?`ans updated to <span style="color:var(--pur-dark);font-weight:700">${ans}</span>. `:`ans stays ${ans}. `)
+        +`<strong>Break</strong> — no need to go further.`,
+        'sorted_sub', EXPLAIN.sorted_subarray(lo,hi,a[lo],a[hi],ans),
+        -1, `a[lo]=${a[lo]} ≤ a[hi]=${a[hi]} → sorted subarray`
+      );
+      break;
+    }
+
+    const mid=lo+Math.floor((hi-lo)/2);
+    const newAns=Math.min(ans,a[mid]);
+    const improved=newAns<ans;
+    if(improved){ans=newAns;ansIdx=mid;}
+
+    snap(
+      `🔢 <strong>Compute mid.</strong> lo=${lo}, hi=${hi} → mid=<span style="color:#7a5a00;font-weight:700">${mid}</span>. a[mid]=<span style="color:#7a5a00;font-weight:700">${a[mid]}</span>. `
+      +(improved?`ans updated to <span style="color:var(--pur-dark);font-weight:700">${ans}</span>.`:`ans stays ${ans}.`),
+      'calc_mid', EXPLAIN.init(n,a[0]), mid,
+      `a[mid]=${a[mid]} ${improved?'→ new ans':'→ ans unchanged'}`
+    );
+
+    if(a[lo]<=a[mid]){
+      snap(
+        `➡️ a[lo]=${a[lo]} ≤ a[mid]=${a[mid]} → <span style="color:#028a5b;font-weight:700">left half sorted</span>. Inflection is in RIGHT half → <strong>lo = mid+1 = ${mid+1}</strong>.`,
+        'go_right', EXPLAIN.left_sorted_go_right(lo,mid,hi,a[lo],a[mid],a[hi],ans),
+        mid, `left half sorted → go right`
+      );
+      lo=mid+1;
+    } else {
+      snap(
+        `⬅️ a[lo]=${a[lo]} &gt; a[mid]=${a[mid]} → <span style="color:var(--pur-dark);font-weight:700">left half unsorted</span>. Inflection is in LEFT half → <strong>hi = mid−1 = ${mid-1}</strong>.`,
+        'go_left', EXPLAIN.right_sorted_go_left(lo,mid,hi,a[lo],a[mid],a[hi],ans),
+        mid, `left half unsorted → go left`
+      );
+      hi=mid-1;
+    }
+  }
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> Minimum = <span style="color:var(--pur-dark);font-weight:700">${ans}</span> at index ${ansIdx}. O(log n) — each step halved the search space.`,
+    'done', EXPLAIN.done(ans, ansIdx, n),
+    -1, `answer = ${ans}`
+  );
+  steps[steps.length-1].result={ans,ansIdx};
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// ROTATION CHART
+// ─────────────────────────────────────────────
+function drawChart(a, lo, hi, mid, ansIdx, isFinal){
+  const n=a.length;
+  const mn=Math.min(...a), mx=Math.max(...a);
+  const W=600,H=80,padX=8,padY=8;
+  const bw=Math.floor((W-padX*2)/n);
+  const scaleY=v=>padY+(H-2*padY)*(1-(v-mn)/(mx-mn||1));
+
+  let html='';
+  for(let i=0;i<n;i++){
+    const x=padX+i*bw, y=scaleY(a[i]), bh=H-padY-y;
+    let fill='rgba(180,180,170,0.4)', stroke='#d4ccb8';
+    if(isFinal&&i===ansIdx){fill='rgba(6,214,160,0.6)';stroke='#06d6a0';}
+    else if(!isFinal&&i===ansIdx){fill='rgba(192,84,252,0.5)';stroke='#c084fc';}
+    else if(i===mid){fill='rgba(255,209,102,0.55)';stroke='#ffd166';}
+    else if(i===lo&&!isFinal){fill='rgba(230,57,70,0.4)';stroke='#e63946';}
+    else if(i===hi&&!isFinal){fill='rgba(33,150,243,0.4)';stroke='#2196f3';}
+    else if(i>=lo&&i<=hi&&!isFinal){fill='rgba(33,150,243,0.12)';stroke='#2196f3';}
+    html+=`<rect x="${x+1}" y="${y}" width="${bw-2}" height="${bh}" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+  }
+  // Pivot dip marker
+  let pivot=-1;
+  for(let i=0;i<n-1;i++){if(a[i]>a[i+1]){pivot=i;break;}}
+  if(pivot>=0){
+    const px=padX+pivot*bw+bw-1;
+    html+=`<line x1="${px}" y1="${padY-4}" x2="${px}" y2="${H-padY+4}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="3,2"/>`;
+  }
+  // ans label line
+  if(ansIdx>=0){
+    const ax=padX+ansIdx*bw+bw/2;
+    const ay=scaleY(a[ansIdx]);
+    html+=`<line x1="${ax}" y1="${padY-6}" x2="${ax}" y2="${ay}" stroke="${isFinal?'#06d6a0':'#c084fc'}" stroke-width="2" stroke-dasharray="3,2"/>`;
+    html+=`<text x="${ax}" y="${padY-8}" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="${isFinal?'#028a5b':'#7a3fc0'}">ans</text>`;
+  }
+  document.getElementById('rcSvg').innerHTML=html;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let aVal=[], nVal=0;
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  aVal=document.getElementById('inputArr').value.split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x));
+  if(!aVal.length)return;
+  nVal=aVal.length;
+  steps=computeSteps(aVal);
+  currentStep=0;
+
+  // Char blocks
+  const ab=document.getElementById('arrayBlocks');
+  ab.innerHTML='';
+  for(let i=0;i<nVal;i++){
+    const d=document.createElement('div');
+    d.className='char-block';d.id=`blk-${i}`;
+    d.innerHTML=`${aVal[i]}<span class="idx">${i}</span>`;
+    ab.appendChild(d);
+  }
+
+  // Mini array
+  const ma=document.getElementById('arrMini');
+  ma.innerHTML='';
+  for(let i=0;i<nVal;i++){
+    const d=document.createElement('div');
+    d.className='arr-mini-block';d.id=`mini-${i}`;
+    d.textContent=aVal[i];
+    ma.appendChild(d);
+  }
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show','final');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  drawChart(aVal,0,nVal-1,-1,0,false);
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+const BW=62;
+let prevVals={}, prevAns=null;
+
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId), card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Blocks
+  for(let i=0;i<nVal;i++){
+    const b=document.getElementById(`blk-${i}`);
+    const m=document.getElementById(`mini-${i}`);
+    if(!b||!m)continue;
+    b.className='char-block'; m.className='arr-mini-block';
+
+    if(isFinal){
+      if(i===st.ansIdx){b.classList.add('is-ans','is-mid');m.classList.add('is-final');}
+      else{b.classList.add('is-dead');m.classList.add('is-dead');}
+    } else if(st.type==='sorted_sub'){
+      if(i>=st.lo&&i<=st.hi){b.classList.add('in-range');m.classList.add('in-range');}
+      else{b.classList.add('is-dead');m.classList.add('is-dead');}
+      if(i===st.ansIdx){b.classList.add('is-ans');m.classList.add('is-ans');}
+    } else {
+      if(i<st.lo||i>st.hi){b.classList.add('is-dead');m.classList.add('is-dead');}
+      else if(i===st.mid){b.classList.add('is-mid');m.classList.add('is-mid');}
+      else{b.classList.add('in-range');m.classList.add('in-range');}
+      if(i===st.ansIdx&&i!==st.mid){b.classList.add('is-ans');m.classList.add('is-ans');}
+    }
+  }
+
+  // Pointer labels (SIBLING pattern, BW=62, centre=28+3=31 for 56px block)
+  const pl=document.getElementById('pointerLabels');
+  const lx=st.lo*BW+28, hx=st.hi*BW+28;
+  const ax=st.ansIdx*BW+28;
+  if(isFinal){
+    pl.innerHTML=`<span class="ptr-label ptr-ans" style="left:${ax}px">min=${st.ans}</span>`;
+  } else if(st.mid>=0){
+    const mx=st.mid*BW+28;
+    const ptrMid=st.lo===st.mid?
+      `<span class="ptr-label ptr-lo" style="left:${lx}px">lo=mid=${st.lo}</span>`:
+      `<span class="ptr-label ptr-lo" style="left:${lx}px">lo=${st.lo}</span>`+
+      `<span class="ptr-label ptr-mid" style="left:${mx}px">mid=${st.mid}</span>`;
+    const ptrHi=st.hi===st.mid?'':
+      `<span class="ptr-label ptr-hi" style="left:${hx}px">hi=${st.hi}</span>`;
+    const ptrAns=st.ansIdx!==st.mid&&st.ansIdx!==st.lo&&st.ansIdx!==st.hi?
+      `<span class="ptr-label ptr-ans" style="left:${ax}px">ans</span>`:'';
+    pl.innerHTML=ptrMid+ptrHi+ptrAns;
+  } else {
+    pl.innerHTML=`<span class="ptr-label ptr-lo" style="left:${lx}px">lo=${st.lo}</span>`
+               +`<span class="ptr-label ptr-hi" style="left:${hx}px">hi=${st.hi}</span>`
+               +`<span class="ptr-label ptr-ans" style="left:${ax}px">ans</span>`;
+  }
+
+  // Rotation chart
+  drawChart(aVal, st.lo, st.hi, st.mid, st.ansIdx, isFinal);
+
+  // Search space bands
+  const dL=st.lo, act=Math.max(st.hi-st.lo+1,0), dR=Math.max(nVal-1-st.hi,0);
+  document.getElementById('spb-dead-l').style.flex=dL;
+  document.getElementById('spb-active').style.flex=Math.max(act,0.01);
+  document.getElementById('spb-dead-r').style.flex=dR;
+  document.getElementById('sbl-dead-l').style.flex=dL;
+  document.getElementById('sbl-active').style.flex=Math.max(act,0.01);
+  document.getElementById('sbl-dead-r').style.flex=dR;
+  document.getElementById('sbl-dead-l').textContent=dL>0?`${dL} cut`:'';
+  document.getElementById('sbl-active').textContent=act>0?`${act} left`:'';
+  document.getElementById('sbl-dead-r').textContent=dR>0?`${dR} cut`:'';
+
+  // Minimum tracker
+  const mt=document.getElementById('minTracker');
+  const ansImproved=prevAns!==null&&st.ans<prevAns;
+  mt.className='min-tracker'+(isFinal?' final':ansImproved?' updated':'');
+  document.getElementById('mtVal').textContent=st.ans;
+  document.getElementById('mtIdx').textContent=`index ${st.ansIdx} · value ${aVal[st.ansIdx]}`;
+  document.getElementById('mtReason').textContent=st.reason||'—';
+  prevAns=st.ans;
+
+  // Decision row
+  const dL2=document.getElementById('decLeft'), dR2=document.getElementById('decRight');
+  const dRes=document.getElementById('decResult');
+  dL2.className='dec-card'; dR2.className='dec-card'; dRes.className='dec-result';
+  if(st.mid>=0&&!isFinal){
+    const leftSorted=aVal[st.lo]<=aVal[st.mid];
+    document.getElementById('decLeftVal').textContent=
+      `[${aVal[st.lo]}..${aVal[st.mid]}] ${leftSorted?'✓ sorted':'✗ unsorted'}`;
+    document.getElementById('decRightVal').textContent=
+      `[${aVal[st.mid]}..${aVal[st.hi]}] ${!leftSorted?'✓ sorted':'✗ unsorted'}`;
+    if(st.type==='go_right'){dL2.classList.add('sorted-half');dR2.classList.add('min-half');}
+    else if(st.type==='go_left'){dR2.classList.add('sorted-half');dL2.classList.add('min-half');}
+    document.getElementById('decResultVal').textContent=
+      st.type==='go_right'?`left sorted → pivot in right → lo=mid+1`:
+      st.type==='go_left' ?`left unsorted → pivot in left → hi=mid−1`:
+      `computing…`;
+    if(st.type==='go_right')dRes.classList.add('go-right');
+    else if(st.type==='go_left')dRes.classList.add('go-left');
+  } else if(st.type==='sorted_sub'){
+    document.getElementById('decLeftVal').textContent=`a[lo]=${aVal[st.lo]}`;
+    document.getElementById('decRightVal').textContent=`a[hi]=${aVal[st.hi]}`;
+    document.getElementById('decResultVal').textContent=`a[lo]≤a[hi] → sorted → break`;
+    dRes.classList.add('done');
+  } else if(isFinal){
+    document.getElementById('decLeftVal').textContent='—';
+    document.getElementById('decRightVal').textContent='—';
+    document.getElementById('decResultVal').textContent=`min = ${st.ans} ✓`;
+    dRes.classList.add('done');
+  } else {
+    document.getElementById('decLeftVal').textContent='—';
+    document.getElementById('decRightVal').textContent='—';
+    document.getElementById('decResultVal').textContent='waiting…';
+  }
+
+  // 3-tab explanation
+  updateExplain(st);
+
+  // Code highlight
+  highlightCode(st.type==='calc_mid'?'calc_mid':st.type);
+
+  // Variables
+  setVar('vLo',  'vcLo',  st.lo);
+  setVar('vMid', 'vcMid', st.mid>=0?st.mid:'—');
+  setVar('vHi',  'vcHi',  st.hi);
+  setVar('vAlo', 'vcAlo', aVal[st.lo]);
+  setVar('vAmid','vcAmid',st.mid>=0?aVal[st.mid]:'—');
+  setVar('vAhi', 'vcAhi', aVal[st.hi]);
+  setVar('vAns', 'vcAns', st.ans);
+  setVar('vSpc', 'vcSpc', Math.max(st.hi-st.lo+1,0));
+
+  // Range bar
+  const pL=(st.lo/nVal)*100, pR=((nVal-1-st.hi)/nVal)*100;
+  document.getElementById('rbl').style.width=pL+'%';
+  document.getElementById('rba').style.left=pL+'%';
+  document.getElementById('rba').style.width=Math.max(100-pL-pR,0)+'%';
+  document.getElementById('rbr').style.width=pR+'%';
+
+  // Done / result
+  if(st.result){
+    const db=document.getElementById('doneBanner');
+    db.className='done-banner show';
+    db.textContent=`✓ MINIMUM = ${st.result.ans}  (index ${st.result.ansIdx})`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ MIN = ${st.result.ans} — O(LOG N)`;
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show final';
+    document.getElementById('bestVal').textContent=String(st.result.ans);
+    document.getElementById('bestMeta').textContent=`index ${st.result.ansIdx} · ${steps.length} steps · O(log ${nVal})`;
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

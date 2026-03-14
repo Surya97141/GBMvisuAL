@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lower / Upper Bound — Binary Search</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+    --lb-bg:rgba(33,150,243,0.12);   --lb-border:#2196f3;
+    --ub-bg:rgba(192,84,252,0.12);   --ub-border:#c084fc;
+    --active-bg:rgba(33,150,243,0.07); --active-border:#2196f3;
+    --mid-bg:rgba(255,209,102,0.18); --mid-border:#ffd166;
+    --elim-bg:rgba(0,0,0,0.04);
+    --target-bg:rgba(6,214,160,0.12);--target-border:#06d6a0;
+    --dup-bg:rgba(255,209,102,0.15); --dup-border:#ffd166;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent2);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.2vw,1.3rem);font-weight:700;letter-spacing:-0.5px;}
+  .header .sub{font-size:0.75rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent2);color:white;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;font-weight:700;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:24px 32px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent2);}
+  .field input.wide{width:280px;}
+  .field input.narrow{width:76px;}
+  .btn{padding:7px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}
+  .btn-primary:hover{background:var(--accent2);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:3px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* MODE TOGGLE */
+  .mode-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:16px;}
+  .mode-btn{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;background:var(--surface);color:var(--muted);border:none;}
+  .mode-btn.active-lb{background:var(--accent2);color:white;}
+  .mode-btn.active-ub{background:#c084fc;color:white;}
+  .mode-btn.active-both{background:var(--ink);color:var(--bg);}
+
+  .legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .leg-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;}
+  .leg-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ── ARRAY ── */
+  .array-outer{position:relative;padding-bottom:58px;margin-bottom:14px;overflow-x:auto;}
+  .array-blocks{display:flex;gap:5px;flex-wrap:nowrap;}
+  .blk{
+    position:relative;width:54px;height:54px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;
+    border-radius:8px;border:2px solid var(--border);
+    background:var(--surface);color:var(--ink);
+    transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .blk .bidx{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);}
+  .blk.active  {background:var(--active-bg);border-color:var(--active-border);color:var(--accent2);transform:translateY(-3px);}
+  .blk.is-mid  {background:var(--mid-bg);   border-color:var(--mid-border);   color:#7a5a00;transform:translateY(-7px);box-shadow:0 8px 18px rgba(255,209,102,0.3);}
+  .blk.is-target{background:var(--target-bg);border-color:var(--target-border);color:#028a5b;}
+  .blk.is-dup  {background:var(--dup-bg);   border-color:var(--dup-border);}
+  .blk.is-lb   {background:var(--lb-bg);    border-color:var(--lb-border);    color:var(--accent2);transform:translateY(-6px);box-shadow:0 6px 16px rgba(33,150,243,0.25);}
+  .blk.is-ub   {background:var(--ub-bg);    border-color:var(--ub-border);    color:#c084fc;transform:translateY(-6px);box-shadow:0 6px 16px rgba(192,84,252,0.25);}
+  .blk.is-lb.is-ub{background:rgba(100,130,250,0.15);border-color:#7c6fc4;color:#7c6fc4;}
+  .blk.eliminated{opacity:0.3;transform:scale(0.92);border-color:transparent;background:var(--elim-bg);color:var(--muted);}
+  .blk.is-L-lb{box-shadow:0 0 0 3px rgba(33,150,243,0.4);}
+  .blk.is-R-lb{box-shadow:0 0 0 3px rgba(33,150,243,0.4);}
+  .blk.is-L-ub{box-shadow:0 0 0 3px rgba(192,84,252,0.4);}
+  .blk.is-R-ub{box-shadow:0 0 0 3px rgba(192,84,252,0.4);}
+
+  /* pointer labels — two rows for LB and UB */
+  .ptr-labels{position:absolute;bottom:0;left:0;right:0;height:52px;pointer-events:none;}
+  .ptr{position:absolute;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;padding:2px 6px;border-radius:3px;transform:translateX(-50%);transition:left 0.4s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+  .ptr-lb{background:var(--accent2);color:white;top:2px;}
+  .ptr-ub{background:#c084fc;      color:white;top:30px;}
+  .ptr-mid-lb{background:var(--accent4);color:#3a2800;top:2px;}
+  .ptr-mid-ub{background:var(--accent4);color:#3a2800;top:30px;}
+  .ptr-res{background:var(--accent3);color:#0a2e22;top:2px;font-size:0.62rem;}
+
+  /* ── RESULT FLAGS ── */
+  .result-flags{display:flex;gap:10px;margin-bottom:16px;}
+  .rflag{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;transition:all 0.3s;text-align:center;}
+  .rflag.active-lb{border-color:var(--lb-border);background:var(--lb-bg);}
+  .rflag.active-ub{border-color:var(--ub-border);background:var(--ub-bg);}
+  .rflag.done-lb{border-color:var(--lb-border);background:var(--lb-bg);}
+  .rflag.done-ub{border-color:var(--ub-border);background:var(--ub-bg);}
+  .rflag-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .rflag-label.lb{color:var(--accent2);}
+  .rflag-label.ub{color:#c084fc;}
+  .rflag-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--ink);}
+  .rflag-sub{font-size:0.68rem;color:var(--muted);margin-top:3px;}
+
+  /* ── DEFINITION BOX ── */
+  .def-box{display:flex;gap:8px;margin-bottom:14px;}
+  .def-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;font-size:0.78rem;line-height:1.6;}
+  .def-title{font-family:'Space Mono',monospace;font-size:0.6rem;font-weight:700;margin-bottom:4px;}
+  .def-title.lb{color:var(--accent2);}
+  .def-title.ub{color:#c084fc;}
+
+  /* ── EXPLANATION PANEL (3 tabs) ── */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-lb  {border-color:var(--accent2);}
+  .explain-panel.ep-ub  {border-color:#c084fc;}
+  .explain-panel.ep-done{border-color:var(--accent3);}
+
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active{color:var(--ink);border-bottom-color:var(--accent2);}
+  .ep-tab.active.t-why  {border-bottom-color:#c084fc;color:#7a3fc0;}
+  .ep-tab.active.t-inv  {border-bottom-color:var(--accent3);color:#028a5b;}
+
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+  /* what tab — matches old step-box style */
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .pur{color:#c084fc;font-weight:600;}
+
+  /* why tab */
+  .ep-why-block{background:rgba(192,84,252,0.06);border-left:3px solid #c084fc;border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .ep-why-block.why-lb{background:rgba(33,150,243,0.06);border-left-color:var(--accent2);}
+  .ep-why-block.why-done{background:rgba(6,214,160,0.06);border-left-color:var(--accent3);}
+
+  /* invariant tab */
+  .ep-inv-block{display:flex;flex-direction:column;gap:8px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:8px 12px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-broken{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.2);}
+  .inv-row.inv-broken .inv-text strong{color:var(--accent);}
+  .inv-row.inv-neutral{background:rgba(255,209,102,0.06);border-color:rgba(255,209,102,0.2);}
+  .inv-row.inv-neutral .inv-text strong{color:#7a5a00;}
+
+  .progress-wrap{margin-bottom:10px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent2);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent3);color:#0a2e22;text-align:center;padding:9px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;animation:fadeUp 0.4s ease;}
+  .done-banner.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}
+  .state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:14px 14px 8px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.63rem;line-height:1.85;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.85em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-lb  {background:rgba(33,150,243,0.18);border-left-color:#2196f3;color:#e2e8f0;}
+  .code-line.hl-ub  {background:rgba(192,84,252,0.18);border-left-color:#c084fc;color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(6,214,160,0.16); border-left-color:#06d6a0;color:#e2e8f0;}
+  .ck{color:#c084fc;} .cf{color:#67e8f9;} .cc{color:#374151;font-style:italic;} .cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 14px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+
+  /* dual var grids for LB and UB */
+  .dual-vars{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+  .dv-section{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;}
+  .dv-label{font-family:'Space Mono',monospace;font-size:0.52rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;}
+  .dv-label.lb{color:rgba(33,150,243,0.7);}
+  .dv-label.ub{color:rgba(192,84,252,0.7);}
+  .dv-row{display:flex;gap:6px;}
+  .dv-card{flex:1;background:#060610;border:1px solid #1a1a2e;border-radius:4px;padding:6px 8px;transition:all 0.3s;text-align:center;}
+  .dv-card.changed{animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .dv-name{font-family:'Space Mono',monospace;font-size:0.48rem;color:#6b6b8a;margin-bottom:2px;}
+  .dv-val{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;}
+  .dv-val.lb{color:#4fc3f7;}
+  .dv-val.ub{color:#d8b4fe;}
+  .dv-val.yel{color:var(--accent4);}
+  .dv-val.grn{color:var(--accent3);}
+
+  /* OCCURRENCE MAP */
+  .occ-map{margin-bottom:12px;}
+  .om-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .om-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:5px;background:#0d0d18;border:1px solid #2a2a3e;margin-bottom:4px;}
+  .om-range{font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--bg);flex:1;}
+  .om-lb{font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:#4fc3f7;}
+  .om-ub{font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:#d8b4fe;}
+  .om-cnt{font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--accent3);}
+
+  .best-box{margin:0 14px 12px;padding:9px 11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--bg);line-height:1.7;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 14px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Lower Bound / Upper Bound</h1>
+    <div class="sub">Binary Search · First & Last Occurrence · Duplicates</div>
+  </div>
+  <div class="family-badge">03 · Binary Search</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Sorted Array (duplicates ok)</label>
+        <input type="text" id="inputArr" class="wide" value="1,3,5,5,5,8,8,11,13,13,13,17">
+      </div>
+      <div class="field">
+        <label>Target</label>
+        <input type="number" id="inputTarget" class="narrow" value="5">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1600">0.5×</button>
+          <button class="speed-btn active" data-ms="900">1×</button>
+          <button class="speed-btn" data-ms="450">2×</button>
+          <button class="speed-btn" data-ms="180">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <!-- MODE TOGGLE -->
+    <div class="mode-toggle">
+      <button class="mode-btn" id="modeLB" onclick="setMode('lb')">Lower Bound only</button>
+      <button class="mode-btn" id="modeUB" onclick="setMode('ub')">Upper Bound only</button>
+      <button class="mode-btn active-both" id="modeBoth" onclick="setMode('both')">Both together</button>
+    </div>
+
+    <!-- DEFINITIONS -->
+    <div class="def-box">
+      <div class="def-card">
+        <div class="def-title lb">Lower Bound</div>
+        First index where a[i] ≥ target. The <strong>leftmost</strong> position target could be inserted to keep array sorted.
+      </div>
+      <div class="def-card">
+        <div class="def-title ub">Upper Bound</div>
+        First index where a[i] &gt; target. One past the <strong>rightmost</strong> occurrence. Count = UB − LB.
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--active-bg);border-color:var(--active-border)"></div>Active space</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--mid-bg);border-color:var(--mid-border)"></div>Mid</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--lb-bg);border-color:var(--lb-border)"></div>Lower bound</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--ub-bg);border-color:var(--ub-border)"></div>Upper bound</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--target-bg);border-color:var(--target-border)"></div>Target value</div>
+    </div>
+
+    <!-- ARRAY -->
+    <div class="section-label">Array</div>
+    <div class="array-outer">
+      <div class="array-blocks" id="arrayBlocks"></div>
+      <div class="ptr-labels" id="ptrLabels"></div>
+    </div>
+
+    <!-- RESULT FLAGS -->
+    <div class="result-flags">
+      <div class="rflag" id="rflagLB">
+        <div class="rflag-label lb">Lower Bound</div>
+        <div class="rflag-val" id="rfLBVal">—</div>
+        <div class="rflag-sub" id="rfLBSub">first index ≥ target</div>
+      </div>
+      <div class="rflag" id="rflagUB">
+        <div class="rflag-label ub">Upper Bound</div>
+        <div class="rflag-val" id="rfUBVal">—</div>
+        <div class="rflag-sub" id="rfUBSub">first index &gt; target</div>
+      </div>
+      <div class="rflag" id="rflagCnt">
+        <div class="rflag-label" style="color:var(--accent3)">Count</div>
+        <div class="rflag-val" id="rfCntVal">—</div>
+        <div class="rflag-sub">UB − LB occurrences</div>
+      </div>
+    </div>
+
+    <!-- 3-TAB EXPLANATION PANEL -->
+    <div class="explain-panel" id="explainPanel">
+      <div class="ep-tabs">
+        <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+        <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+        <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+      </div>
+      <div class="ep-body">
+        <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ BOTH BOUNDS FOUND</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="state-panel">
+
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Both Bounds</div>
+      <pre class="code-block">
+<span class="code-line" id="cl-lb1"><span class="cc">// Lower Bound: first i where a[i] >= t</span></span>
+<span class="code-line" id="cl-lb2"><span class="ck">int</span> <span class="cf">lowerBound</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a, <span class="ck">int</span> t) {</span>
+<span class="code-line" id="cl-lb3">  <span class="ck">int</span> L=<span class="cn">0</span>, R=n, ans=n;</span>
+<span class="code-line" id="cl-lb4">  <span class="ck">while</span>(L&lt;R){ <span class="ck">int</span> m=L+(R-L)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-lb5">    <span class="ck">if</span>(a[m]&gt;=t){ans=m; R=m;}  <span class="cc">// go left</span></span>
+<span class="code-line" id="cl-lb6">    <span class="ck">else</span> L=m+<span class="cn">1</span>;              <span class="cc">// go right</span></span>
+<span class="code-line" id="cl-lb7">  } <span class="ck">return</span> ans; }</span>
+<span class="code-line" id="cl-ub1"><span class="cc">// Upper Bound: first i where a[i] > t</span></span>
+<span class="code-line" id="cl-ub2"><span class="ck">int</span> <span class="cf">upperBound</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a, <span class="ck">int</span> t) {</span>
+<span class="code-line" id="cl-ub3">  <span class="ck">int</span> L=<span class="cn">0</span>, R=n, ans=n;</span>
+<span class="code-line" id="cl-ub4">  <span class="ck">while</span>(L&lt;R){ <span class="ck">int</span> m=L+(R-L)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-ub5">    <span class="ck">if</span>(a[m]&gt;t){ans=m; R=m;}   <span class="cc">// go left</span></span>
+<span class="code-line" id="cl-ub6">    <span class="ck">else</span> L=m+<span class="cn">1</span>;              <span class="cc">// go right</span></span>
+<span class="code-line" id="cl-ub7">  } <span class="ck">return</span> ans; }</span></pre>
+    </div>
+
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+
+      <div class="dual-vars">
+        <div class="dv-section" id="dvLB">
+          <div class="dv-label lb">Lower Bound pass</div>
+          <div class="dv-row">
+            <div class="dv-card" id="dvcLBL"><div class="dv-name">L</div><div class="dv-val lb" id="dvLBL">—</div></div>
+            <div class="dv-card" id="dvcLBR"><div class="dv-name">R</div><div class="dv-val lb" id="dvLBR">—</div></div>
+            <div class="dv-card" id="dvcLBM"><div class="dv-name">mid</div><div class="dv-val yel" id="dvLBM">—</div></div>
+            <div class="dv-card" id="dvcLBAns"><div class="dv-name">ans</div><div class="dv-val grn" id="dvLBAns">n</div></div>
+          </div>
+        </div>
+        <div class="dv-section" id="dvUB">
+          <div class="dv-label ub">Upper Bound pass</div>
+          <div class="dv-row">
+            <div class="dv-card" id="dvcUBL"><div class="dv-name">L</div><div class="dv-val ub" id="dvUBL">—</div></div>
+            <div class="dv-card" id="dvcUBR"><div class="dv-name">R</div><div class="dv-val ub" id="dvUBR">—</div></div>
+            <div class="dv-card" id="dvcUBM"><div class="dv-name">mid</div><div class="dv-val yel" id="dvUBM">—</div></div>
+            <div class="dv-card" id="dvcUBAns"><div class="dv-name">ans</div><div class="dv-val grn" id="dvUBAns">n</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OCCURRENCE MAP -->
+      <div class="occ-map">
+        <div class="om-title">Occurrence summary</div>
+        <div class="om-row" id="omRow">
+          <div class="om-range" id="omRange">—</div>
+          <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:#6b6b8a;">LB=</div>
+          <div class="om-lb" id="omLB">—</div>
+          <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:#6b6b8a;">UB=</div>
+          <div class="om-ub" id="omUB">—</div>
+          <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:#6b6b8a;">count=</div>
+          <div class="om-cnt" id="omCnt">—</div>
+        </div>
+      </div>
+
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Final Result</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta"></div>
+      </div>
+    </div>
+
+    <div class="done-bar" id="doneBar"></div>
+  </div>
+</div>
+
+<script>
+let currentMode = 'both';
+let activeTab = 'what';
+
+function switchTab(tab){
+  activeTab = tab;
+  ['what','why','inv'].forEach(t=>{
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1))
+      .classList.toggle('active', t===tab);
+    document.getElementById('pane'+t.charAt(0).toUpperCase()+t.slice(1))
+      .classList.toggle('active', t===tab);
+  });
+  // re-render current step's explain without rebuilding everything
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+
+function setMode(m){
+  currentMode = m;
+  document.getElementById('modeLB').className   = 'mode-btn' + (m==='lb'?'   active-lb':'');
+  document.getElementById('modeUB').className   = 'mode-btn' + (m==='ub'?'   active-ub':'');
+  document.getElementById('modeBoth').className = 'mode-btn' + (m==='both'?' active-both':'');
+  stopPlay(); buildUI();
+}
+// ── CODE HIGHLIGHT ─────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init_lb: {ids:['cl-lb1','cl-lb2','cl-lb3','cl-lb4'], cls:'hl-lb'},
+  lb_left: {ids:['cl-lb4','cl-lb5'],                   cls:'hl-lb'},
+  lb_right:{ids:['cl-lb4','cl-lb6'],                   cls:'hl-lb'},
+  lb_done: {ids:['cl-lb7'],                            cls:'hl-done'},
+  init_ub: {ids:['cl-ub1','cl-ub2','cl-ub3','cl-ub4'], cls:'hl-ub'},
+  ub_left: {ids:['cl-ub4','cl-ub5'],                   cls:'hl-ub'},
+  ub_right:{ids:['cl-ub4','cl-ub6'],                   cls:'hl-ub'},
+  ub_done: {ids:['cl-ub7'],                            cls:'hl-done'},
+  done:    {ids:['cl-lb7','cl-ub7'],                   cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── ALGORITHM ──────────────────────────────────────────────────────────────
+function runLB(arr, target){
+  const n=arr.length, iters=[];
+  let L=0, R=n, ans=n;
+  while(L<R){
+    const mid=L+Math.floor((R-L)/2);
+    if(arr[mid]>=target){ iters.push({L,R,mid,ans,decision:'left',aMid:arr[mid]});  ans=mid; R=mid; }
+    else                 { iters.push({L,R,mid,ans,decision:'right',aMid:arr[mid]}); L=mid+1; }
+  }
+  iters.push({L,R,mid:-1,ans,decision:'done',aMid:null});
+  return {ans, iters};
+}
+
+function runUB(arr, target){
+  const n=arr.length, iters=[];
+  let L=0, R=n, ans=n;
+  while(L<R){
+    const mid=L+Math.floor((R-L)/2);
+    if(arr[mid]>target){ iters.push({L,R,mid,ans,decision:'left',aMid:arr[mid]});  ans=mid; R=mid; }
+    else                { iters.push({L,R,mid,ans,decision:'right',aMid:arr[mid]}); L=mid+1; }
+  }
+  iters.push({L,R,mid:-1,ans,decision:'done',aMid:null});
+  return {ans, iters};
+}
+
+function computeSteps(arr, target, mode){
+  const n=arr.length, steps=[];
+  const lb=runLB(arr,target);
+  const ub=runUB(arr,target);
+  const lbAns=lb.ans, ubAns=ub.ans, count=ubAns-lbAns;
+
+  // snap helper — now includes explain object
+  const s=(phase,iterLB,iterUB,type,desc,explain)=>steps.push({
+    phase, iterLB, iterUB,
+    lbDone:phase==='ub'||phase==='done',
+    ubDone:phase==='done',
+    lbAns:phase==='ub'||phase==='done'?lbAns:-1,
+    ubAns:phase==='done'?ubAns:-1,
+    count:phase==='done'?count:0,
+    type, desc, explain, n, target
+  });
+
+  // ── EXPLANATION LIBRARY ──────────────────────────────────────────────
+  const E = {
+    init: {
+      why: `<div class="ep-why-block why-lb">We can't just scan left-to-right to find the first occurrence — that would be O(n). Since the array is <strong>sorted</strong>, we can do O(log n) by halving the search space each step. Lower bound finds the leftmost valid index; upper bound finds one past the rightmost. Together they give count = UB − LB in just 2 × O(log n).</div>`,
+      inv: [
+        {icon:'🔒', cls:'', text:`<strong>Before LB starts:</strong> Everything before index 0 satisfies <em>a[i] &lt; target</em>. Everything from index n onwards satisfies <em>a[i] ≥ target</em>. These ranges start empty and will grow.`},
+        {icon:'📌', cls:'inv-neutral', text:`<strong>ans is initialised to n</strong> — the "not found" sentinel. If target is greater than every element, LB correctly returns n.`},
+      ]
+    },
+    lb_left: (it) => ({
+      why: `<div class="ep-why-block why-lb">a[mid] = ${it.aMid} ≥ target = ${target}. This means mid <em>could</em> be the lower bound — but there might be an even smaller index that also satisfies the condition. So we <strong>record mid as our best answer so far</strong> and move R to mid. We don't discard mid — we just stop searching to its right.</div>`,
+      inv: [
+        {icon:'🔒', cls:'', text:`<strong>LB invariant:</strong> ans always holds the smallest index seen so far where a[i] ≥ target. Everything to the right of ans has already been confirmed to meet the condition.`},
+        {icon:'➡️', cls:'inv-neutral', text:`<strong>R = mid (not mid−1):</strong> We set R = mid, not R = mid − 1, because mid itself is a candidate. Using R = mid − 1 would skip it.`},
+      ]
+    }),
+    lb_right: (it) => ({
+      why: `<div class="ep-why-block why-lb">a[mid] = ${it.aMid} &lt; target = ${target}. This means mid and everything to its left <strong>cannot</strong> be the lower bound — they're too small. So we safely discard the left half by setting L = mid + 1. We lose nothing because we already know those values don't qualify.</div>`,
+      inv: [
+        {icon:'🔒', cls:'', text:`<strong>LB invariant maintained:</strong> Everything to the left of L has a[i] &lt; target — confirmed eliminated. The answer must be in [L..R].`},
+        {icon:'✂️', cls:'inv-neutral', text:`<strong>L = mid + 1:</strong> We skip mid itself because a[mid] &lt; target — it's definitely not the lower bound.`},
+      ]
+    }),
+    lb_done: {
+      why: `<div class="ep-why-block why-lb">L has met R — the search space is empty. The last value recorded in <strong>ans</strong> is the smallest index where a[i] ≥ target. If ans = n, the target is larger than every element in the array.</div>`,
+      inv: [
+        {icon:'✅', cls:'', text:`<strong>LB complete.</strong> The invariant has fully converged: everything left of ans has a[i] &lt; target, everything from ans onwards has a[i] ≥ target.`},
+        {icon:'🔢', cls:'inv-neutral', text:`<strong>Count of occurrences = UB − LB.</strong> Now we run the upper bound pass to find where the target range ends.`},
+      ]
+    },
+    ub_left: (it) => ({
+      why: `<div class="ep-why-block">a[mid] = ${it.aMid} &gt; target = ${target}. This means mid <em>could</em> be the upper bound. We record it as best-so-far and go left — there might be a smaller valid index. Note the strict <strong>&gt;</strong> vs lower bound's <strong>≥</strong> — that one character difference is everything.</div>`,
+      inv: [
+        {icon:'🔒', cls:'', text:`<strong>UB invariant:</strong> ans holds the smallest index seen so far where a[i] &gt; target. Everything to the right of ans has a[i] &gt; target.`},
+        {icon:'🔑', cls:'inv-neutral', text:`<strong>The key difference:</strong> UB uses <em>a[mid] &gt; target</em>. LB uses <em>a[mid] ≥ target</em>. For elements equal to target: LB records them, UB skips right past them.`},
+      ]
+    }),
+    ub_right: (it) => ({
+      why: `<div class="ep-why-block">a[mid] = ${it.aMid} ≤ target = ${target}. This index is not past the target yet — the upper bound must be further right. We discard the left half. Equal elements (a[mid] = target) push L right, which is how UB skips over all occurrences of target.</div>`,
+      inv: [
+        {icon:'🔒', cls:'', text:`<strong>UB invariant maintained:</strong> Everything to the left of L has a[i] ≤ target. The first index where a[i] &gt; target must be in [L..R].`},
+        {icon:'⚖️', cls:'inv-neutral', text:`<strong>Equals go right:</strong> When a[mid] = target, UB moves L rightward. This is intentional — we want one past the last occurrence.`},
+      ]
+    }),
+    done: (lb, ub, cnt, tgt) => ({
+      why: `<div class="ep-why-block why-done">Two binary searches, both O(log n) → total O(log n). The count trick works because in a sorted array, all occurrences of target sit in a contiguous block. LB pins the left edge, UB pins the right edge (exclusive). <strong>count = UB − LB</strong> in O(1). No need to scan. This is how C++ <em>lower_bound</em> and <em>upper_bound</em> work internally.</div>`,
+      inv: [
+        {icon:'✅', cls:'', text:`<strong>Both invariants converged.</strong> [0..LB−1] all have a[i] &lt; target. [LB..UB−1] all have a[i] = target. [UB..n−1] all have a[i] &gt; target.`},
+        {icon:'🔢', cls:'', text:`<strong>count = UB − LB = ${ub} − ${lb} = ${cnt}.</strong> ${cnt>0?`Target ${tgt} appears ${cnt} time${cnt>1?'s':''}.`:`Target ${tgt} is absent — LB = UB means the range is empty.`}`},
+        {icon:'📐', cls:'inv-neutral', text:`<strong>Complexity:</strong> O(log n) — each comparison halves the search space. n = ${arr.length} → max ⌈log₂(${arr.length})⌉ = ${Math.ceil(Math.log2(arr.length))} comparisons per pass.`},
+      ]
+    }),
+  };
+
+
+  // INIT
+  s('init', lb.iters[0], ub.iters[0], 'init_lb',
+    `🚀 <strong>Starting.</strong> Array has <strong>${n}</strong> elements, target=<span class="yel">${target}</span>. We run <span class="blu">lower bound</span> first (first index ≥ target), then <span class="pur">upper bound</span> (first index &gt; target). Count = UB − LB.`,
+    E.init);
+
+  // LB pass
+  if(mode==='lb'||mode==='both'){
+    lb.iters.forEach((it,i)=>{
+      if(it.decision==='done'){
+        s('lb_done', it, ub.iters[0], 'lb_done',
+          `<span class="blu">Lower bound complete.</span> ans = <strong>${lbAns}</strong>. ${lbAns<n?`a[${lbAns}]=${arr[lbAns]} is the first element ≥ ${target}.`:`${target} is greater than all elements — LB = n = ${n}.`}`,
+          E.lb_done);
+      } else {
+        const goLeft=it.decision==='left';
+        s('lb', it, ub.iters[0], goLeft?'lb_left':'lb_right',
+          `<span class="blu">LB</span> iter ${i+1}: mid=${it.mid}, a[mid]=${it.aMid} <strong>${it.aMid>=target?'≥':'<'}</strong> ${target}. ${goLeft?`<span class="blu">a[mid] ≥ target</span> — record ans=${it.mid}, go left (R=mid). Could be first occurrence.`:`<span class="red">a[mid] < target</span> — go right (L=mid+1). Target must be further right.`}`,
+          goLeft?E.lb_left(it):E.lb_right(it));
+      }
+    });
+  }
+
+  // UB pass
+  if(mode==='ub'||mode==='both'){
+    ub.iters.forEach((it,i)=>{
+      if(it.decision==='done'){
+        s('done', lb.iters[lb.iters.length-1], it, 'done',
+          `🎉 <span class="grn"><strong>Done!</strong></span> <span class="blu">LB=${lbAns}</span> · <span class="pur">UB=${ubAns}</span> · Count=<strong>${count}</strong>. ${count>0?`Target ${target} appears ${count} time${count>1?'s':''} at indices [${lbAns}..${ubAns-1}].`:`Target ${target} does not exist in the array.`} O(log n) — each pass halved the space ⌈log₂(${n})⌉ times.`,
+          E.done(lbAns,ubAns,count,target));
+      } else {
+        const goLeft=it.decision==='left';
+        s('ub', lb.iters[lb.iters.length-1], it, goLeft?'ub_left':'ub_right',
+          `<span class="pur">UB</span> iter ${i+1}: mid=${it.mid}, a[mid]=${it.aMid} <strong>${it.aMid>target?'>':'≤'}</strong> ${target}. ${goLeft?`<span class="pur">a[mid] > target</span> — record ans=${it.mid}, go left (R=mid). Looking for the boundary.`:`<span class="red">a[mid] ≤ target</span> — go right (L=mid+1). Boundary is further right.`}`,
+          goLeft?E.ub_left(it):E.ub_right(it));
+      }
+    });
+  }
+
+  if(mode==='lb')
+    s('done', lb.iters[lb.iters.length-1], ub.iters[0], 'lb_done',
+      `🎉 <span class="grn"><strong>Done (LB only).</strong></span> Lower bound = <span class="blu">${lbAns}</span>. ${lbAns<n?`First occurrence of ${target} (or first element > ${target}) is at index ${lbAns}.`:`${target} not found — would insert at end.`}`,
+      E.done(lbAns,lbAns,0,target));
+
+  return {steps, lbAns, ubAns, count};
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let arr=[], target=5, steps=[], lbAns=-1, ubAns=-1, countAns=0;
+let currentStep=0, playing=false, timer=null, speed=900;
+
+function parseArr(){
+  return document.getElementById('inputArr').value
+    .split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x));
+}
+
+function buildUI(){
+  arr=parseArr().sort((a,b)=>a-b);
+  document.getElementById('inputArr').value=arr.join(',');
+  target=parseInt(document.getElementById('inputTarget').value)||0;
+  const result=computeSteps(arr,target,currentMode);
+  steps=result.steps; lbAns=result.lbAns; ubAns=result.ubAns; countAns=result.count;
+  currentStep=0;
+  const n=arr.length;
+
+  const ab=document.getElementById('arrayBlocks');
+  ab.innerHTML='';
+  arr.forEach((v,i)=>{
+    const isTgt=v===target;
+    ab.innerHTML+=`<div class="blk ${isTgt?'is-target is-dup':'active'}" id="blk-${i}">${v}<span class="bidx">${i}</span></div>`;
+  });
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').textContent='';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('rflagLB').className='rflag';
+  document.getElementById('rflagUB').className='rflag';
+  document.getElementById('rfLBVal').textContent='—';
+  document.getElementById('rfUBVal').textContent='—';
+  document.getElementById('rfCntVal').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+let prevDV={};
+function setDV(elId,cardId,val,changed){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  el.textContent=String(val);
+  if(changed){card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');setTimeout(()=>card.classList.remove('changed'),500);}
+}
+
+function updateExplain(st){
+  if(!st||!st.explain) return;
+  const ex = st.explain;
+
+  // panel border colour
+  const ep = document.getElementById('explainPanel');
+  ep.className = 'explain-panel ' +
+    (st.phase==='done'?'ep-done': st.phase==='ub'||st.phase==='lb_done'?'ep-ub':'ep-lb');
+
+  // WHAT tab
+  document.getElementById('paneWhat').innerHTML = st.desc;
+
+  // WHY tab
+  document.getElementById('paneWhy').innerHTML =
+    ex.why || '<em style="color:var(--muted)">No additional explanation for this step.</em>';
+
+  // INVARIANT tab
+  const inv = ex.inv || [];
+  document.getElementById('invBlock').innerHTML = inv.map(row=>`
+    <div class="inv-row ${row.cls||''}">
+      <div class="inv-icon">${row.icon}</div>
+      <div class="inv-text">${row.text}</div>
+    </div>`).join('');
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const n=arr.length;
+  const itLB=st.iterLB, itUB=st.iterUB;
+
+  // array blocks
+  arr.forEach((v,i)=>{
+    const b=document.getElementById(`blk-${i}`);
+    if(!b)return;
+    b.className='blk';
+    const isTgt=v===target;
+
+    // determine state based on phase
+    const isLBPhase=st.phase==='init'||st.phase==='lb'||st.phase==='lb_done';
+    const curIt=isLBPhase?itLB:itUB;
+
+    if(curIt&&curIt.decision!=='done'){
+      if(i<curIt.L||i>=curIt.R) b.classList.add('eliminated');
+      else b.classList.add('active');
+      if(i===curIt.mid){ b.classList.remove('active'); b.classList.add('is-mid'); }
+    } else {
+      b.classList.add('active');
+    }
+
+    // mark LB/UB results
+    if(st.lbDone&&i===st.lbAns) b.classList.add('is-lb');
+    if(st.ubDone&&i===st.ubAns) b.classList.add('is-ub');
+    if(isTgt&&!b.classList.contains('is-lb')&&!b.classList.contains('is-ub')&&!b.classList.contains('eliminated'))
+      b.classList.add('is-dup');
+  });
+
+  // pointer labels
+  const BW=59;
+  const pl=document.getElementById('ptrLabels');
+  let ptrs='';
+  const isLBPhase=st.phase==='init'||st.phase==='lb'||st.phase==='lb_done';
+  const curIt=isLBPhase?itLB:itUB;
+  if(curIt&&curIt.decision!=='done'&&curIt.mid>=0){
+    if(isLBPhase){
+      ptrs+=`<span class="ptr ptr-lb" style="left:${curIt.L*BW+27}px">L<sub style="font-size:0.45rem">lb</sub></span>`;
+      ptrs+=`<span class="ptr ptr-lb" style="left:${(curIt.R-1)*BW+27}px">R<sub style="font-size:0.45rem">lb</sub></span>`;
+      ptrs+=`<span class="ptr ptr-mid-lb" style="left:${curIt.mid*BW+27}px">mid</span>`;
+    } else {
+      ptrs+=`<span class="ptr ptr-ub" style="left:${curIt.L*BW+27}px">L<sub style="font-size:0.45rem">ub</sub></span>`;
+      ptrs+=`<span class="ptr ptr-ub" style="left:${(curIt.R-1)*BW+27}px">R<sub style="font-size:0.45rem">ub</sub></span>`;
+      ptrs+=`<span class="ptr ptr-mid-ub" style="left:${curIt.mid*BW+27}px">mid</span>`;
+    }
+  }
+  if(st.lbDone&&st.lbAns<n)
+    ptrs+=`<span class="ptr ptr-res" style="left:${st.lbAns*BW+27}px;background:var(--accent2)">LB</span>`;
+  if(st.ubDone&&st.ubAns<n)
+    ptrs+=`<span class="ptr ptr-res" style="left:${st.ubAns*BW+27}px;background:#c084fc;color:white">UB</span>`;
+  pl.innerHTML=ptrs;
+
+  // result flags
+  const rfLB=document.getElementById('rflagLB');
+  const rfUB=document.getElementById('rflagUB');
+  if(st.lbDone){ rfLB.className='rflag done-lb'; document.getElementById('rfLBVal').textContent=st.lbAns; }
+  if(st.ubDone){ rfUB.className='rflag done-ub'; document.getElementById('rfUBVal').textContent=st.ubAns; document.getElementById('rfCntVal').textContent=st.count; }
+
+  // dual vars
+  const lbSection=document.getElementById('dvLB');
+  const ubSection=document.getElementById('dvUB');
+  lbSection.style.opacity=isLBPhase?'1':'0.45';
+  ubSection.style.opacity=!isLBPhase?'1':'0.45';
+  if(itLB){
+    setDV('dvLBL','dvcLBL',itLB.L,false);
+    setDV('dvLBR','dvcLBR',itLB.R,false);
+    setDV('dvLBM','dvcLBM',itLB.mid>=0?itLB.mid:'—',false);
+    setDV('dvLBAns','dvcLBAns',itLB.ans<n?itLB.ans:'n',false);
+  }
+  if(itUB){
+    setDV('dvUBL','dvcUBL',itUB.L,false);
+    setDV('dvUBR','dvcUBR',itUB.R,false);
+    setDV('dvUBM','dvcUBM',itUB.mid>=0?itUB.mid:'—',false);
+    setDV('dvUBAns','dvcUBAns',itUB.ans<n?itUB.ans:'n',false);
+  }
+
+  // occurrence summary
+  document.getElementById('omRange').textContent=
+    st.lbDone&&st.lbAns<n?`a[${st.lbAns}..${st.ubAns-1}]`:`target=${target}`;
+  document.getElementById('omLB').textContent=st.lbDone?st.lbAns:'—';
+  document.getElementById('omUB').textContent=st.ubDone?st.ubAns:'—';
+  document.getElementById('omCnt').textContent=st.ubDone?st.count:'—';
+
+  // explanation panel
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // done
+  if(st.phase==='done'){
+    document.getElementById('doneBanner').classList.add('show');
+    const db=document.getElementById('doneBar');
+    db.className='done-bar show';
+    db.style.background=countAns>0?'var(--accent3)':'var(--accent)';
+    db.style.color=countAns>0?'#0a2e22':'white';
+    db.textContent=countAns>0?`✓ FOUND ${countAns}× · LB=${lbAns} UB=${ubAns}`:`✗ NOT FOUND · LB=UB=${lbAns}`;
+    const bb=document.getElementById('bestBox');bb.classList.add('show');
+    document.getElementById('bestVal').innerHTML=
+      `LB = ${lbAns}\nUB = ${ubAns}\nCount = ${countAns}`;
+    document.getElementById('bestMeta').textContent=
+      countAns>0?`${target} at indices [${lbAns}..${ubAns-1}]`:`${target} not present · insert at ${lbAns}`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ── PLAYBACK ───────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){
+  if(!playing)return;
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  renderStep(currentStep+1);
+  timer=setTimeout(tick,speed);
+}
+function stopPlay(){
+  playing=false;clearTimeout(timer);
+  document.getElementById('btnPause').textContent='▶ Resume';
+  document.getElementById('btnRun').disabled=false;
+}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');speed=parseInt(b.dataset.ms);
+  });
+});
+
+buildUI();
+</script>
+</body>
+</html>

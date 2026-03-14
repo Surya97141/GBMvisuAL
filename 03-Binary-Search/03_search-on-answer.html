@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search on Answer — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+    --feasible-bg:rgba(6,214,160,0.10);   --feasible-border:#06d6a0;
+    --infeasible-bg:rgba(230,57,70,0.09); --infeasible-border:#e63946;
+    --mid-bg:rgba(255,209,102,0.15);      --mid-border:#ffd166;
+    --ans-bg:rgba(255,209,102,0.13);      --ans-border:#ffd166;
+    --active-bg:rgba(33,150,243,0.08);    --active-border:#2196f3;
+    --elim-bg:rgba(0,0,0,0.04);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent2);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.2vw,1.3rem);font-weight:700;letter-spacing:-0.5px;}
+  .header .sub{font-size:0.75rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent2);color:white;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;font-weight:700;white-space:nowrap;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:24px 32px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent2);}
+  .field input.wide{width:260px;} .field input.narrow{width:70px;}
+  .btn{padding:7px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}
+  .btn-primary:hover{background:var(--accent2);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:3px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* PROBLEM SELECTOR */
+  .problem-select{display:flex;gap:0;border:1.5px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;}
+  .prob-btn{flex:1;padding:7px 6px;text-align:center;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;cursor:pointer;transition:all 0.15s;background:var(--surface);color:var(--muted);border:none;}
+  .prob-btn.active{background:var(--ink);color:var(--bg);}
+
+  .legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .leg-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;}
+  .leg-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ── ANSWER SPACE RULER ── */
+  .ruler-section{margin-bottom:16px;}
+  .ruler-wrap{position:relative;height:56px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
+  .ruler-elim-l{position:absolute;left:0;top:0;bottom:0;background:rgba(230,57,70,0.15);transition:width 0.4s ease;}
+  .ruler-active {position:absolute;top:0;bottom:0;background:rgba(33,150,243,0.10);transition:left 0.4s,width 0.4s;}
+  .ruler-elim-r{position:absolute;right:0;top:0;bottom:0;background:rgba(230,57,70,0.15);transition:width 0.4s ease;}
+  .ruler-mid   {position:absolute;top:0;bottom:0;width:3px;background:var(--accent4);transition:left 0.4s;border-radius:1px;}
+  .ruler-ans   {position:absolute;top:0;bottom:0;width:3px;background:var(--accent3);transition:left 0.4s;border-radius:1px;display:none;}
+  .ruler-labels{display:flex;justify-content:space-between;margin-top:5px;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);}
+  .ruler-labels .hi{color:var(--accent2);font-weight:700;}
+  .ruler-labels .gold{color:#7a5a00;font-weight:700;}
+  .ruler-labels .grn{color:#028a5b;font-weight:700;}
+
+  /* tick marks on ruler */
+  .ruler-ticks{position:absolute;bottom:0;left:0;right:0;height:12px;pointer-events:none;}
+  .ruler-tick{position:absolute;bottom:0;width:1px;background:rgba(0,0,0,0.1);height:6px;}
+  .ruler-tick.major{height:12px;background:rgba(0,0,0,0.18);}
+
+  /* ── FEASIBILITY CHECKER ── */
+  .feasibility-section{margin-bottom:14px;}
+  .feas-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .feas-mid-display{background:var(--surface);border:1.5px solid var(--mid-border);border-radius:6px;padding:6px 14px;font-family:'Space Mono',monospace;font-size:0.72rem;display:flex;align-items:center;gap:8px;}
+  .feas-mid-label{color:var(--muted);}
+  .feas-mid-val{font-size:1.1rem;font-weight:700;color:#7a5a00;}
+  .feas-result{padding:6px 14px;border-radius:6px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;transition:all 0.3s;}
+  .feas-result.feasible  {background:var(--feasible-bg);  border:1.5px solid var(--feasible-border);  color:#028a5b;}
+  .feas-result.infeasible{background:var(--infeasible-bg);border:1.5px solid var(--infeasible-border);color:var(--accent);}
+  .feas-result.pending   {background:rgba(0,0,0,0.04);    border:1.5px solid var(--border);            color:var(--muted);}
+
+  /* ── INPUT BARS (the piles / weights) ── */
+  .input-viz{margin-bottom:14px;}
+  .input-bars{display:flex;gap:5px;align-items:flex-end;height:100px;overflow-x:auto;}
+  .ibar-col{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:46px;}
+  .ibar-val{font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--muted);margin-bottom:3px;}
+  .ibar{width:34px;border-radius:4px 4px 0 0;transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);background:rgba(180,170,155,0.4);border:1.5px solid var(--border);}
+  .ibar.exceeds{background:rgba(230,57,70,0.15);border-color:var(--accent);}
+  .ibar.fits   {background:rgba(6,214,160,0.15);border-color:var(--accent3);}
+  .ibar.current-group{background:rgba(33,150,243,0.15);border-color:var(--accent2);}
+  .ibar-idx{font-family:'Space Mono',monospace;font-size:0.48rem;color:var(--muted);margin-top:4px;}
+
+  /* group dividers */
+  .ibar-divider{width:2px;background:var(--accent);border-radius:1px;height:100%;flex-shrink:0;opacity:0.6;align-self:stretch;}
+
+  /* ── SIMULATION DISPLAY ── */
+  .sim-section{margin-bottom:14px;}
+  .sim-rows{display:flex;flex-direction:column;gap:4px;}
+  .sim-row{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;padding:6px 10px;transition:all 0.3s;font-family:'Space Mono',monospace;font-size:0.7rem;}
+  .sim-row.sim-ok   {border-color:var(--feasible-border); background:var(--feasible-bg);}
+  .sim-row.sim-over {border-color:var(--infeasible-border);background:var(--infeasible-bg);}
+  .sim-row.sim-active{border-color:var(--accent2);background:var(--active-bg);}
+  .sim-truck{color:var(--muted);width:52px;flex-shrink:0;}
+  .sim-load{flex:1;color:var(--ink);}
+  .sim-total{font-weight:700;width:52px;text-align:right;}
+  .sim-total.ok  {color:#028a5b;}
+  .sim-total.over{color:var(--accent);}
+
+  /* ── ITERATION LOG ── */
+  .iter-log{margin-bottom:14px;}
+  .il-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+  .il-rows::-webkit-scrollbar{width:3px;}
+  .il-rows::-webkit-scrollbar-thumb{background:var(--border);}
+  .il-row{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:5px;padding:5px 10px;font-family:'Space Mono',monospace;font-size:0.65rem;transition:all 0.3s;}
+  .il-row.active{border-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .il-row.il-feasible  {border-color:var(--feasible-border);}
+  .il-row.il-infeasible{border-color:var(--infeasible-border);}
+  .il-iter{color:var(--muted);width:20px;}
+  .il-range{color:var(--accent2);width:80px;}
+  .il-mid{color:#7a5a00;width:50px;}
+  .il-result{flex:1;}
+  .il-result.feasible  {color:#028a5b;font-weight:700;}
+  .il-result.infeasible{color:var(--accent);font-weight:700;}
+  .il-decision{font-weight:700;}
+  .il-decision.left {color:var(--accent2);}
+  .il-decision.right{color:var(--accent);}
+
+  /* ── 3-TAB EXPLANATION PANEL ── */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-feasible  {border-color:var(--feasible-border);}
+  .explain-panel.ep-infeasible{border-color:var(--infeasible-border);}
+  .explain-panel.ep-done      {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active       {color:var(--ink);   border-bottom-color:var(--accent2);}
+  .ep-tab.active.t-why {color:#7a3fc0;      border-bottom-color:#c084fc;}
+  .ep-tab.active.t-inv {color:#028a5b;      border-bottom-color:var(--accent3);}
+  .ep-body{padding:13px 17px;min-height:88px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-why-block{border-left:3px solid #c084fc;border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-feas{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-inf {border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+
+  .progress-wrap{margin-bottom:10px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent2);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent3);color:#0a2e22;text-align:center;padding:9px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;animation:fadeUp 0.4s ease;}
+  .done-banner.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}
+  .state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:14px 14px 8px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.65rem;line-height:1.85;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.85em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(255,209,102,0.16);border-left-color:#ffd166;color:#e2e8f0;}
+  .code-line.hl-feas {background:rgba(6,214,160,0.16); border-left-color:#06d6a0;color:#e2e8f0;}
+  .code-line.hl-inf  {background:rgba(230,57,70,0.16); border-left-color:#e63946;color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(255,209,102,0.18);border-left-color:#ffd166;color:#e2e8f0;}
+  .ck{color:#c084fc;} .cf{color:#67e8f9;} .cc{color:#374151;font-style:italic;} .cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 14px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 11px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);} .var-value.blu{color:#4fc3f7;}
+
+  /* feasibility sim right */
+  .sim-mini{margin-bottom:12px;}
+  .sm-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .sm-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+  .sm-rows::-webkit-scrollbar{width:3px;}
+  .sm-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .sm-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.62rem;transition:all 0.3s;}
+  .sm-row.sm-ok  {border-color:rgba(6,214,160,0.4);background:rgba(6,214,160,0.07);}
+  .sm-row.sm-over{border-color:rgba(230,57,70,0.4);background:rgba(230,57,70,0.07);}
+  .sm-trip{color:#6b6b8a;width:52px;flex-shrink:0;}
+  .sm-items{color:var(--bg);flex:1;}
+  .sm-sum{font-weight:700;}
+  .sm-sum.ok  {color:var(--accent3);}
+  .sm-sum.over{color:#ff6b6b;}
+
+  /* iter log right */
+  .rlog{margin-bottom:12px;}
+  .rl-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .rl-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+  .rl-rows::-webkit-scrollbar{width:3px;}
+  .rl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .rl-row{display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.62rem;transition:all 0.3s;}
+  .rl-row.rl-feas{border-color:rgba(6,214,160,0.4);background:rgba(6,214,160,0.07);}
+  .rl-row.rl-inf {border-color:rgba(230,57,70,0.4);background:rgba(230,57,70,0.07);}
+  .rl-row.rl-new {border-color:#ffd166;}
+  .rl-iter{color:#6b6b8a;width:18px;}
+  .rl-mid{color:var(--accent4);width:44px;}
+  .rl-res{flex:1;font-weight:700;}
+  .rl-res.ok {color:var(--accent3);}
+  .rl-res.bad{color:#ff6b6b;}
+  .rl-dec{color:#6b6b8a;}
+
+  .best-box{margin:0 14px 12px;padding:9px 11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 14px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Binary Search on Answer</h1>
+    <div class="sub">Binary Search · Search the Answer Space · Feasibility Check</div>
+  </div>
+  <div class="family-badge">03 · Binary Search</div>
+</div>
+
+<div class="main">
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Weights / Piles</label>
+        <input type="text" id="inputArr" class="wide" value="3,6,7,11,5,9,4,8">
+      </div>
+      <div class="field">
+        <label>Days / Trucks</label>
+        <input type="number" id="inputDays" class="narrow" value="3" min="1">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1600">0.5×</button>
+          <button class="speed-btn active" data-ms="900">1×</button>
+          <button class="speed-btn" data-ms="450">2×</button>
+          <button class="speed-btn" data-ms="180">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <!-- PROBLEM SWITCH -->
+    <div class="problem-select">
+      <button class="prob-btn active" id="probShip" onclick="setProb('ship')">📦 Ship packages in D days</button>
+      <button class="prob-btn" id="probKoko" onclick="setProb('koko')">🍌 Koko eating bananas</button>
+      <button class="prob-btn" id="probSplit" onclick="setProb('split')">📚 Split array largest sum</button>
+    </div>
+
+    <!-- PROBLEM DESCRIPTION -->
+    <div id="probDesc" style="background:rgba(33,150,243,0.06);border:1.5px solid rgba(33,150,243,0.2);border-radius:7px;padding:10px 14px;font-size:0.82rem;line-height:1.6;margin-bottom:14px;"></div>
+
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--active-bg);border-color:var(--active-border)"></div>Search space (active)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--mid-bg);border-color:var(--mid-border)"></div>mid (candidate answer)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--feasible-bg);border-color:var(--feasible-border)"></div>Feasible ✓</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--infeasible-bg);border-color:var(--infeasible-border)"></div>Infeasible ✗</div>
+    </div>
+
+    <!-- ANSWER SPACE RULER -->
+    <div class="ruler-section">
+      <div class="section-label">Answer Space (binary searching this)</div>
+      <div class="ruler-wrap" id="rulerWrap">
+        <div class="ruler-elim-l"  id="rulerEL" style="width:0%"></div>
+        <div class="ruler-active"  id="rulerAct" style="left:0%;width:100%"></div>
+        <div class="ruler-ticks"   id="rulerTicks"></div>
+        <div class="ruler-elim-r"  id="rulerER" style="width:0%"></div>
+        <div class="ruler-mid"     id="rulerMid" style="left:50%"></div>
+        <div class="ruler-ans"     id="rulerAns" style="left:0%"></div>
+      </div>
+      <div class="ruler-labels">
+        <span id="rlL">L=—</span>
+        <span class="gold" id="rlM">mid=—</span>
+        <span class="grn"  id="rlAns">ans=—</span>
+        <span id="rlR">R=—</span>
+      </div>
+    </div>
+
+    <!-- INPUT BARS -->
+    <div class="input-viz">
+      <div class="section-label">Input array (showing capacity check)</div>
+      <div class="input-bars" id="inputBars"></div>
+    </div>
+
+    <!-- FEASIBILITY CHECKER -->
+    <div class="feasibility-section">
+      <div class="feas-header">
+        <div class="feas-mid-display">
+          <span class="feas-mid-label">Testing capacity =</span>
+          <span class="feas-mid-val" id="feasMidVal">—</span>
+        </div>
+        <div class="feas-result pending" id="feasResult">—</div>
+      </div>
+      <div class="sim-rows" id="simRows"></div>
+    </div>
+
+    <!-- ITERATION LOG -->
+    <div class="iter-log">
+      <div class="section-label">Binary search log</div>
+      <div class="il-rows" id="ilRows"></div>
+    </div>
+
+    <!-- 3-TAB EXPLANATION PANEL -->
+    <div class="explain-panel" id="explainPanel">
+      <div class="ep-tabs">
+        <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+        <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+        <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+      </div>
+      <div class="ep-body">
+        <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneWhy" >Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneInv" ><div class="ep-inv-block" id="invBlock"></div></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ MINIMUM ANSWER FOUND</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="state-panel">
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Search on Answer</div>
+      <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="cc">// Can we achieve ≤ capacity with ≤ days?</span></span>
+<span class="code-line" id="cl-feas"><span class="ck">bool</span> <span class="cf">feasible</span>(<span class="ck">int</span> cap, vector&lt;<span class="ck">int</span>&gt;&amp; w, <span class="ck">int</span> d){</span>
+<span class="code-line" id="cl-feas2">  <span class="ck">int</span> days=<span class="cn">1</span>, cur=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-feas3">  <span class="ck">for</span>(<span class="ck">auto</span> x:w){</span>
+<span class="code-line" id="cl-feas4">    <span class="ck">if</span>(cur+x&gt;cap){days++;cur=<span class="cn">0</span>;}</span>
+<span class="code-line" id="cl-feas5">    cur+=x; }
+  <span class="ck">return</span> days&lt;=d; }</span>
+<span class="code-line" id="cl-main"><span class="ck">int</span> <span class="cf">solve</span>(vector&lt;<span class="ck">int</span>&gt;&amp; w, <span class="ck">int</span> d) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> L=max(w), R=sum(w), ans=R;</span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span>(L&lt;=R){</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid=L+(R-L)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-if">    <span class="ck">if</span>(feasible(mid,w,d))</span>
+<span class="code-line" id="cl-ok">      {ans=mid; R=mid-<span class="cn">1</span>;} <span class="cc">// try smaller</span></span>
+<span class="code-line" id="cl-bad">    <span class="ck">else</span> L=mid+<span class="cn">1</span>; <span class="cc">// need more capacity</span></span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> ans; }</span></pre>
+    </div>
+
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+      <div class="var-grid">
+        <div class="var-card" id="vcL">
+          <div class="var-name">L</div>
+          <div class="var-value red" id="vL">—</div>
+        </div>
+        <div class="var-card" id="vcR">
+          <div class="var-name">R</div>
+          <div class="var-value blu" id="vR">—</div>
+        </div>
+        <div class="var-card" id="vcMid">
+          <div class="var-name">mid</div>
+          <div class="var-value yel" id="vMid">—</div>
+        </div>
+        <div class="var-card" id="vcAns">
+          <div class="var-name">ans</div>
+          <div class="var-value grn" id="vAns">—</div>
+        </div>
+        <div class="var-card" id="vcDays">
+          <div class="var-name">days used</div>
+          <div class="var-value yel" id="vDays">—</div>
+        </div>
+        <div class="var-card" id="vcIter">
+          <div class="var-name">iteration</div>
+          <div class="var-value blu" id="vIter">0</div>
+        </div>
+      </div>
+
+      <!-- SIM MINI (right) -->
+      <div class="sim-mini">
+        <div class="sm-title">Feasibility sim (mid=<span id="smMidLabel">?</span>)</div>
+        <div class="sm-rows" id="smRows"></div>
+      </div>
+
+      <!-- LOG (right) -->
+      <div class="rlog">
+        <div class="rl-title">Iteration log</div>
+        <div class="rl-rows" id="rlRows"></div>
+      </div>
+
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Minimum Answer</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta"></div>
+      </div>
+    </div>
+
+    <div class="done-bar" id="doneBar">✓ O(N·log(SUM)) COMPLETE</div>
+  </div>
+</div>
+
+<script>
+// ── PROBLEM DEFINITIONS ───────────────────────────────────────────────────────
+const PROBLEMS = {
+  ship: {
+    name:'Ship packages in D days',
+    desc: w => `<strong>Ship packages in D days.</strong> Each package has a weight. A conveyor belt ships packages in order each day. What is the <em>minimum capacity</em> of the belt so all packages ship in ≤ D days?`,
+    paramLabel: 'D days',
+    unitLabel: 'capacity',
+    simLabel: d => `Day`,
+    feasible(cap, arr, d){
+      let days=1, cur=0, trips=[];
+      let curItems=[];
+      for(const x of arr){
+        if(cur+x>cap){ trips.push({items:[...curItems],sum:cur,ok:true}); days++; cur=0; curItems=[]; }
+        cur+=x; curItems.push(x);
+      }
+      trips.push({items:[...curItems],sum:cur,ok:true});
+      const feasible = days<=d;
+      if(!feasible) trips[trips.length-1].ok=false; // mark last conceptually over
+      return {feasible, days, trips};
+    }
+  },
+  koko: {
+    name:'Koko eating bananas',
+    desc: w => `<strong>Koko eating bananas.</strong> There are N piles of bananas. Koko can eat K bananas/hour. Each hour she eats from one pile. What is the <em>minimum K</em> so she finishes all piles in ≤ H hours?`,
+    paramLabel: 'H hours',
+    feasible(speed, arr, h){
+      let hours=0, trips=[];
+      for(const pile of arr){
+        const t=Math.ceil(pile/speed);
+        hours+=t;
+        trips.push({items:[pile],sum:t,ok:true,label:`⌈${pile}/${speed}⌉=${t}h`});
+      }
+      const feasible=hours<=h;
+      return {feasible, days:hours, trips};
+    }
+  },
+  split: {
+    name:'Split array largest sum',
+    desc: w => `<strong>Split array into K subarrays.</strong> Split the array into exactly K non-empty subarrays. Minimise the <em>maximum subarray sum</em>. Binary search the answer (the max sum), check if K splits suffice.`,
+    paramLabel: 'K splits',
+    feasible(cap, arr, k){
+      let parts=1, cur=0, trips=[], curItems=[];
+      for(const x of arr){
+        if(cur+x>cap){ trips.push({items:[...curItems],sum:cur,ok:true}); parts++; cur=0; curItems=[]; }
+        cur+=x; curItems.push(x);
+      }
+      trips.push({items:[...curItems],sum:cur,ok:true});
+      const feasible=parts<=k;
+      return {feasible, days:parts, trips};
+    }
+  }
+};
+
+let currentProb = 'ship';
+function setProb(p){
+  currentProb = p;
+  ['ship','koko','split'].forEach(id=>{
+    document.getElementById('prob'+id.charAt(0).toUpperCase()+id.slice(1))
+      .classList.toggle('active', id===p);
+  });
+  stopPlay(); buildUI();
+}
+
+// ── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init:   {ids:['cl-main','cl-init','cl-whl','cl-mid'], cls:'hl-init'},
+  check:  {ids:['cl-whl','cl-mid','cl-if'],             cls:'hl-init'},
+  feas:   {ids:['cl-if','cl-ok'],                       cls:'hl-feas'},
+  infeas: {ids:['cl-if','cl-bad'],                      cls:'hl-inf' },
+  done:   {ids:['cl-ret'],                              cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── EXPLANATION LIBRARY ───────────────────────────────────────────────────────
+function makeExplain(type, mid, L, R, feasible, days, d, ans, lo, hi, iter){
+  const pName = PROBLEMS[currentProb].name;
+  const uLabel = PROBLEMS[currentProb].unitLabel || 'capacity';
+  if(type==='init') return {
+    why:`<div class="ep-why-block">This is <strong>Binary Search on the Answer</strong> — instead of searching <em>in</em> an array, we binary search <em>for</em> the answer directly. The key insight: the feasibility function is <strong>monotone</strong>. If capacity C works, then C+1 also works. This monotonicity is exactly what binary search needs.</div>`,
+    inv:[
+      {icon:'🗺️',cls:'',text:`<strong>Answer space:</strong> The minimum possible answer is <strong>${lo}</strong> (max element — every item must fit in one trip). The maximum is <strong>${hi}</strong> (sum — one trip for everything). The true answer lives somewhere in [${lo}..${hi}].`},
+      {icon:'🔒',cls:'inv-warn',text:`<strong>Invariant:</strong> Everything left of L is <em>infeasible</em> (capacity too small). Everything right of R is <em>feasible but not minimum</em>. <strong>ans</strong> always holds the smallest feasible value seen so far.`},
+    ]
+  };
+  if(type==='feas') return {
+    why:`<div class="ep-why-block why-feas">mid=${mid} is <strong>feasible</strong> — it works! We can achieve the goal with capacity ${mid} using only ${days} of the allowed ${d}. But is it the <em>minimum</em>? Maybe a smaller value also works. So we <strong>record mid as our best answer</strong> and search left: set R=mid−1.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant maintained:</strong> ans=${ans} is now the smallest feasible value seen. Everything in [${mid+1}..old_R] is feasible but larger — we don't need them.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Why R=mid−1 (not mid):</strong> mid itself is already recorded in ans. We search strictly left of it to find something smaller. If nothing smaller is feasible, ans stays at ${mid}.`},
+    ]
+  };
+  if(type==='infeas') return {
+    why:`<div class="ep-why-block why-inf">mid=${mid} is <strong>infeasible</strong> — it doesn't work. With capacity ${mid} we need ${days} trips but only have ${d}. Any value ≤ ${mid} also won't work (monotonicity). So we eliminate the entire left half by setting L=mid+1.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant maintained:</strong> Everything left of L (now ${mid+1}) is confirmed infeasible. The answer cannot be in [old_L..${mid}].`},
+      {icon:'✂️',cls:'inv-warn',text:`<strong>Monotonicity is the key:</strong> feasible(cap) = true implies feasible(cap+1) = true. So once we find an infeasible mid, the entire left side [L..mid] is eliminated in one step.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">L has passed R — search space exhausted. <strong>ans</strong> holds the minimum feasible value found across all iterations. We never need to check all values in [lo..hi] explicitly — binary search narrowed it down in just ⌈log₂(hi−lo)⌉ = ${Math.ceil(Math.log2(hi-lo+1))} steps.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Final invariant:</strong> [lo..ans−1] are all infeasible. ans is feasible. [ans+1..hi] are feasible but not minimum. ans is the unique boundary.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Complexity:</strong> O(n · log(sum−max)) — each binary search step costs O(n) for the feasibility check. The search space has size sum−max ≈ O(n·maxVal), so log factor is O(log(n·maxVal)).`},
+      {icon:'🔑',cls:'inv-key',text:`<strong>The template:</strong> Any problem where feasible(x)=true implies feasible(x+1)=true (or vice versa) can use this exact pattern. Just write the feasibility function and plug it in.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ── ALGORITHM ─────────────────────────────────────────────────────────────────
+function computeSteps(arr, d){
+  const prob = PROBLEMS[currentProb];
+  const lo = Math.max(...arr);
+  const hi = arr.reduce((a,b)=>a+b,0);
+  const n = arr.length;
+  const steps = [];
+  let L=lo, R=hi, ans=hi, iter=0, log=[];
+
+  const s=(type,desc,mid,feasResult,simTrips)=>steps.push({
+    L, R, mid, ans, type, desc, iter,
+    feasResult: feasResult||null,
+    simTrips: simTrips||[],
+    log:[...log], lo, hi, n, d
+  });
+
+  s('init',
+    `🚀 <strong>Starting.</strong> We don't search <em>in</em> the array — we search the <em>answer space</em> [<span class="blu">${lo}</span>..<span class="red">${hi}</span>]. L=${lo} (max element — minimum possible answer). R=${hi} (total sum — maximum possible answer). For each candidate mid, we run a feasibility check.`,
+    -1, null, []
+  );
+  steps[0].explain = makeExplain('init',-1,L,R,null,null,d,ans,lo,hi,0);
+
+  while(L<=R){
+    iter++;
+    const mid = L + Math.floor((R-L)/2);
+    const {feasible, days, trips} = prob.feasible(mid, arr, d);
+    log.push({iter, L, R, mid, feasible, days});
+
+    if(feasible){
+      s('feas',
+        `✅ mid=<span class="yel">${mid}</span> is <span class="grn"><strong>feasible</strong></span> — uses <strong>${days}</strong> of ${d} allowed. <span class="grn">Record ans=${mid}</span>, search left (R=${mid-1}) for something smaller.`,
+        mid, {feasible,days,trips}, trips
+      );
+      steps[steps.length-1].explain = makeExplain('feas',mid,L,R,feasible,days,d,mid,lo,hi,iter);
+      ans = mid;
+      R = mid-1;
+    } else {
+      s('infeas',
+        `❌ mid=<span class="yel">${mid}</span> is <span class="red"><strong>infeasible</strong></span> — needs <strong>${days}</strong> trips but only ${d} allowed. Too small. Search right (L=${mid+1}).`,
+        mid, {feasible,days,trips}, trips
+      );
+      steps[steps.length-1].explain = makeExplain('infeas',mid,L,R,feasible,days,d,ans,lo,hi,iter);
+      L = mid+1;
+    }
+  }
+
+  s('done',
+    `🎉 <span class="grn"><strong>Done!</strong></span> Minimum answer = <strong>${ans}</strong>. Checked only <strong>${iter}</strong> value${iter>1?'s':''} out of ${hi-lo+1} possibilities. O(n·log(sum)) — feasibility check is O(n), binary search adds log factor.`,
+    -1, null, []
+  );
+  steps[steps.length-1].explain = makeExplain('done',-1,L,R,null,null,d,ans,lo,hi,iter);
+
+  return {steps, lo, hi, ans};
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let arr=[], days=3, steps=[], lo=0, hi=0, finalAns=0;
+let currentStep=0, playing=false, timer=null, speed=900;
+let activeTab='what';
+
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t.charAt(0).toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+
+function updateExplain(st){
+  if(!st) return;
+  const ep=document.getElementById('explainPanel');
+  ep.className='explain-panel '+(st.type==='feas'?'ep-feasible':st.type==='infeas'?'ep-infeasible':st.type==='done'?'ep-done':'');
+  document.getElementById('paneWhat').innerHTML=st.desc||'—';
+  if(st.explain){
+    document.getElementById('paneWhy').innerHTML=st.explain.why||'<em style="color:var(--muted)">No extra explanation.</em>';
+    document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+      `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`
+    ).join('');
+  }
+}
+
+function parseArr(){
+  return document.getElementById('inputArr').value
+    .split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>0);
+}
+
+function buildUI(){
+  arr=parseArr();
+  days=parseInt(document.getElementById('inputDays').value)||3;
+  const prob=PROBLEMS[currentProb];
+  const result=computeSteps(arr,days);
+  steps=result.steps; lo=result.lo; hi=result.hi; finalAns=result.ans;
+  currentStep=0;
+
+  // problem description
+  document.getElementById('probDesc').innerHTML=prob.desc(arr);
+
+  // input bars
+  const maxV=Math.max(...arr);
+  const ib=document.getElementById('inputBars');
+  ib.innerHTML='';
+  arr.forEach((v,i)=>{
+    const h=Math.max(8,Math.round((v/maxV)*88));
+    ib.innerHTML+=`<div class="ibar-col"><div class="ibar-val">${v}</div><div class="ibar" id="ibar-${i}" style="height:${h}px"></div><div class="ibar-idx">${i}</div></div>`;
+  });
+
+  // ruler ticks
+  const ticks=document.getElementById('rulerTicks');
+  ticks.innerHTML='';
+  const range=hi-lo;
+  const tickStep=Math.max(1,Math.round(range/20));
+  for(let v=lo;v<=hi;v+=tickStep){
+    const pct=((v-lo)/range*100);
+    const major=v===lo||v===hi||v%Math.round(range/5)===0;
+    ticks.innerHTML+=`<div class="ruler-tick ${major?'major':''}" style="left:${pct}%"></div>`;
+  }
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('rlRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const range=hi-lo;
+
+  // ruler
+  const lPct=Math.max(0,(st.L-lo)/range*100);
+  const rPct=Math.max(0,(hi-st.R)/range*100);
+  const mPct=st.mid>=0?(st.mid-lo)/range*100:50;
+  const aPct=st.ans<hi?(st.ans-lo)/range*100:99;
+  document.getElementById('rulerEL').style.width=lPct+'%';
+  document.getElementById('rulerER').style.width=rPct+'%';
+  document.getElementById('rulerAct').style.left=lPct+'%';
+  document.getElementById('rulerAct').style.width=(100-lPct-rPct)+'%';
+  document.getElementById('rulerMid').style.left=mPct+'%';
+  const ra=document.getElementById('rulerAns');
+  ra.style.display=st.ans<hi?'block':'none';
+  ra.style.left=aPct+'%';
+  document.getElementById('rlL').textContent=`L=${st.L}`;
+  document.getElementById('rlR').textContent=`R=${st.R}`;
+  document.getElementById('rlM').textContent=st.mid>=0?`mid=${st.mid}`:'mid=—';
+  document.getElementById('rlAns').textContent=st.ans<hi?`ans=${st.ans}`:'';
+
+  // feasibility display
+  const fr=document.getElementById('feasResult');
+  const fmv=document.getElementById('feasMidVal');
+  fmv.textContent=st.mid>=0?st.mid:'—';
+  document.getElementById('smMidLabel').textContent=st.mid>=0?st.mid:'?';
+  if(st.feasResult){
+    fr.textContent=st.feasResult.feasible?`✓ feasible (${st.feasResult.days} trips)`:`✗ infeasible (${st.feasResult.days} trips)`;
+    fr.className='feas-result '+(st.feasResult.feasible?'feasible':'infeasible');
+  } else {
+    fr.textContent='—'; fr.className='feas-result pending';
+  }
+
+  // input bars colouring
+  if(st.simTrips&&st.simTrips.length>0&&st.mid>=0){
+    let itemIdx=0;
+    st.simTrips.forEach((trip,ti)=>{
+      trip.items.forEach(v=>{
+        const bar=document.getElementById(`ibar-${itemIdx}`);
+        if(bar) bar.className='ibar '+(ti===st.simTrips.length-1&&!st.feasResult?.feasible?'exceeds':'fits');
+        itemIdx++;
+      });
+    });
+    // draw group dividers
+    const ib=document.getElementById('inputBars');
+    ib.querySelectorAll('.ibar-divider').forEach(d=>d.remove());
+    let runIdx=0;
+    st.simTrips.forEach((trip,ti)=>{
+      runIdx+=trip.items.length;
+      if(ti<st.simTrips.length-1){
+        const col=ib.children[runIdx];
+        if(col){
+          const div=document.createElement('div');
+          div.className='ibar-divider';
+          ib.insertBefore(div,col);
+        }
+      }
+    });
+  } else {
+    document.querySelectorAll('.ibar').forEach(b=>b.className='ibar');
+    document.querySelectorAll('.ibar-divider').forEach(d=>d.remove());
+  }
+
+  // sim rows (left)
+  const simR=document.getElementById('simRows');
+  simR.innerHTML='';
+  if(st.simTrips&&st.simTrips.length){
+    st.simTrips.forEach((trip,i)=>{
+      const isOver=!st.feasResult?.feasible&&i===st.simTrips.length-1;
+      simR.innerHTML+=`<div class="sim-row ${isOver?'sim-over':'sim-ok'}">
+        <div class="sim-truck">Trip ${i+1}</div>
+        <div class="sim-load">[${trip.items.join(', ')}]${trip.label?` → ${trip.label}`:''}</div>
+        <div class="sim-total ${isOver?'over':'ok'}">${trip.sum}</div>
+      </div>`;
+    });
+  }
+
+  // sim rows (right)
+  const smR=document.getElementById('smRows');
+  smR.innerHTML='';
+  if(st.simTrips&&st.simTrips.length){
+    st.simTrips.forEach((trip,i)=>{
+      const isOver=!st.feasResult?.feasible&&i===st.simTrips.length-1;
+      smR.innerHTML+=`<div class="sm-row ${isOver?'sm-over':'sm-ok'}">
+        <div class="sm-trip">Trip ${i+1}</div>
+        <div class="sm-items">[${trip.items.join(',')}]</div>
+        <div class="sm-sum ${isOver?'over':'ok'}">${trip.sum}</div>
+      </div>`;
+    });
+  }
+
+  // iter log (left)
+  const ilR=document.getElementById('ilRows');
+  ilR.innerHTML='';
+  st.log.forEach((e,i)=>{
+    const isLatest=i===st.log.length-1;
+    ilR.innerHTML+=`<div class="il-row ${isLatest?'active':''} ${e.feasible?'il-feasible':'il-infeasible'}">
+      <div class="il-iter">#${e.iter}</div>
+      <div class="il-range">[${e.L}..${e.R}]</div>
+      <div class="il-mid">mid=${e.mid}</div>
+      <div class="il-result ${e.feasible?'feasible':'infeasible'}">${e.feasible?'✓ feasible':'✗ infeasible'}</div>
+      <div class="il-decision ${e.feasible?'left':'right'}">${e.feasible?'→ try smaller':'→ go bigger'}</div>
+    </div>`;
+  });
+
+  // iter log (right)
+  const rlR=document.getElementById('rlRows');
+  rlR.innerHTML='';
+  [...st.log].reverse().forEach((e,ri)=>{
+    const isLatest=ri===0;
+    rlR.innerHTML+=`<div class="rl-row ${e.feasible?'rl-feas':'rl-inf'} ${isLatest?'rl-new':''}">
+      <div class="rl-iter">#${e.iter}</div>
+      <div class="rl-mid">mid=${e.mid}</div>
+      <div class="rl-res ${e.feasible?'ok':'bad'}">${e.feasible?`✓ ${e.days}d`:`✗ ${e.days}d`}</div>
+      <div class="rl-dec">${e.feasible?'R←':'L→'}</div>
+    </div>`;
+  });
+
+  // vars
+  setVar('vL','vcL',st.L);
+  setVar('vR','vcR',st.R);
+  setVar('vMid','vcMid',st.mid>=0?st.mid:'—');
+  setVar('vAns','vcAns',st.ans<=hi?st.ans:'—');
+  setVar('vDays','vcDays',st.feasResult?st.feasResult.days:'—');
+  setVar('vIter','vcIter',st.iter);
+
+  // explanation tabs
+  updateExplain(st);
+  highlightCode(st.type==='infeas'?'infeas':st.type==='feas'?'feas':st.type==='done'?'done':'init');
+
+  // done
+  if(st.type==='done'){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.classList.add('show');
+    document.getElementById('bestVal').textContent=finalAns;
+    document.getElementById('bestMeta').textContent=
+      `min answer = ${finalAns} · ${st.iter} iteration${st.iter!==1?'s':''} · O(n·log(sum))`;
+    document.getElementById('rulerAns').style.display='block';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){
+  if(!playing)return;
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  renderStep(currentStep+1);
+  timer=setTimeout(tick,speed);
+}
+function stopPlay(){
+  playing=false;clearTimeout(timer);
+  document.getElementById('btnPause').textContent='▶ Resume';
+  document.getElementById('btnRun').disabled=false;
+}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');speed=parseInt(b.dataset.ms);
+  });
+});
+
+buildUI();
+</script>
+</body>
+</html>

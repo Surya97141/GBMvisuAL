@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Variable Window — Smallest Subarray Sum ≥ X</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+    --win-bg:rgba(33,150,243,0.09);   --win-border:#2196f3;
+    --valid-bg:rgba(6,214,160,0.11);  --valid-border:#06d6a0;
+    --shrink-bg:rgba(230,57,70,0.09); --shrink-border:#e63946;
+    --best-bg:rgba(255,209,102,0.14); --best-border:#ffd166;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:24px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent);color:white;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;font-weight:700;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 78px);overflow:hidden;}
+  .viz-panel{padding:28px 36px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:12px;margin-bottom:20px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:7px 12px;font-family:'Space Mono',monospace;font-size:0.9rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--accent);}
+  .field input.wide{width:280px;}
+  .field input.narrow{width:72px;}
+  .btn{padding:8px 18px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}
+  .btn-primary:hover{background:var(--accent);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:6px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:7px 11px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .legend{display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
+  .leg-item{display:flex;align-items:center;gap:7px;font-size:0.8rem;}
+  .leg-dot{width:14px;height:14px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+  .section-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+
+  /* ── ARRAY ── */
+  .array-outer{position:relative;padding-bottom:56px;margin-bottom:10px;overflow-x:auto;}
+  .array-blocks{display:flex;gap:5px;flex-wrap:nowrap;}
+
+  .blk{
+    position:relative; width:54px; height:54px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-size:1.3rem; font-weight:700;
+    border-radius:8px; border:2px solid var(--border);
+    background:var(--surface); color:var(--muted);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .blk .bidx{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--muted);}
+
+  /* states */
+  .blk.in-window  {background:var(--win-bg);   border-color:var(--win-border);  color:var(--accent2); transform:translateY(-4px);}
+  .blk.is-valid   {background:var(--valid-bg);  border-color:var(--valid-border);color:#028a5b; transform:translateY(-6px); box-shadow:0 6px 16px rgba(6,214,160,0.2);}
+  .blk.is-shrink  {background:var(--shrink-bg); border-color:var(--shrink-border);color:var(--accent); transform:translateY(-6px); box-shadow:0 6px 16px rgba(230,57,70,0.2);}
+  .blk.is-best    {background:var(--best-bg);   border-color:var(--best-border); color:#7a5a00;}
+  .blk.is-L       {box-shadow:0 0 0 3px rgba(230,57,70,0.35);}
+  .blk.is-R       {box-shadow:0 0 0 3px rgba(33,150,243,0.35);}
+  .blk.is-L.is-R  {box-shadow:0 0 0 3px rgba(130,80,200,0.4);}
+
+  /* pointer labels */
+  .ptr-labels{position:absolute;bottom:0;left:0;right:0;height:48px;pointer-events:none;}
+  .ptr{
+    position:absolute; font-family:'Space Mono',monospace; font-size:0.62rem; font-weight:700;
+    padding:2px 7px; border-radius:3px; transform:translateX(-50%);
+    transition:left 0.35s cubic-bezier(0.34,1.56,0.64,1); white-space:nowrap;
+  }
+  .ptr-L{background:var(--accent); color:white; top:4px;}
+  .ptr-R{background:var(--accent2);color:white; top:26px;}
+
+  /* ── SUM METER ── */
+  .sum-meter{margin-bottom:18px;}
+  .sm-row{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+  .sm-label{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);width:56px;flex-shrink:0;}
+  .sm-bar-wrap{flex:1;height:18px;background:var(--border);border-radius:4px;overflow:hidden;position:relative;}
+  .sm-bar{height:100%;border-radius:4px;transition:width 0.4s cubic-bezier(0.34,1.56,0.64,1),background 0.3s;}
+  .sm-val{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;width:56px;text-align:right;flex-shrink:0;}
+  .sm-target-line{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);opacity:0.7;border-radius:1px;transition:left 0.3s;}
+  .sm-target-label{position:absolute;top:-18px;font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--accent);transform:translateX(-50%);white-space:nowrap;}
+
+  /* ── STATUS CARDS ── */
+  .status-cards{display:flex;gap:10px;margin-bottom:16px;}
+  .scard{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;transition:all 0.3s;}
+  .scard.valid{border-color:var(--valid-border);background:var(--valid-bg);}
+  .scard.shrinking{border-color:var(--shrink-border);background:var(--shrink-bg);}
+  .scard.best{border-color:var(--best-border);background:var(--best-bg);}
+  .scard-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .scard-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--ink);}
+  .scard-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+
+  /* ── CANDIDATE ROW ── */
+  .candidates{margin-bottom:16px;}
+  .cand-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .cand-chip{font-family:'Space Mono',monospace;font-size:0.72rem;padding:4px 10px;border-radius:4px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);transition:all 0.3s;text-align:center;}
+  .cand-chip.filled{background:rgba(6,214,160,0.1);border-color:var(--accent3);color:#028a5b;}
+  .cand-chip.best-chip{background:var(--best-bg);border-color:var(--best-border);color:#7a5a00;font-weight:700;}
+  .cand-chip.current{border-color:var(--valid-border);background:var(--valid-bg);color:#028a5b;animation:chipPop 0.3s ease;}
+  @keyframes chipPop{0%{transform:scale(0.85)}100%{transform:scale(1)}}
+
+  /* ── STEP BOX ── */
+  .step-box{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent2);border-radius:8px;padding:14px 18px;margin-bottom:14px;min-height:72px;transition:border-color 0.3s,background 0.3s;}
+  .step-box.s-expand {border-left-color:var(--accent2);}
+  .step-box.s-valid  {border-left-color:var(--accent3);background:rgba(6,214,160,0.03);}
+  .step-box.s-shrink {border-left-color:var(--accent); background:rgba(230,57,70,0.03);}
+  .step-box.s-done   {border-left-color:var(--accent4);background:rgba(255,209,102,0.04);}
+  .step-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .step-desc{font-size:0.87rem;line-height:1.65;color:var(--ink);}
+  .step-desc strong{font-weight:700;}
+  .step-desc .grn{color:#028a5b;font-weight:600;}
+  .step-desc .yel{color:#7a5a00;font-weight:600;}
+  .step-desc .red{color:var(--accent);font-weight:600;}
+  .step-desc .blu{color:var(--accent2);font-weight:600;}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.62rem;color:var(--muted);margin-bottom:5px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent3);color:#0a2e22;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;animation:fadeUp 0.4s ease;}
+  .done-banner.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 78px);}
+  .state-panel::-webkit-scrollbar{width:4px;}
+  .state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:16px 16px 10px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.9em * 4 + 16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init  {background:rgba(255,209,102,0.14);border-left-color:#ffd166;color:#e2e8f0;}
+  .code-line.hl-expand{background:rgba(33,150,243,0.18); border-left-color:#2196f3;color:#e2e8f0;}
+  .code-line.hl-valid {background:rgba(6,214,160,0.18);  border-left-color:#06d6a0;color:#e2e8f0;}
+  .code-line.hl-shrink{background:rgba(230,57,70,0.18);  border-left-color:#e63946;color:#e2e8f0;}
+  .code-line.hl-done  {background:rgba(255,209,102,0.2); border-left-color:#ffd166;color:#e2e8f0;}
+  .ck{color:#c084fc;} .cf{color:#67e8f9;} .cc{color:#374151;font-style:italic;} .cn{color:#fda4af;} .cs{color:#86efac;}
+
+  .vars-panel{flex-shrink:0;padding:14px 16px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.63rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:10px 12px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.58rem;color:#6b6b8a;margin-bottom:4px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);} .var-value.blu{color:#4fc3f7;}
+
+  /* CONDITION BADGE */
+  .cond-badge{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;margin-bottom:14px;background:#0d0d18;border:1px solid #2a2a3e;transition:all 0.3s;font-family:'Space Mono',monospace;font-size:0.72rem;}
+  .cond-badge.met{border-color:#06d6a0;background:rgba(6,214,160,0.1);}
+  .cond-badge.unmet{border-color:#e63946;background:rgba(230,57,70,0.08);}
+  .cond-lhs{color:var(--bg);font-weight:700;}
+  .cond-op{color:#6b6b8a;}
+  .cond-rhs{color:#fda4af;}
+  .cond-result{margin-left:auto;font-weight:700;}
+  .cond-result.yes{color:#06d6a0;}
+  .cond-result.no{color:#e63946;}
+
+  /* WINDOW CONTENTS */
+  .win-box{margin-bottom:14px;}
+  .wb-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  .wb-chips{display:flex;gap:4px;flex-wrap:wrap;}
+  .wb-chip{min-width:30px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#6b7280;padding:0 6px;transition:all 0.3s;}
+  .wb-chip.wc-in{background:rgba(33,150,243,0.18);border-color:#2196f3;color:#4fc3f7;}
+  .wb-chip.wc-shrink{background:rgba(230,57,70,0.18);border-color:#e63946;color:#ff6b6b;}
+
+  /* CANDIDATE LOG */
+  .clog{margin-bottom:14px;}
+  .clog-title{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  .clog-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+  .clog-rows::-webkit-scrollbar{width:3px;}
+  .clog-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .clog-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.65rem;transition:all 0.3s;}
+  .clog-row.cl-best{border-color:#ffd166;background:rgba(255,209,102,0.08);}
+  .clog-row.cl-new{border-color:#06d6a0;}
+  .cl-win{color:#6b6b8a;flex:1;}
+  .cl-len{color:var(--accent3);font-weight:700;}
+  .cl-star{color:#ffd166;}
+
+  .best-box{margin:0 16px 14px;padding:10px 12px;background:rgba(255,209,102,0.06);border:1px solid rgba(255,209,102,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:6px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.65rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 16px 10px;background:var(--accent4);color:#3a2800;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Variable Window — Smallest Subarray Sum ≥ X</h1>
+    <div class="sub">Sliding Window · Family B · Variable Size · Minimize</div>
+  </div>
+  <div class="family-badge">02 · Sliding Window</div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Array (positive integers)</label>
+        <input type="text" id="inputArr" class="wide" value="2,3,1,2,4,3,5,1,2">
+      </div>
+      <div class="field">
+        <label>Target X</label>
+        <input type="number" id="inputX" class="narrow" value="7" min="1">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1400">0.5×</button>
+          <button class="speed-btn active" data-ms="800">1×</button>
+          <button class="speed-btn" data-ms="400">2×</button>
+          <button class="speed-btn" data-ms="160">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--win-bg);border-color:var(--win-border)"></div>Expanding (sum &lt; X)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--valid-bg);border-color:var(--valid-border)"></div>Valid (sum ≥ X)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--shrink-bg);border-color:var(--shrink-border)"></div>Shrinking (L moves)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--best-bg);border-color:var(--best-border)"></div>Best window so far</div>
+    </div>
+
+    <!-- ARRAY -->
+    <div class="section-label">Array</div>
+    <div class="array-outer">
+      <div class="array-blocks" id="arrayBlocks"></div>
+      <div class="ptr-labels" id="ptrLabels"></div>
+    </div>
+
+    <!-- SUM METER -->
+    <div class="sum-meter">
+      <div class="sm-row">
+        <div class="sm-label">SUM</div>
+        <div class="sm-bar-wrap">
+          <div class="sm-bar" id="smBar" style="width:0%;background:var(--accent2)"></div>
+          <div class="sm-target-line" id="smTargetLine"></div>
+          <div class="sm-target-label" id="smTargetLabel"></div>
+        </div>
+        <div class="sm-val" id="smVal" style="color:var(--accent2)">0</div>
+      </div>
+      <div class="sm-row">
+        <div class="sm-label">TARGET</div>
+        <div class="sm-bar-wrap" style="background:transparent;border:none;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--accent);padding-top:1px;" id="smCondition">sum ≥ X — condition unmet</div>
+        </div>
+        <div class="sm-val" id="smX" style="color:var(--accent)">—</div>
+      </div>
+    </div>
+
+    <!-- STATUS CARDS -->
+    <div class="status-cards">
+      <div class="scard" id="scWin">
+        <div class="scard-label">Window</div>
+        <div class="scard-val" id="scWinVal">—</div>
+        <div class="scard-sub" id="scWinSub">L=— R=—</div>
+      </div>
+      <div class="scard" id="scLen">
+        <div class="scard-label">Length</div>
+        <div class="scard-val" id="scLenVal">—</div>
+        <div class="scard-sub">current window size</div>
+      </div>
+      <div class="scard" id="scBest">
+        <div class="scard-label">Best (min len)</div>
+        <div class="scard-val" id="scBestVal">∞</div>
+        <div class="scard-sub" id="scBestSub">not found yet</div>
+      </div>
+    </div>
+
+    <!-- VALID WINDOWS FOUND -->
+    <div class="candidates">
+      <div class="section-label">Valid windows found</div>
+      <div class="cand-chips" id="candChips"><span style="font-size:0.8rem;color:var(--muted)">none yet</span></div>
+    </div>
+
+    <!-- STEP BOX -->
+    <div class="step-box" id="stepBox">
+      <div class="step-title">Status</div>
+      <div class="step-desc" id="stepDesc">Press <strong>RUN</strong> to start.</div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">✓ SMALLEST SUBARRAY FOUND</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="state-panel">
+
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Executing Line</div>
+      <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">minSubLen</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a, <span class="ck">int</span> x) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> L=<span class="cn">0</span>, sum=<span class="cn">0</span>, ans=INT_MAX;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> R=<span class="cn">0</span>; R&lt;n; R++) {</span>
+<span class="code-line" id="cl-add">    sum += a[R];   <span class="cc">// expand right</span></span>
+<span class="code-line" id="cl-whl">    <span class="ck">while</span> (sum &gt;= x) { <span class="cc">// valid — try shrink</span></span>
+<span class="code-line" id="cl-upd">      ans = min(ans, R-L+<span class="cn">1</span>);</span>
+<span class="code-line" id="cl-sub">      sum -= a[L++]; <span class="cc">// shrink from left</span></span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> ans==INT_MAX ? <span class="cn">-1</span> : ans; }</span></pre>
+    </div>
+
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+
+      <div class="var-grid">
+        <div class="var-card" id="vcL">
+          <div class="var-name">L</div>
+          <div class="var-value red" id="vL">—</div>
+        </div>
+        <div class="var-card" id="vcR">
+          <div class="var-name">R</div>
+          <div class="var-value blu" id="vR">—</div>
+        </div>
+        <div class="var-card" id="vcX">
+          <div class="var-name">x (target)</div>
+          <div class="var-value red" id="vX">—</div>
+        </div>
+        <div class="var-card" id="vcSum">
+          <div class="var-name">sum</div>
+          <div class="var-value grn" id="vSum">0</div>
+        </div>
+        <div class="var-card" id="vcLen">
+          <div class="var-name">R-L+1</div>
+          <div class="var-value yel" id="vLen">—</div>
+        </div>
+        <div class="var-card" id="vcAns">
+          <div class="var-name">ans</div>
+          <div class="var-value grn" id="vAns">∞</div>
+        </div>
+      </div>
+
+      <!-- CONDITION BADGE -->
+      <div class="cond-badge" id="condBadge">
+        <span class="cond-lhs" id="condLhs">sum=0</span>
+        <span class="cond-op">≥</span>
+        <span class="cond-rhs" id="condRhs">x=?</span>
+        <span class="cond-result no" id="condResult">FALSE</span>
+      </div>
+
+      <!-- WINDOW CONTENTS -->
+      <div class="win-box">
+        <div class="wb-title">Window contents</div>
+        <div class="wb-chips" id="wbChips"></div>
+      </div>
+
+      <!-- CANDIDATE LOG -->
+      <div class="clog">
+        <div class="clog-title">Valid windows log</div>
+        <div class="clog-rows" id="clogRows"></div>
+      </div>
+
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Shortest Valid Window</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta">not yet found</div>
+      </div>
+    </div>
+
+    <div class="done-bar" id="doneBar">✓ O(N) · MINIMIZE COMPLETE</div>
+  </div>
+</div>
+
+<script>
+// ── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init:   {ids:['cl-sig','cl-init','cl-for'],       cls:'hl-init'  },
+  expand: {ids:['cl-for','cl-add','cl-whl'],         cls:'hl-expand'},
+  valid:  {ids:['cl-whl','cl-upd'],                  cls:'hl-valid' },
+  shrink: {ids:['cl-upd','cl-sub','cl-end'],         cls:'hl-shrink'},
+  done:   {ids:['cl-ret'],                           cls:'hl-done'  },
+};
+function highlightCode(type) {
+  document.querySelectorAll('.code-line').forEach(el => el.className='code-line');
+  const e = TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id => { const el=document.getElementById(id); if(el) el.classList.add(e.cls); });
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── ALGORITHM ─────────────────────────────────────────────────────────────
+function computeSteps(arr, X) {
+  const steps=[], n=arr.length;
+  let L=0, sum=0, ans=Infinity, ansL=-1, ansR=-1;
+  let validLog=[];
+
+  const snap=(type,desc,shrinkIdx=-1)=>steps.push({
+    L, R:steps.length===0?-1:undefined, // will be set below
+    sum, ans, ansL, ansR, validLog:[...validLog], type, desc, shrinkIdx, n, X
+  });
+
+  // we re-run with R tracked properly
+  const steps2=[];
+  L=0; sum=0; ans=Infinity; ansL=-1; ansR=-1; validLog=[];
+
+  const snap2=(L,R,sum,ans,ansL,ansR,vlog,type,desc,shrinkIdx)=>steps2.push({
+    L,R,sum,ans,ansL,ansR,validLog:[...vlog],type,desc,shrinkIdx,n,X
+  });
+
+  snap2(0,-1,0,ans,-1,-1,validLog,'init',
+    `🚀 <strong>Starting up.</strong> Array has <strong>${n}</strong> elements. Target X=<strong>${X}</strong>. We want the <strong>shortest</strong> subarray whose sum ≥ X. R expands right; whenever sum ≥ X we try to shrink from the left to minimise length.`,
+    -1);
+
+  for(let R=0; R<n; R++){
+    sum += arr[R];
+    snap2(L,R,sum,ans,ansL,ansR,validLog,'expand',
+      `➡️ R moves to index <span class="blu">${R}</span> (value <strong>${arr[R]}</strong>). sum = ${sum-arr[R]} + ${arr[R]} = <strong>${sum}</strong>. ${sum>=X?`<span class="grn">sum ≥ ${X} — window is valid! Enter shrink loop.</span>`:`sum &lt; ${X} — keep expanding.`}`,
+      -1);
+
+    while(sum >= X){
+      const len = R-L+1;
+      const isNew = len < ans;
+      if(isNew){ ans=len; ansL=L; ansR=R; }
+      validLog.push({L,R,len,sum,isNew});
+
+      snap2(L,R,sum,ans,ansL,ansR,validLog,'valid',
+        `✅ sum=${sum} ≥ ${X} — <strong>valid window!</strong> [${L}..${R}] = [${arr.slice(L,R+1).join(', ')}], length=<span class="grn">${len}</span>.${isNew?` <span class="yel">New best! ans=${len}</span>`:` ans stays ${ans}.`} Try shrinking: remove a[${L}]=${arr[L]}.`,
+        L);
+
+      sum -= arr[L];
+      L++;
+
+      snap2(L,R,sum,ans,ansL,ansR,validLog,'shrink',
+        `⬅️ <span class="red">L shrinks</span> from ${L-1} to <strong>${L}</strong>. Dropped a[${L-1}]=${arr[L-1]}. sum = ${sum+arr[L-1]} − ${arr[L-1]} = <strong>${sum}</strong>. ${sum>=X?`<span class="grn">Still ≥ ${X} — keep shrinking!</span>`:`sum &lt; ${X} now — stop shrinking, continue expanding.`}`,
+        L-1);
+    }
+  }
+
+  snap2(ansL,ansR,sum,ans,ansL,ansR,validLog,'done',
+    ans===Infinity
+      ? `🔴 <span class="red">No valid subarray found</span> — total sum of array &lt; X.`
+      : `🎉 <span class="grn"><strong>Done!</strong></span> Shortest subarray with sum ≥ ${X}: <strong>[${ansL}..${ansR}]</strong> = [${arr.slice(ansL,ansR+1).join(', ')}], length = <span class="yel"><strong>${ans}</strong></span>. O(n) — each element enters and leaves the window at most once.`,
+    -1);
+
+  return steps2;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let arr=[], X=7, steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let maxSum=1;
+
+function parseArr(){
+  return document.getElementById('inputArr').value
+    .split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)&&x>0);
+}
+
+// ── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  arr  = parseArr();
+  X    = parseInt(document.getElementById('inputX').value)||7;
+  maxSum = arr.reduce((a,b)=>a+b,0);
+  steps = computeSteps(arr, X);
+  currentStep = 0;
+
+  // array blocks
+  const ab = document.getElementById('arrayBlocks');
+  ab.innerHTML='';
+  arr.forEach((v,i)=>{
+    ab.innerHTML+=`<div class="blk" id="blk-${i}">${v}<span class="bidx">${i}</span></div>`;
+  });
+
+  // sum meter target line
+  const pct = Math.min(100, (X / maxSum)*100);
+  document.getElementById('smTargetLine').style.left = pct+'%';
+  document.getElementById('smTargetLabel').textContent = 'X='+X;
+  document.getElementById('smTargetLabel').style.left = pct+'%';
+  document.getElementById('smX').textContent = X;
+
+  // answer chips placeholder
+  document.getElementById('candChips').innerHTML=
+    '<span style="font-size:0.8rem;color:var(--muted)">none yet</span>';
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('clogRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('vX').textContent=X;
+  document.getElementById('condRhs').textContent='x='+X;
+
+  renderStep(0);
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId), card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed'); void card.offsetWidth; card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx];
+  currentStep=idx;
+
+  // blocks
+  arr.forEach((_,i)=>{
+    const b=document.getElementById(`blk-${i}`);
+    if(!b) return;
+    b.className='blk';
+    if(st.L>=0&&st.R>=0&&i>=st.L&&i<=st.R){
+      if(st.type==='valid') b.classList.add('is-valid');
+      else if(st.type==='shrink'&&i===st.L-1) b.classList.add('is-shrink');
+      else b.classList.add('in-window');
+    }
+    // mark best window
+    if(st.ansL>=0&&i>=st.ansL&&i<=st.ansR&&st.type!=='valid'&&st.type!=='shrink')
+      b.classList.add('is-best');
+    if(i===st.L&&st.R>=0) b.classList.add('is-L');
+    if(i===st.R&&st.R>=0) b.classList.add('is-R');
+  });
+
+  // pointer labels
+  const BW=59;
+  const pl=document.getElementById('ptrLabels');
+  if(st.R>=0){
+    pl.innerHTML=`
+      <span class="ptr ptr-L" style="left:${st.L*BW+27}px">L</span>
+      <span class="ptr ptr-R" style="left:${st.R*BW+27}px">R</span>`;
+  } else {
+    pl.innerHTML='';
+  }
+
+  // sum meter
+  const pct=Math.min(100,(st.sum/maxSum)*100);
+  const smBar=document.getElementById('smBar');
+  smBar.style.width=pct+'%';
+  smBar.style.background=st.sum>=X?'#06d6a0':'#2196f3';
+  document.getElementById('smVal').textContent=st.sum;
+  document.getElementById('smVal').style.color=st.sum>=X?'#028a5b':'var(--accent2)';
+  document.getElementById('smCondition').textContent=
+    st.sum>=X?`✓ sum=${st.sum} ≥ ${X} — VALID, shrink!`:`sum=${st.sum} < ${X} — expand`;
+  document.getElementById('smCondition').style.color=st.sum>=X?'#028a5b':'var(--muted)';
+
+  // status cards
+  const scWin=document.getElementById('scWin');
+  scWin.className='scard'+(st.type==='valid'?' valid':st.type==='shrink'?' shrinking':'');
+  document.getElementById('scWinVal').textContent=
+    st.R>=0?`[${arr.slice(st.L,st.R+1).join(',')}]`:'—';
+  document.getElementById('scWinSub').textContent=
+    st.R>=0?`L=${st.L}  R=${st.R}`:'L=— R=—';
+
+  const len=st.R>=0?st.R-st.L+1:0;
+  const scLen=document.getElementById('scLen');
+  scLen.className='scard'+(st.type==='valid'?' valid':st.type==='shrink'?' shrinking':'');
+  document.getElementById('scLenVal').textContent=st.R>=0?len:'—';
+
+  const scBest=document.getElementById('scBest');
+  scBest.className='scard'+(st.ans<Infinity?' best':'');
+  document.getElementById('scBestVal').textContent=st.ans<Infinity?st.ans:'∞';
+  document.getElementById('scBestSub').textContent=
+    st.ansL>=0?`[${st.ansL}..${st.ansR}]`:'not found yet';
+
+  // valid window chips
+  const cc=document.getElementById('candChips');
+  if(st.validLog.length===0){
+    cc.innerHTML='<span style="font-size:0.8rem;color:var(--muted)">none yet</span>';
+  } else {
+    cc.innerHTML='';
+    st.validLog.forEach((e,i)=>{
+      const isLatest=i===st.validLog.length-1&&(st.type==='valid'||st.type==='shrink');
+      cc.innerHTML+=`<div class="cand-chip ${e.isNew?'best-chip':''} ${isLatest?'current':e.isNew?'best-chip':'filled'}">[${e.L}..${e.R}]<br>len=${e.len}</div>`;
+    });
+  }
+
+  // window contents (right)
+  const wbc=document.getElementById('wbChips');
+  wbc.innerHTML='';
+  if(st.L>=0&&st.R>=0){
+    arr.slice(st.L,st.R+1).forEach((v,i)=>{
+      const isShrink=st.type==='shrink'&&i===0;
+      wbc.innerHTML+=`<div class="wb-chip ${isShrink?'wc-shrink':'wc-in'}">${v}</div>`;
+    });
+  }
+
+  // valid log (right)
+  const clr=document.getElementById('clogRows');
+  clr.innerHTML='';
+  [...st.validLog].reverse().forEach((e,ri)=>{
+    const isLatest=ri===0&&(st.type==='valid'||st.type==='shrink');
+    clr.innerHTML+=`<div class="clog-row ${e.isNew?'cl-best':''} ${isLatest?'cl-new':''}">
+      <div class="cl-win">[${e.L}..${e.R}]=[${arr.slice(e.L,e.R+1).join(',')}]</div>
+      <div class="cl-len">${e.len}</div>
+      ${e.isNew?'<div class="cl-star">★</div>':''}
+    </div>`;
+  });
+
+  // condition badge
+  const cb=document.getElementById('condBadge');
+  const met=st.sum>=X;
+  cb.className='cond-badge '+(met?'met':'unmet');
+  document.getElementById('condLhs').textContent=`sum=${st.sum}`;
+  document.getElementById('condResult').textContent=met?'TRUE':'FALSE';
+  document.getElementById('condResult').className='cond-result '+(met?'yes':'no');
+
+  // vars
+  setVar('vL','vcL',st.L>=0?st.L:'—');
+  setVar('vR','vcR',st.R>=0?st.R:'—');
+  setVar('vSum','vcSum',st.sum);
+  setVar('vLen','vcLen',st.R>=0?st.R-st.L+1:'—');
+  setVar('vAns','vcAns',st.ans<Infinity?st.ans:'∞');
+
+  // step box
+  const box=document.getElementById('stepBox');
+  const cls={expand:'s-expand',valid:'s-valid',shrink:'s-shrink',done:'s-done',init:'s-expand'};
+  box.className='step-box '+(cls[st.type]||'s-expand');
+  document.getElementById('stepDesc').innerHTML=st.desc;
+  highlightCode(st.type==='init'?'init':st.type);
+
+  // done
+  if(st.type==='done'){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBar').classList.add('show');
+    if(st.ans<Infinity){
+      const bb=document.getElementById('bestBox');
+      bb.classList.add('show');
+      document.getElementById('bestVal').textContent=
+        `[${arr.slice(st.ansL,st.ansR+1).join(', ')}]`;
+      document.getElementById('bestMeta').textContent=
+        `length=${st.ans} · [${st.ansL}..${st.ansR}] · sum=${arr.slice(st.ansL,st.ansR+1).reduce((a,b)=>a+b,0)}`;
+    }
+  }
+
+  // progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){
+  if(!playing) return;
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  renderStep(currentStep+1);
+  timer=setTimeout(tick,speed);
+}
+function stopPlay(){
+  playing=false; clearTimeout(timer);
+  document.getElementById('btnPause').textContent='▶ Resume';
+  document.getElementById('btnRun').disabled=false;
+}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); speed=parseInt(b.dataset.ms);
+  });
+});
+
+buildUI();
+</script>
+</body>
+</html>

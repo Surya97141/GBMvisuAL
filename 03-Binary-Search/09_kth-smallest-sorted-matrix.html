@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search — Kth Smallest in Sorted Matrix · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(192,84,252,0.2);border:1px solid var(--pur);color:var(--pur);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:22px 30px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:12px;margin-bottom:20px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:7px 11px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:var(--pur);}
+  .field input.wide{width:300px;}
+  .field input.small{width:78px;}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.76rem;}
+  .zone-dot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+  /* SECTION LABEL */
+  .section-label{font-family:'Space Mono',monospace;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: 2D MATRIX GRID
+     Cells show ≤mid state (shaded blue) vs
+     >mid (normal). Staircase walker shown
+     as an animated cursor with trail.
+  ══════════════════════════════════════ */
+  .matrix-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 14px 18px;margin-bottom:14px;overflow-x:auto;}
+  .matrix-header-row{display:flex;gap:5px;margin-bottom:5px;padding-left:30px;}
+  .col-hdr{width:52px;text-align:center;font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);flex-shrink:0;}
+  .matrix-body{display:flex;flex-direction:column;gap:5px;}
+  .matrix-row-wrap{display:flex;align-items:center;gap:5px;}
+  .row-hdr{width:24px;text-align:right;font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);flex-shrink:0;padding-right:6px;}
+  .cell{
+    position:relative;width:52px;height:52px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;
+    border-radius:7px;border:2px solid var(--border);background:var(--surface);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  /* cell states */
+  .cell.c-lte    {background:rgba(33,150,243,0.12);border-color:#2196f3;color:var(--accent2);}
+  .cell.c-gt     {background:rgba(0,0,0,0.03);border-color:var(--border);color:#bbb;}
+  .cell.c-walker {background:rgba(255,209,102,0.28);border-color:#ffd166;color:#7a5a00;transform:scale(1.08) translateY(-3px);box-shadow:0 6px 18px rgba(255,209,102,0.35);z-index:2;}
+  .cell.c-walker.c-lte{background:rgba(255,209,102,0.28);border-color:#ffd166;color:#7a5a00;}
+  .cell.c-ans    {background:rgba(6,214,160,0.22);border-color:#06d6a0;color:#014d3a;transform:scale(1.1) translateY(-4px);box-shadow:0 8px 22px rgba(6,214,160,0.35);z-index:3;}
+  .cell.c-mid-val{background:rgba(192,84,252,0.12);border-color:var(--pur);color:var(--pur-dark);}
+  /* count badge on matrix */
+  .count-badge{
+    position:absolute;top:-8px;right:-8px;
+    background:var(--accent2);color:white;
+    font-family:'Space Mono',monospace;font-size:0.52rem;font-weight:700;
+    padding:1px 5px;border-radius:8px;white-space:nowrap;
+    opacity:0;transition:opacity 0.3s;
+  }
+  .count-badge.show{opacity:1;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: STAIRCASE WALK PANEL
+     Shows the O(m+n) counting walk live:
+     start top-right, go left if ≤mid, down if >mid
+  ══════════════════════════════════════ */
+  .staircase-section{margin-bottom:14px;}
+  .staircase-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .staircase-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .staircase-title{font-family:'Space Mono',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .staircase-count{font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;color:var(--accent2);}
+  .staircase-steps{display:flex;flex-wrap:wrap;gap:5px;}
+  .stair-step{
+    display:flex;align-items:center;gap:4px;
+    background:#f0ece0;border:1.5px solid var(--border);
+    border-radius:5px;padding:3px 8px;
+    font-family:'Space Mono',monospace;font-size:0.65rem;transition:all 0.2s;
+  }
+  .stair-step.ss-lte {background:rgba(33,150,243,0.1);border-color:#2196f3;color:var(--accent2);}
+  .stair-step.ss-gt  {background:rgba(230,57,70,0.07);border-color:#e63946;color:var(--accent);}
+  .stair-step.ss-cur {background:rgba(255,209,102,0.22);border-color:#ffd166;color:#7a5a00;transform:scale(1.06);}
+  .stair-arrow{font-size:0.7rem;color:var(--muted);}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: VALUE RANGE SEARCH BAR
+     Binary search on value space, not indices.
+  ══════════════════════════════════════ */
+  .val-search-section{margin-bottom:14px;}
+  .val-bar-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px 28px;position:relative;}
+  .val-track{height:8px;background:#e8e2d4;border-radius:4px;position:relative;margin-bottom:6px;}
+  .vt-dead-l{position:absolute;left:0;top:0;height:100%;background:rgba(230,57,70,0.2);border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .vt-active{position:absolute;top:0;height:100%;background:rgba(192,84,252,0.35);transition:left 0.4s,width 0.4s;}
+  .vt-dead-r{position:absolute;right:0;top:0;height:100%;background:rgba(33,150,243,0.15);border-radius:0 4px 4px 0;transition:width 0.4s;}
+  .vt-ans-marker{position:absolute;top:-3px;width:4px;height:14px;background:var(--accent3);border-radius:2px;transition:left 0.4s;z-index:2;display:none;}
+  .vt-mid-marker{position:absolute;top:-2px;width:3px;height:12px;background:var(--accent4);border-radius:2px;transition:left 0.4s;z-index:2;display:none;}
+  .val-ptr{position:absolute;bottom:-20px;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.59rem;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;transition:left 0.4s cubic-bezier(0.34,1.56,0.64,1);}
+  .vp-lo {background:var(--accent); color:white;}
+  .vp-mid{background:var(--accent4);color:#333;}
+  .vp-hi {background:var(--accent2);color:white;}
+  .vp-ans{background:var(--accent3);color:#014d3a;}
+  .val-endpoints{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.59rem;color:var(--muted);margin-top:24px;}
+
+  /* COUNT vs K VERDICT */
+  .verdict-row{display:flex;gap:10px;margin-bottom:14px;}
+  .verd-card{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;background:var(--surface);transition:all 0.3s;font-family:'Space Mono',monospace;}
+  .verd-card .vc-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .verd-card .vc-val{font-size:1rem;font-weight:700;color:var(--muted);}
+  .verd-card.vc-active{border-color:var(--pur);background:rgba(192,84,252,0.05);}
+  .verd-card.vc-active .vc-val{color:var(--pur-dark);}
+  .verd-card.vc-lte{border-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .verd-card.vc-lte .vc-val{color:var(--accent2);}
+  .verd-card.vc-gte{border-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .verd-card.vc-gte .vc-val{color:#028a5b;}
+  .verd-decision{flex:2;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;background:var(--surface);transition:all 0.3s;}
+  .verd-decision .vc-label{font-family:'Space Mono',monospace;font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px;}
+  .verd-decision .vc-val{font-size:0.82rem;line-height:1.5;color:var(--ink);}
+  .verd-decision.dec-right{border-color:var(--accent); background:rgba(230,57,70,0.04);}
+  .verd-decision.dec-left {border-color:var(--accent3);background:rgba(6,214,160,0.04);}
+  .verd-decision.dec-done {border-color:var(--accent3);background:rgba(6,214,160,0.08);}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--pur);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.64rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--pur-dark);margin-bottom:7px;}
+  .prob-body{font-size:0.83rem;line-height:1.7;color:var(--ink);}
+  .prob-body strong{font-weight:700;}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(192,84,252,0.05);border:1px solid rgba(192,84,252,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.7rem;line-height:1.7;color:var(--ink);}
+  .prob-example .ex-label{font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB EXPLANATION PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init  {border-color:var(--pur);}
+  .explain-panel.ep-count {border-color:var(--accent4);}
+  .explain-panel.ep-right {border-color:var(--accent);}
+  .explain-panel.ep-left  {border-color:var(--accent3);}
+  .explain-panel.ep-done  {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--pur);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:82px;}
+  .ep-pane{display:none;font-size:0.83rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.81rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-right{border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-left {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-why-block.why-count{border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.79rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:14px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.61rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.59rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.59rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:14px 14px 10px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:9px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.65rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.9em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(192,84,252,0.15);border-left-color:var(--pur);color:#e2e8f0;}
+  .code-line.hl-mid  {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-count{background:rgba(255,209,102,0.14);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-right{background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-left {background:rgba(6,214,160,0.18); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 14px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.62rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 11px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.56rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.blue{color:#4fc3f7;}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* MINI MATRIX (right panel) */
+  .mini-mat-wrap{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .mini-matrix{display:inline-grid;gap:3px;}
+  .mini-cell{width:21px;height:21px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all 0.22s;}
+  .mini-cell.mc-lte   {background:rgba(33,150,243,0.2);border-color:#2196f3;color:#4fc3f7;}
+  .mini-cell.mc-walker{background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .mini-cell.mc-ans   {background:rgba(6,214,160,0.3); border-color:#06d6a0;color:#06d6a0;}
+
+  /* RANGE BAR */
+  .range-track{margin-bottom:12px;}
+  .range-bar-wrap{height:7px;background:#1a1a2e;border-radius:4px;overflow:hidden;position:relative;margin-top:5px;}
+  .range-bar-dead-l{position:absolute;left:0;top:0;height:100%;background:#2a2a3e;border-radius:4px 0 0 4px;transition:width 0.4s;}
+  .range-bar-active{position:absolute;top:0;height:100%;background:var(--pur);opacity:0.5;transition:left 0.4s,width 0.4s;}
+  .range-bar-dead-r{position:absolute;right:0;top:0;height:100%;background:#2a2a3e;border-radius:0 4px 4px 0;transition:width 0.4s;}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:12px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);letter-spacing:4px;}
+  .best-meta{font-size:0.63rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 14px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Kth Smallest in Sorted Matrix</h1>
+    <div class="sub">Binary Search · Value Range · Live Visualizer</div>
+  </div>
+  <div class="family-badge">03·05 · Matrix</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Matrix rows (semicolon-separated)</label>
+      <input type="text" id="inputMatrix" value="1,5,9;10,11,13;12,13,15" class="wide">
+    </div>
+    <div class="field">
+      <label>K</label>
+      <input type="text" id="inputK" value="8" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.12);border-color:#2196f3"></div>Value ≤ mid</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.28);border-color:#ffd166"></div>Staircase Walker</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.22);border-color:#06d6a0"></div>Answer Found</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(0,0,0,0.03);border-color:#ccc"></div>Value > mid</div>
+  </div>
+
+  <!-- MATRIX GRID -->
+  <div class="section-label">Matrix</div>
+  <div class="matrix-outer">
+    <div class="matrix-header-row" id="matHeaderRow"></div>
+    <div class="matrix-body" id="matrixBody"></div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: VALUE RANGE SEARCH BAR -->
+  <div class="val-search-section">
+    <div class="section-label">Value Search Space  [matrix[0][0] … matrix[n-1][n-1]]</div>
+    <div class="val-bar-wrap" id="valBarWrap">
+      <div class="val-track" id="valTrack">
+        <div class="vt-dead-l"   id="vtDeadL"  style="width:0%"></div>
+        <div class="vt-active"   id="vtActive" style="left:0%;width:100%"></div>
+        <div class="vt-dead-r"   id="vtDeadR"  style="width:0%"></div>
+        <div class="vt-ans-marker" id="vtAns"></div>
+        <div class="vt-mid-marker" id="vtMid"></div>
+      </div>
+      <div class="val-ptr vp-lo"  id="vpLo"  style="left:0%">lo</div>
+      <div class="val-ptr vp-mid" id="vpMid" style="left:50%;display:none">mid</div>
+      <div class="val-ptr vp-hi"  id="vpHi"  style="left:100%">hi</div>
+      <div class="val-ptr vp-ans" id="vpAns" style="left:0%;display:none">ans</div>
+      <div class="val-endpoints">
+        <span id="valMin">—</span>
+        <span id="valMax">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: STAIRCASE WALK PANEL -->
+  <div class="staircase-section">
+    <div class="section-label">Staircase Count — countLessEqual(mid)</div>
+    <div class="staircase-wrap">
+      <div class="staircase-header">
+        <div class="staircase-title">Walk: start top-right → left if ≤ mid, down if > mid</div>
+        <div class="staircase-count">count = <span id="staircaseCount">—</span></div>
+      </div>
+      <div class="staircase-steps" id="staircaseSteps">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Press RUN to see walk</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUNT vs K VERDICT -->
+  <div class="verdict-row" id="verdictRow">
+    <div class="verd-card" id="vcCount">
+      <div class="vc-label">count ≤ mid</div>
+      <div class="vc-val" id="vcCountVal">—</div>
+    </div>
+    <div class="verd-card" id="vcK">
+      <div class="vc-label">K</div>
+      <div class="vc-val" id="vcKVal">—</div>
+    </div>
+    <div class="verd-decision" id="vcDecision">
+      <div class="vc-label">Decision</div>
+      <div class="vc-val" id="vcDecVal">waiting…</div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given an <strong id="probSize">n×n</strong> matrix where each row and column is sorted in ascending order,
+      find the <span class="prob-hi">K<sup>th</sup> smallest element</span> overall.
+      <br><br>
+      <strong>Key constraint:</strong> rows sorted left→right, columns sorted top→bottom.
+      The matrix is <em>not</em> globally sorted — you cannot flatten and binary search directly.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION PANEL -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">kthSmallest</span>(</span>
+<span class="code-line" id="cl-sig2">    vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; m, <span class="ck">int</span> k) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> n=m.size();</span>
+<span class="code-line" id="cl-init2">  <span class="ck">int</span> lo=m[0][0], hi=m[n-1][n-1];</span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (lo &lt; hi) {</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid = lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-cnt">    <span class="ck">int</span> cnt = <span class="cf">countLE</span>(m, mid);</span>
+<span class="code-line" id="cl-cmp">    <span class="ck">if</span> (cnt &lt; k)</span>
+<span class="code-line" id="cl-right">      lo = mid + <span class="cn">1</span>; <span class="cc">// too few ≤ mid</span></span>
+<span class="code-line" id="cl-left">    <span class="ck">else</span> hi = mid;  <span class="cc">// enough ≤ mid</span></span>
+<span class="code-line" id="cl-wend">  } <span class="ck">return</span> lo;</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-fn"><span class="ck">int</span> <span class="cf">countLE</span>(m, mid) { <span class="cc">// O(n)</span></span>
+<span class="code-line" id="cl-fninit">  <span class="ck">int</span> cnt=0, r=0, c=n-1;</span>
+<span class="code-line" id="cl-fnloop">  <span class="ck">while</span> (r &lt; n) {</span>
+<span class="code-line" id="cl-fnlte">    <span class="ck">while</span>(c&gt;=0 &amp;&amp; m[r][c]&gt;mid) c--;</span>
+<span class="code-line" id="cl-fnadd">    cnt += c+1; r++;</span>
+<span class="code-line" id="cl-fnend">  } <span class="ck">return</span> cnt;</span>
+<span class="code-line" id="cl-fnclose">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo">  <div class="var-name">lo (val)</div>  <div class="var-value red"  id="vLo">—</div></div>
+      <div class="var-card" id="vcHi">  <div class="var-name">hi (val)</div>  <div class="var-value blue" id="vHi">—</div></div>
+      <div class="var-card" id="vcMid"> <div class="var-name">mid (val)</div> <div class="var-value yel"  id="vMid">—</div></div>
+      <div class="var-card" id="vcAns"> <div class="var-name">ans (lo)</div>  <div class="var-value grn"  id="vAns">—</div></div>
+      <div class="var-card" id="vcCnt"> <div class="var-name">count ≤ mid</div><div class="var-value pur" id="vCnt">—</div></div>
+      <div class="var-card" id="vcK">   <div class="var-name">k</div>         <div class="var-value"     id="vK" style="color:#e2e8f0;">—</div></div>
+      <div class="var-card" id="vcWR"  style="grid-column:1/2"><div class="var-name">walk row</div>   <div class="var-value yel" id="vWR">—</div></div>
+      <div class="var-card" id="vcWC"  style="grid-column:2/3"><div class="var-name">walk col</div>   <div class="var-value yel" id="vWC">—</div></div>
+    </div>
+
+    <!-- MINI MATRIX -->
+    <div class="mini-mat-wrap">
+      <div class="arr-state-title">Matrix State</div>
+      <div class="mini-matrix" id="miniMatrix"></div>
+    </div>
+
+    <!-- VALUE RANGE BAR -->
+    <div class="range-track">
+      <div class="arr-state-title">Value Search Space</div>
+      <div class="range-bar-wrap">
+        <div class="range-bar-dead-l" id="rbl" style="width:0%"></div>
+        <div class="range-bar-active" id="rba" style="left:0%;width:100%"></div>
+        <div class="range-bar-dead-r" id="rbr" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Kth Smallest</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// countLE — O(n) staircase count, returns steps
+// ─────────────────────────────────────────────
+function countLESteps(matrix, mid){
+  const n=matrix.length;
+  const steps=[];
+  let cnt=0, r=0, c=n-1;
+  while(r<n){
+    while(c>=0 && matrix[r][c]>mid) {
+      steps.push({r,c,val:matrix[r][c],action:'move-left',cnt});
+      c--;
+    }
+    // everything in row r, col 0..c is ≤ mid
+    if(c>=0) steps.push({r,c,val:matrix[r][c],action:'count-row',cnt,rowCount:c+1});
+    cnt+=c+1;
+    steps.push({r,c,cnt,action:'next-row'});
+    r++;
+  }
+  return{count:cnt, steps};
+}
+
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(lo,hi,k,n)=>({
+    why:`<div class="ep-why-block">We can't flatten this matrix and binary search — rows/cols are sorted but the matrix isn't globally sorted. Instead, binary search on the <strong>value range</strong> [${lo}..${hi}]. For each candidate mid, count how many elements are ≤ mid using an O(n) staircase walk. The Kth smallest is the smallest value where count ≥ K.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> lo=${lo} (top-left = global min), hi=${hi} (bottom-right = global max). The Kth smallest is guaranteed to be in [lo..hi]. k=${k}.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The monotonicity invariant:</strong> countLE(v) is non-decreasing in v. If countLE(mid) < k, the answer is > mid. If countLE(mid) ≥ k, the answer is ≤ mid.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why lo converges to the answer:</strong> We use lo < hi (not lo ≤ hi), and we set hi=mid (not mid-1) when feasible. This guarantees lo converges to the smallest value where countLE ≥ k — which is exactly the Kth smallest.`},
+    ]
+  }),
+  calc_mid:(lo,hi,mid)=>({
+    why:`<div class="ep-why-block why-count">mid = ${lo}+(${hi}−${lo})/2 = ${mid}. This is the candidate value. We now run countLE(matrix, ${mid}) — a staircase walk starting at the top-right corner that counts all elements ≤ ${mid} in O(n).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant holds:</strong> lo=${lo} ≤ mid=${mid} < hi=${hi}. The answer is in [lo..hi].`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>The staircase trick:</strong> Start at top-right (row=0, col=n-1). If matrix[r][c] ≤ mid → entire column c for rows 0..r contributes, add c+1, move right (next row). If > mid → move left. Each step eliminates a row or column — O(n) total.`},
+    ]
+  }),
+  walk_step:(r,c,val,mid,action,cnt)=>({
+    why:`<div class="ep-why-block why-count">At [${r}][${c}] = ${val}. ${action==='move-left'?`${val} > mid=${mid} → move left (c--). This entire column to the right has values > mid.`:`${val} ≤ mid=${mid} → count entire row 0..${c}: add ${c+1}. Move to next row.`}</div>`,
+    inv:[
+      {icon:action==='move-left'?'⬅️':'➕',cls:action==='move-left'?'inv-key':'',
+        text:action==='move-left'
+          ?`<strong>Move left:</strong> m[${r}][${c}]=${val} > mid=${mid}. Eliminate this column for current row.`
+          :`<strong>Count row ${r}:</strong> m[${r}][${c}]=${val} ≤ mid. Add ${c+1} elements (col 0 to ${c}). count → ${cnt+c+1}.`},
+    ]
+  }),
+  count_done:(mid,cnt,k)=>({
+    why:`<div class="ep-why-block why-count">countLE(${mid}) = ${cnt}. Compare with k=${k}: ${cnt<k?`${cnt} < ${k} → too few elements ≤ ${mid}. The Kth smallest must be > ${mid}. Set lo = mid+1.`:`${cnt} ≥ ${k} → enough elements ≤ ${mid}. The Kth smallest is ≤ ${mid}. Set hi = mid.`}</div>`,
+    inv:[
+      {icon:cnt<k?'❌':'✅',cls:cnt<k?'inv-key':'',
+        text:cnt<k
+          ?`<strong>count=${cnt} < k=${k}:</strong> Not enough small values. Answer is > ${mid}. lo=mid+1.`
+          :`<strong>count=${cnt} ≥ k=${k}:</strong> Enough small values. Answer ≤ ${mid}. hi=mid (not mid-1!).`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why hi=mid (not mid-1)?</strong> mid itself might be the answer. Setting hi=mid-1 could skip it. We keep hi=mid and the loop terminates when lo==hi, which is the answer.`},
+    ]
+  }),
+  done:(ans,k,n)=>({
+    why:`<div class="ep-why-block why-done">lo == hi == ${ans}. The loop terminates. At this point, countLE(${ans}) ≥ k AND countLE(${ans}-1) < k — meaning exactly: ${ans} is the smallest value such that at least k elements are ≤ it. That is the definition of the Kth smallest element.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> lo converged to the Kth smallest because: every time count < k we moved lo up (eliminating too-small values), every time count ≥ k we kept hi at mid (never skipping the answer).`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n log(max−min))</strong> — binary search over value range (log iterations), each iteration runs O(n) staircase walk. For n×n matrix: O(n log(max−min)). Space O(1).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The answer exists in the matrix:</strong> lo always converges to a value that is actually in the matrix (not just any integer in the range), because at convergence countLE(lo) ≥ k and countLE(lo-1) < k forces lo to be an actual matrix value.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',calc_mid:'ep-count',walk_step:'ep-count',
+    count_done_right:'ep-right',count_done_left:'ep-left',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:             {ids:['cl-sig','cl-sig2','cl-init','cl-init2','cl-whl'],cls:'hl-init'},
+  calc_mid:         {ids:['cl-mid','cl-cnt'],                               cls:'hl-mid'},
+  walk_step:        {ids:['cl-fn','cl-fninit','cl-fnloop','cl-fnlte','cl-fnadd'],cls:'hl-count'},
+  count_done_right: {ids:['cl-cmp','cl-right'],                             cls:'hl-right'},
+  count_done_left:  {ids:['cl-cmp','cl-left'],                              cls:'hl-left'},
+  done:             {ids:['cl-wend'],                                       cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(matrix, k){
+  const steps=[];
+  const n=matrix.length;
+  const loInit=matrix[0][0], hiInit=matrix[n-1][n-1];
+  let lo=loInit, hi=hiInit;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    lo,hi,k,n,matrix,desc,type,explain,
+    mid:null,count:null,walkRow:null,walkCol:null,
+    walkSteps:[],lteSet:new Set(),result:null,...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n}×${n} matrix. K=${k}. Binary search on value range `
+    +`[<span style="color:#e63946;font-weight:700">${loInit}</span>…<span style="color:#2196f3;font-weight:700">${hiInit}</span>]. `
+    +`For each candidate <span style="color:#7a5a00;font-weight:700">mid</span>, count elements ≤ mid using a staircase walk. `
+    +`If count &lt; K → answer &gt; mid (lo=mid+1). If count ≥ K → answer ≤ mid (hi=mid). `
+    +`When lo==hi, that value is the Kth smallest.`,
+    'init', EXPLAIN.init(loInit,hiInit,k,n)
+  );
+
+  while(lo<hi){
+    const mid=lo+Math.floor((hi-lo)/2);
+
+    snap(
+      `🔢 <strong>Compute mid.</strong> lo=${lo}, hi=${hi} → mid=<span style="color:#7a5a00;font-weight:700">${mid}</span>. Now run countLE(${mid})…`,
+      'calc_mid', EXPLAIN.calc_mid(lo,hi,mid),
+      {mid, count:null, walkRow:0, walkCol:n-1}
+    );
+
+    // Compute walk steps for visualization
+    const{count,steps:wSteps}=countLESteps(matrix,mid);
+
+    // Compute which cells are ≤ mid for shading
+    const lteSet=new Set();
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(matrix[r][c]<=mid) lteSet.add(`${r},${c}`);
+
+    // Push walk steps
+    let walkR=0,walkC=n-1,runCount=0;
+    for(const ws of wSteps){
+      if(ws.action==='move-left'){
+        snap(
+          `⬅️ [${ws.r}][${ws.c}]=${ws.val} <span style="color:var(--accent);font-weight:700">&gt; mid=${mid}</span> → move left (col--)`,
+          'walk_step', EXPLAIN.walk_step(ws.r,ws.c,ws.val,mid,'move-left',runCount),
+          {mid, count:runCount, walkRow:ws.r, walkCol:ws.c, walkSteps:[...wSteps], lteSet}
+        );
+        walkC=ws.c-1;
+      } else if(ws.action==='count-row'){
+        runCount+=ws.rowCount;
+        snap(
+          `➕ [${ws.r}][${ws.c}]=${ws.val} <span style="color:var(--accent2);font-weight:700">≤ mid=${mid}</span> → add ${ws.rowCount} (row ${ws.r}, cols 0–${ws.c}). count=<span style="color:var(--pur-dark);font-weight:700">${runCount}</span>`,
+          'walk_step', EXPLAIN.walk_step(ws.r,ws.c,ws.val,mid,'count-row',ws.cnt),
+          {mid, count:runCount, walkRow:ws.r, walkCol:ws.c, walkSteps:[...wSteps], lteSet}
+        );
+      }
+    }
+
+    // Verdict step
+    const feasible=count>=k;
+    snap(
+      feasible
+        ? `✅ countLE(${mid})=${count} <span style="color:#028a5b;font-weight:700">≥ K=${k}</span>. Enough elements. Answer ≤ ${mid}. <strong>hi = mid = ${mid}</strong>.`
+        : `❌ countLE(${mid})=${count} <span style="color:var(--accent);font-weight:700">&lt; K=${k}</span>. Too few elements ≤ ${mid}. <strong>lo = mid+1 = ${mid+1}</strong>.`,
+      feasible?'count_done_left':'count_done_right',
+      EXPLAIN.count_done(mid,count,k),
+      {mid, count, walkRow:null, walkCol:null, walkSteps:wSteps, lteSet}
+    );
+
+    if(feasible) hi=mid; else lo=mid+1;
+  }
+
+  // Final
+  const lteSet=new Set();
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(matrix[r][c]<=lo) lteSet.add(`${r},${c}`);
+  // Find answer cell
+  let ansR=-1,ansC=-1;
+  outer: for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(matrix[r][c]===lo){ansR=r;ansC=c;break outer;}
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> lo == hi == <span style="color:#028a5b;font-weight:700">${lo}</span>. The <strong>${k}th smallest</strong> element is <span style="color:#028a5b;font-weight:700">${lo}</span>.`,
+    'done', EXPLAIN.done(lo,k,n),
+    {mid:null, count:null, walkRow:ansR, walkCol:ansC, walkSteps:[], lteSet, result:{ans:lo,ansR,ansC}}
+  );
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let matrixVal=[], kVal=0, nVal=0, valMin=0, valMax=0;
+
+// ─────────────────────────────────────────────
+// PARSE
+// ─────────────────────────────────────────────
+function parseInput(){
+  const raw=document.getElementById('inputMatrix').value.trim();
+  const matrix=raw.split(';').map(r=>r.split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x))).filter(r=>r.length>0);
+  const k=parseInt(document.getElementById('inputK').value.trim());
+  if(!matrix.length||isNaN(k))return null;
+  const cols=matrix[0].length;
+  if(!matrix.every(r=>r.length===cols))return null;
+  return{matrix,k};
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput();
+  if(!parsed)return;
+  matrixVal=parsed.matrix; kVal=parsed.k;
+  nVal=matrixVal.length; valMin=matrixVal[0][0]; valMax=matrixVal[nVal-1][nVal-1];
+
+  steps=computeSteps(matrixVal,kVal);
+  currentStep=0;
+
+  // Build matrix grid
+  const headerRow=document.getElementById('matHeaderRow');
+  headerRow.innerHTML='';
+  for(let c=0;c<nVal;c++){
+    const d=document.createElement('div');d.className='col-hdr';d.textContent=`c${c}`;
+    headerRow.appendChild(d);
+  }
+  const body=document.getElementById('matrixBody');
+  body.innerHTML='';
+  for(let r=0;r<nVal;r++){
+    const wrap=document.createElement('div');wrap.className='matrix-row-wrap';
+    const rh=document.createElement('div');rh.className='row-hdr';rh.textContent=`r${r}`;
+    wrap.appendChild(rh);
+    for(let c=0;c<nVal;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';cell.id=`cell-${r}-${c}`;
+      cell.textContent=matrixVal[r][c];
+      wrap.appendChild(cell);
+    }
+    body.appendChild(wrap);
+  }
+
+  // Build mini matrix
+  const mm=document.getElementById('miniMatrix');
+  mm.style.gridTemplateColumns=`repeat(${nVal},21px)`;
+  mm.innerHTML='';
+  for(let r=0;r<nVal;r++) for(let c=0;c<nVal;c++){
+    const d=document.createElement('div');
+    d.className='mini-cell';d.id=`mini-${r}-${c}`;
+    d.textContent=matrixVal[r][c];
+    mm.appendChild(d);
+  }
+
+  // Value endpoints
+  document.getElementById('valMin').textContent=`lo=${valMin}`;
+  document.getElementById('valMax').textContent=`hi=${valMax}`;
+  document.getElementById('vcKVal').textContent=kVal;
+  document.getElementById('vK').textContent=kVal;
+  document.getElementById('probSize').textContent=`${nVal}×${nVal}`;
+
+  // Problem example
+  const ans=steps[steps.length-1].result.ans;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">Example: K=${kVal} in this ${nVal}×${nVal} matrix → answer = ${ans}</span>`
+    +`Matrix values in sorted order: [${[...new Set(matrixVal.flat())].sort((a,b)=>a-b).join(', ')}]<br>`
+    +`The ${kVal}th smallest = <strong>${ans}</strong>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function valPct(v){
+  if(valMax===valMin)return 0;
+  return Math.max(0,Math.min(100,((v-valMin)/(valMax-valMin))*100));
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Matrix cells
+  for(let r=0;r<nVal;r++){
+    for(let c=0;c<nVal;c++){
+      const cell=document.getElementById(`cell-${r}-${c}`);
+      const mini=document.getElementById(`mini-${r}-${c}`);
+      if(!cell||!mini)continue;
+      cell.className='cell'; mini.className='mini-cell';
+
+      if(isFinal){
+        if(r===st.result.ansR&&c===st.result.ansC){cell.classList.add('c-ans');mini.classList.add('mc-ans');}
+        else if(st.lteSet.has(`${r},${c}`)){cell.classList.add('c-lte');mini.classList.add('mc-lte');}
+        else cell.classList.add('c-gt');
+      } else if(st.type==='walk_step'||st.type==='count_done_left'||st.type==='count_done_right'){
+        const isLte=st.lteSet&&st.lteSet.has(`${r},${c}`);
+        const isWalker=st.walkRow===r&&st.walkCol===c;
+        if(isWalker){cell.classList.add('c-walker');mini.classList.add('mc-walker');}
+        else if(isLte){cell.classList.add('c-lte');mini.classList.add('mc-lte');}
+        else cell.classList.add('c-gt');
+      } else if(st.mid!==null&&st.type==='calc_mid'){
+        // Just show mid value marker at top-right starting position
+        if(r===0&&c===nVal-1){cell.classList.add('c-mid-val');mini.classList.add('mc-walker');}
+      }
+    }
+  }
+
+  // Value search bar
+  const loPct=valPct(st.lo), hiPct=valPct(st.hi);
+  const actW=Math.max(hiPct-loPct,0.3);
+  document.getElementById('vtDeadL').style.width=loPct+'%';
+  document.getElementById('vtActive').style.left=loPct+'%';
+  document.getElementById('vtActive').style.width=actW+'%';
+  document.getElementById('vtDeadR').style.width=(100-hiPct)+'%';
+  document.getElementById('vpLo').style.left=loPct+'%';
+  document.getElementById('vpLo').textContent=`lo=${st.lo}`;
+  document.getElementById('vpHi').style.left=hiPct+'%';
+  document.getElementById('vpHi').textContent=`hi=${st.hi}`;
+  if(st.mid!==null){
+    const mp=valPct(st.mid);
+    document.getElementById('vpMid').style.left=mp+'%';
+    document.getElementById('vpMid').textContent=`mid=${st.mid}`;
+    document.getElementById('vpMid').style.display='';
+    document.getElementById('vtMid').style.left=mp+'%';
+    document.getElementById('vtMid').style.display='';
+  } else {
+    document.getElementById('vpMid').style.display='none';
+    document.getElementById('vtMid').style.display='none';
+  }
+  // ans marker
+  if(isFinal||st.lo===st.hi){
+    const ap=valPct(st.lo);
+    document.getElementById('vtAns').style.left=ap+'%';
+    document.getElementById('vtAns').style.display='';
+    document.getElementById('vpAns').style.left=ap+'%';
+    document.getElementById('vpAns').textContent=`ans=${st.lo}`;
+    document.getElementById('vpAns').style.display='';
+  }
+
+  // Staircase walk panel
+  renderStaircase(st);
+
+  // Verdict row
+  const vcCount=document.getElementById('vcCount');
+  const vcKCard=document.getElementById('vcK');
+  const vcDec=document.getElementById('vcDecision');
+  vcCount.className='verd-card'; vcKCard.className='verd-card'; vcDec.className='verd-decision';
+  document.getElementById('vcKVal').textContent=kVal;
+  if(st.count!==null){
+    document.getElementById('vcCountVal').textContent=st.count;
+    vcCount.classList.add(st.count<kVal?'vc-active':'vc-gte');
+    if(st.type==='count_done_right'){
+      document.getElementById('vcDecVal').textContent=`${st.count} < K=${kVal} → too few ≤ mid → lo=mid+1`;
+      vcDec.classList.add('dec-right');
+    } else if(st.type==='count_done_left'){
+      document.getElementById('vcDecVal').textContent=`${st.count} ≥ K=${kVal} → enough ≤ mid → hi=mid`;
+      vcDec.classList.add('dec-left');
+    } else if(st.type==='walk_step'){
+      document.getElementById('vcDecVal').textContent=`counting… (${st.count} so far)`;
+      vcCount.classList.add('vc-active');
+    } else {
+      document.getElementById('vcDecVal').textContent='counting…';
+    }
+  } else if(isFinal){
+    document.getElementById('vcCountVal').textContent='—';
+    document.getElementById('vcDecVal').textContent=`lo=hi=${st.lo} → answer ✓`;
+    vcDec.classList.add('dec-done');
+  } else {
+    document.getElementById('vcCountVal').textContent='—';
+    document.getElementById('vcDecVal').textContent='waiting…';
+  }
+
+  // 3-tab
+  updateExplain(st);
+
+  // Code
+  highlightCode(st.type);
+
+  // Variables
+  setVar('vLo',  'vcLo',  st.lo);
+  setVar('vHi',  'vcHi',  st.hi);
+  setVar('vMid', 'vcMid', st.mid!==null?st.mid:'—');
+  setVar('vAns', 'vcAns', st.lo);
+  setVar('vCnt', 'vcCnt', st.count!==null?st.count:'—');
+  setVar('vWR',  'vcWR',  st.walkRow!==null?st.walkRow:'—');
+  setVar('vWC',  'vcWC',  st.walkCol!==null?st.walkCol:'—');
+
+  // Range bar (right panel)
+  const pL=((st.lo-valMin)/(valMax-valMin+1))*100;
+  const pR=((valMax-st.hi)/(valMax-valMin+1))*100;
+  document.getElementById('rbl').style.width=pL+'%';
+  document.getElementById('rba').style.left=pL+'%';
+  document.getElementById('rba').style.width=Math.max(100-pL-pR,0)+'%';
+  document.getElementById('rbr').style.width=pR+'%';
+
+  // Done
+  if(isFinal){
+    const db=document.getElementById('doneBanner');
+    db.className='done-banner show';
+    db.textContent=`✓ ${kVal}TH SMALLEST = ${st.result.ans}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ K=${kVal} → ${st.result.ans} — O(N LOG(MAX-MIN))`;
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.ans);
+    document.getElementById('bestMeta').textContent=`at [${st.result.ansR}][${st.result.ansC}] · ${steps.length} steps`;
+  }
+
+  // Progress
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+function renderStaircase(st){
+  const container=document.getElementById('staircaseSteps');
+  document.getElementById('staircaseCount').textContent=st.count!==null?st.count:'—';
+  if(!st.walkSteps||!st.walkSteps.length){
+    container.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);padding:4px 0;">${st.type==='init'?'Press RUN to see walk':'Waiting…'}</div>`;
+    return;
+  }
+  container.innerHTML='';
+  // Reconstruct walk state up to current step
+  const mid=st.mid;
+  let walkedTo=-1;
+  // Find which step in the walk we're at
+  if(st.type==='walk_step') walkedTo=st.count;
+
+  // Show all steps up to current with visual states
+  const shown=[];
+  for(const ws of st.walkSteps){
+    if(ws.action==='move-left'){
+      shown.push({label:`[${ws.r},${ws.c}]=${ws.val}`,action:'move-left',cur:st.walkRow===ws.r&&st.walkCol===ws.c});
+    } else if(ws.action==='count-row'){
+      shown.push({label:`row${ws.r}+${ws.rowCount}`,action:'count-row',cur:st.walkRow===ws.r&&st.walkCol===ws.c});
+    }
+  }
+  shown.forEach((s,i)=>{
+    const d=document.createElement('div');
+    d.className='stair-step'+(s.cur?' ss-cur':s.action==='move-left'?' ss-gt':' ss-lte');
+    d.textContent=s.label+(s.action==='move-left'?' ←':' +');
+    container.appendChild(d);
+    if(i<shown.length-1){
+      const arr=document.createElement('span');
+      arr.className='stair-arrow';arr.textContent='→';
+      container.appendChild(arr);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
