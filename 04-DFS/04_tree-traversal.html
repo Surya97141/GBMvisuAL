@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Tree Traversal · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+    --pre-col:#e63946;   /* preorder  = red    */
+    --in-col :#2196f3;   /* inorder   = blue   */
+    --post-col:#06d6a0;  /* postorder = green  */
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(255,209,102,0.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;width:280px;}
+  .field input:focus{border-color:var(--accent4);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* MODE TOGGLE */
+  .mode-toggle{display:flex;gap:0;border:1.5px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;}
+  .mode-btn{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;cursor:pointer;transition:all 0.15s;background:var(--surface);color:var(--muted);border:none;}
+  .mode-btn.active-pre {background:var(--pre-col); color:white;}
+  .mode-btn.active-in  {background:var(--in-col);  color:white;}
+  .mode-btn.active-post{background:var(--post-col);color:#0a2e22;}
+  .mode-btn.active-all {background:var(--ink);     color:var(--bg);}
+
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ── TREE SVG ── */
+  .tree-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;}
+  #treeSvg{width:100%;display:block;}
+
+  /* ── TRAVERSAL ORDER STRIPS ── */
+  .traversal-strips{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  .tstrip{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 13px;transition:all 0.3s;}
+  .tstrip.active-strip{transform:translateY(-2px);}
+  .tstrip-header{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  .tstrip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .tstrip-name{font-family:'Space Mono',monospace;font-size:0.6rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+  .tstrip-rule{font-size:0.68rem;color:var(--muted);margin-left:auto;}
+  .tstrip-chips{display:flex;gap:4px;flex-wrap:wrap;min-height:28px;align-items:center;}
+  .tstrip-chip{
+    font-family:'Space Mono',monospace;font-size:0.8rem;font-weight:700;
+    width:30px;height:30px;border-radius:6px;border:1.5px solid;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .tstrip-chip.tc-pre    {background:rgba(230,57,70,0.1); border-color:var(--pre-col); color:var(--pre-col);}
+  .tstrip-chip.tc-in     {background:rgba(33,150,243,0.1); border-color:var(--in-col);  color:var(--in-col);}
+  .tstrip-chip.tc-post   {background:rgba(6,214,160,0.1);  border-color:var(--post-col);color:#028a5b;}
+  .tstrip-chip.tc-current{transform:scale(1.2) translateY(-2px);box-shadow:0 4px 12px rgba(255,209,102,0.4);}
+  .tstrip-chip.tc-pre.tc-current   {background:rgba(230,57,70,0.2);}
+  .tstrip-chip.tc-in.tc-current    {background:rgba(33,150,243,0.2);}
+  .tstrip-chip.tc-post.tc-current  {background:rgba(6,214,160,0.2);}
+  .tstrip-empty{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);font-style:italic;}
+  /* active strip borders */
+  .tstrip.ts-pre  {border-color:var(--pre-col); background:rgba(230,57,70,0.02);}
+  .tstrip.ts-in   {border-color:var(--in-col);  background:rgba(33,150,243,0.02);}
+  .tstrip.ts-post {border-color:var(--post-col);background:rgba(6,214,160,0.02);}
+
+  /* ── CALL STACK ── */
+  .stack-section{margin-bottom:14px;}
+  .stack-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;}
+  .stack-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .stack-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .stack-depth{font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--accent4);font-weight:700;}
+  .stack-frames{display:flex;flex-direction:column;gap:3px;}
+  .stack-frame{
+    display:flex;align-items:center;gap:8px;
+    padding:5px 10px;border-radius:6px;border:1.5px solid var(--border);
+    background:var(--surface);font-family:'Space Mono',monospace;font-size:0.68rem;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .stack-frame.sf-active{border-color:var(--accent4);background:rgba(255,209,102,0.08);transform:translateX(4px);}
+  .stack-frame.sf-returning{border-color:var(--accent);background:rgba(230,57,70,0.05);opacity:0.7;}
+  .sf-node{font-weight:700;width:22px;}
+  .sf-phase{flex:1;color:var(--muted);}
+  .sf-phase.sp-pre {color:var(--pre-col); font-weight:700;}
+  .sf-phase.sp-in  {color:var(--in-col);  font-weight:700;}
+  .sf-phase.sp-post{color:var(--post-col);font-weight:700;}
+  .sf-depth{color:var(--muted);font-size:0.58rem;}
+  .stack-empty{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);font-style:italic;}
+
+  /* ── 3-TAB EXPLAIN ── */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-pre {border-color:var(--pre-col);}
+  .explain-panel.ep-in  {border-color:var(--in-col);}
+  .explain-panel.ep-post{border-color:var(--post-col);}
+  .explain-panel.ep-done{border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent4);}
+  .ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;       border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--pre-col);font-weight:600;}
+  .ep-pane .blu{color:var(--in-col);font-weight:600;}
+  .ep-pane .grn{color:var(--post-col);font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-pre {border-left-color:var(--pre-col); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-in  {border-left-color:var(--in-col);  background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-post{border-left-color:var(--post-col);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-done{border-left-color:var(--accent3); background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur {background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur  .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-pre {background:rgba(230,57,70,0.16); border-left-color:var(--pre-col); color:#e2e8f0;}
+  .code-line.hl-in  {background:rgba(33,150,243,0.16);border-left-color:var(--in-col);  color:#e2e8f0;}
+  .code-line.hl-post{background:rgba(6,214,160,0.16); border-left-color:var(--post-col);color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(255,209,102,0.16);border-left-color:var(--accent4); color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+
+  /* VAR CARDS */
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.52rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.88rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.blu{color:#4fc3f7;} .var-value.grn{color:var(--accent3);} .var-value.yel{color:var(--accent4);}
+
+  /* OUTPUT ARRAYS */
+  .out-section{margin-bottom:12px;}
+  .out-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .out-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;}
+  .out-label{font-family:'Space Mono',monospace;font-size:0.58rem;width:52px;flex-shrink:0;font-weight:700;}
+  .out-chips{display:flex;gap:3px;flex-wrap:wrap;}
+  .out-chip{min-width:22px;height:22px;border-radius:3px;border:1px solid;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;transition:all 0.25s;padding:0 4px;}
+  .out-chip.oc-pre {border-color:rgba(230,57,70,0.5); background:rgba(230,57,70,0.12);  color:#ff6b6b;}
+  .out-chip.oc-in  {border-color:rgba(33,150,243,0.5); background:rgba(33,150,243,0.12); color:#4fc3f7;}
+  .out-chip.oc-post{border-color:rgba(6,214,160,0.5);  background:rgba(6,214,160,0.12);  color:var(--accent3);}
+  .out-chip.oc-new {transform:scale(1.15);box-shadow:0 3px 8px rgba(255,209,102,0.4);}
+
+  /* CALL STACK RIGHT */
+  .rstack{margin-bottom:12px;}
+  .rs-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .rs-rows{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;}
+  .rs-rows::-webkit-scrollbar{width:3px;}
+  .rs-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .rs-row{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.62rem;transition:all 0.3s;}
+  .rs-row.rs-active{border-color:#ffd166;background:rgba(255,209,102,0.08);}
+  .rs-node{font-weight:700;width:20px;}
+  .rs-phase{flex:1;}
+  .rs-phase.rp-pre {color:#ff6b6b;font-weight:700;}
+  .rs-phase.rp-in  {color:#4fc3f7;font-weight:700;}
+  .rs-phase.rp-post{color:var(--accent3);font-weight:700;}
+  .rs-depth{color:#6b6b8a;font-size:0.55rem;}
+
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;background:rgba(255,209,102,0.06);border:1px solid rgba(255,209,102,0.2);}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:6px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;color:var(--bg);line-height:1.8;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent4);color:#3a2800;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Tree Traversal</h1>
+    <div class="sub">Preorder · Inorder · Postorder · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·04 · Tree</div>
+</div>
+
+<div class="main">
+
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Tree (level-order, null = empty)</label>
+      <input type="text" id="inputTree" value="4,2,6,1,3,5,7">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="400">2×</button>
+        <button class="speed-btn" data-ms="160">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- MODE TOGGLE -->
+  <div class="mode-toggle">
+    <button class="mode-btn" id="modePre"  onclick="setMode('pre')">Preorder</button>
+    <button class="mode-btn" id="modeIn"   onclick="setMode('in')">Inorder</button>
+    <button class="mode-btn" id="modePost" onclick="setMode('post')">Postorder</button>
+    <button class="mode-btn active-all" id="modeAll" onclick="setMode('all')">All 3</button>
+  </div>
+
+  <!-- TREE SVG -->
+  <div class="section-label">Binary Tree</div>
+  <div class="tree-wrap">
+    <svg id="treeSvg" viewBox="0 0 580 220"></svg>
+  </div>
+
+  <!-- TRAVERSAL STRIPS -->
+  <div class="traversal-strips" id="traversalStrips">
+    <div class="tstrip" id="stripPre">
+      <div class="tstrip-header">
+        <div class="tstrip-dot" style="background:var(--pre-col);border:2px solid var(--pre-col)"></div>
+        <div class="tstrip-name" style="color:var(--pre-col)">Preorder</div>
+        <div class="tstrip-rule">Root → Left → Right</div>
+      </div>
+      <div class="tstrip-chips" id="chipsPre"><span class="tstrip-empty">waiting…</span></div>
+    </div>
+    <div class="tstrip" id="stripIn">
+      <div class="tstrip-header">
+        <div class="tstrip-dot" style="background:var(--in-col);border:2px solid var(--in-col)"></div>
+        <div class="tstrip-name" style="color:var(--in-col)">Inorder</div>
+        <div class="tstrip-rule">Left → Root → Right</div>
+      </div>
+      <div class="tstrip-chips" id="chipsIn"><span class="tstrip-empty">waiting…</span></div>
+    </div>
+    <div class="tstrip" id="stripPost">
+      <div class="tstrip-header">
+        <div class="tstrip-dot" style="background:var(--post-col);border:2px solid var(--post-col)"></div>
+        <div class="tstrip-name" style="color:var(--post-col)">Postorder</div>
+        <div class="tstrip-rule">Left → Right → Root</div>
+      </div>
+      <div class="tstrip-chips" id="chipsPost"><span class="tstrip-empty">waiting…</span></div>
+    </div>
+  </div>
+
+  <!-- CALL STACK -->
+  <div class="stack-section">
+    <div class="section-label">DFS Call Stack</div>
+    <div class="stack-wrap">
+      <div class="stack-header">
+        <div class="stack-title">recursion frames (top = current)</div>
+        <div class="stack-depth" id="stackDepthLabel">depth 0</div>
+      </div>
+      <div class="stack-frames" id="stackFrames">
+        <div class="stack-empty">Press RUN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLAIN -->
+  <div class="explain-panel ep-pre" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy" >Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv" ><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — All 3 Traversals</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-pre1"><span class="ck">void</span> <span class="cf">preorder</span>(node* n) {</span>
+<span class="code-line" id="cl-pre2">  <span class="ck">if</span>(!n) <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-pre3">  visit(n); <span class="cc">// ROOT first</span></span>
+<span class="code-line" id="cl-pre4">  preorder(n-&gt;left);</span>
+<span class="code-line" id="cl-pre5">  preorder(n-&gt;right); }</span>
+<span class="code-line" id="cl-in1"><span class="ck">void</span> <span class="cf">inorder</span>(node* n) {</span>
+<span class="code-line" id="cl-in2">  <span class="ck">if</span>(!n) <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-in3">  inorder(n-&gt;left);</span>
+<span class="code-line" id="cl-in4">  visit(n); <span class="cc">// ROOT middle</span></span>
+<span class="code-line" id="cl-in5">  inorder(n-&gt;right); }</span>
+<span class="code-line" id="cl-po1"><span class="ck">void</span> <span class="cf">postorder</span>(node* n) {</span>
+<span class="code-line" id="cl-po2">  <span class="ck">if</span>(!n) <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-po3">  postorder(n-&gt;left);</span>
+<span class="code-line" id="cl-po4">  postorder(n-&gt;right);</span>
+<span class="code-line" id="cl-po5">  visit(n); <span class="cc">// ROOT last</span></span>
+<span class="code-line" id="cl-po6">}</span></pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcNode"><div class="var-name">node</div>     <div class="var-value yel" id="vNode">—</div></div>
+      <div class="var-card" id="vcPhase"><div class="var-name">phase</div>   <div class="var-value"    id="vPhase" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">depth</div>   <div class="var-value" style="color:var(--pur)" id="vDepth">0</div></div>
+      <div class="var-card" id="vcPreN"><div class="var-name">pre[] len</div><div class="var-value red" id="vPreN">0</div></div>
+      <div class="var-card" id="vcInN"> <div class="var-name">in[] len</div> <div class="var-value blu" id="vInN">0</div></div>
+      <div class="var-card" id="vcPoN"> <div class="var-name">post[] len</div><div class="var-value grn" id="vPoN">0</div></div>
+    </div>
+
+    <!-- OUTPUT ARRAYS -->
+    <div class="out-section">
+      <div class="out-title">Output arrays</div>
+      <div class="out-row">
+        <div class="out-label" style="color:#ff6b6b">PRE</div>
+        <div class="out-chips" id="outPre"></div>
+      </div>
+      <div class="out-row">
+        <div class="out-label" style="color:#4fc3f7">IN</div>
+        <div class="out-chips" id="outIn"></div>
+      </div>
+      <div class="out-row">
+        <div class="out-label" style="color:var(--accent3)">POST</div>
+        <div class="out-chips" id="outPost"></div>
+      </div>
+    </div>
+
+    <!-- CALL STACK RIGHT -->
+    <div class="rstack">
+      <div class="rs-title">Call stack (newest first)</div>
+      <div class="rs-rows" id="rsRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Final Results</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">✓ ALL 3 TRAVERSALS COMPLETE</div>
+</div>
+
+</div>
+
+<script>
+// ─── TREE STRUCTURE ────────────────────────────────────────────────────────────
+function buildTree(levelOrder){
+  const vals=levelOrder.map(v=>v===null?null:v);
+  if(!vals.length||vals[0]===null)return null;
+  const nodes=vals.map(v=>v===null?null:{val:v,left:null,right:null,id:0});
+  let id=0;
+  nodes.forEach(n=>{if(n)n.id=id++;});
+  for(let i=0;i<nodes.length;i++){
+    if(!nodes[i])continue;
+    const l=2*i+1, r=2*i+2;
+    if(l<nodes.length)nodes[i].left=nodes[l];
+    if(r<nodes.length)nodes[i].right=nodes[r];
+  }
+  return nodes[0];
+}
+
+function treeLayout(root){
+  // Assign x positions using in-order traversal counter
+  const positions={};
+  let counter=0;
+  const maxDepth={val:0};
+  function assignX(node,depth){
+    if(!node)return;
+    if(depth>maxDepth.val)maxDepth.val=depth;
+    assignX(node.left,depth+1);
+    positions[node.id]={x:counter++,y:depth};
+    assignX(node.right,depth+1);
+  }
+  assignX(root,0);
+  const n=counter;
+  const W=540, H=200;
+  const padX=30, padY=30;
+  const spacingX=(W-2*padX)/(Math.max(n-1,1));
+  const spacingY=maxDepth.val>0?(H-2*padY)/maxDepth.val:0;
+  const mapped={};
+  for(const[id,{x,y}] of Object.entries(positions)){
+    mapped[id]={
+      px: padX+x*spacingX,
+      py: padY+y*spacingY
+    };
+  }
+  return mapped;
+}
+
+function collectNodes(root){
+  const nodes=[];
+  function dfs(n){if(!n)return;nodes.push(n);dfs(n.left);dfs(n.right);}
+  dfs(root);
+  return nodes;
+}
+
+// ─── EXPLAIN LIBRARY ──────────────────────────────────────────────────────────
+const EXPLAIN={
+  init:(mode)=>({
+    why:`<div class="ep-why-block">Three DFS traversals, one tree. The <strong>only difference</strong> is <em>when</em> you visit the root relative to the recursive calls. <span class="red">Preorder</span>: visit before recursing — great for cloning, serialising. <span class="blu">Inorder</span>: visit between children — gives sorted output for BSTs. <span class="grn">Postorder</span>: visit after both children — perfect for deletion, size/height computation.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>All three share the same skeleton:</strong> null check → recurse left → recurse right. The visit() call just moves position.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>DFS property:</strong> Each node is visited exactly once per traversal. Total time = O(n) for all three. Space = O(h) for the call stack where h = height.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Memory trick:</strong> Pre=Root first. In=Root middle (In-between). Post=Root last (Post=after). The LEFT child always comes before the RIGHT child.`},
+    ]
+  }),
+  pre_visit:(node,depth)=>({
+    why:`<div class="ep-why-block why-pre"><span class="red">Preorder: visit(root) FIRST.</span> Record ${node} immediately on arrival — before exploring any subtree. This means the root is always the first element in preorder output.</div>`,
+    inv:[{icon:'🔴',cls:'inv-key',text:`<strong>Preorder property:</strong> The first element is always the root. Given preorder output, you can always identify the root of any subtree immediately.`}]
+  }),
+  in_visit:(node,depth)=>({
+    why:`<div class="ep-why-block why-in"><span class="blu">Inorder: visit(root) BETWEEN left and right.</span> We only record ${node} after finishing the entire left subtree. For a BST, inorder gives elements in sorted ascending order.</div>`,
+    inv:[{icon:'🔵',cls:'',text:`<strong>Inorder + BST = sorted array.</strong> Every node in the left subtree is smaller, so all left values appear before root, all right values appear after.`}]
+  }),
+  post_visit:(node,depth)=>({
+    why:`<div class="ep-why-block why-post"><span class="grn">Postorder: visit(root) LAST.</span> We only record ${node} after both children are fully processed. The root is always the last element in postorder output.</div>`,
+    inv:[{icon:'🟢',cls:'',text:`<strong>Postorder property:</strong> Children always appear before their parent. Perfect for computing height, size, or deleting a tree (delete children before parent).`}]
+  }),
+  recurse_left:(node,child)=>({
+    why:`<div class="ep-why-block">Going left from ${node} to ${child}. In all three traversals, we always recurse left before right. This is what makes it a depth-first traversal — we go as deep as possible down the left branch first.</div>`,
+    inv:[{icon:'⬅️',cls:'inv-warn',text:`<strong>Left before right invariant:</strong> All three traversals recurse left before right. The difference is only WHEN the root itself gets visited.`}]
+  }),
+  recurse_right:(node,child)=>({
+    why:`<div class="ep-why-block">Going right from ${node} to ${child}. Left subtree is fully done. Now explore the right subtree.</div>`,
+    inv:[{icon:'➡️',cls:'inv-warn',text:`<strong>Right subtree after left:</strong> At this point, everything in the left subtree has been fully visited. The right subtree is processed depth-first next.`}]
+  }),
+  null_base:(parent,side)=>({
+    why:`<div class="ep-why-block">Reached a null child (${side} of ${parent}). Base case — return immediately. This is what stops the recursion at leaf boundaries.</div>`,
+    inv:[{icon:'🛑',cls:'',text:`<strong>Base case:</strong> if(node == null) return. Every recursion terminates here at the leaves.`}]
+  }),
+  backtrack:(node)=>({
+    why:`<div class="ep-why-block">Returning from ${node}. Both children explored. Popping from call stack.</div>`,
+    inv:[{icon:'⬆️',cls:'inv-warn',text:`<strong>Backtracking:</strong> Both subtrees of ${node} are fully processed. Return control to the parent.`}]
+  }),
+  done:(pre,inn,post)=>({
+    why:`<div class="ep-why-block why-done">All nodes visited. <strong>Key insight:</strong> The three traversals use identical code structure — only the position of visit() changes. This is the essence of DFS: the recursive call stack IS the traversal mechanism.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Preorder:</strong> [${pre.join(', ')}] — root appears before descendants.`},
+      {icon:'✅',cls:'',text:`<strong>Inorder:</strong> [${inn.join(', ')}] — ${inn.every((v,i)=>i===0||v>=inn[i-1])?'sorted ascending ✓ (BST property)':`nodes between their subtrees`}.`},
+      {icon:'✅',cls:'',text:`<strong>Postorder:</strong> [${post.join(', ')}] — root appears after all descendants.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n) time, O(h) space</strong> for all three — n nodes, h = tree height for call stack.`},
+    ]
+  }),
+};
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:         {ids:['cl-pre1','cl-in1','cl-po1'],                    cls:'hl-pre'},
+  pre_visit:    {ids:['cl-pre2','cl-pre3'],                            cls:'hl-pre'},
+  pre_left:     {ids:['cl-pre4'],                                      cls:'hl-pre'},
+  pre_right:    {ids:['cl-pre5'],                                      cls:'hl-pre'},
+  in_left:      {ids:['cl-in2','cl-in3'],                              cls:'hl-in' },
+  in_visit:     {ids:['cl-in4'],                                       cls:'hl-in' },
+  in_right:     {ids:['cl-in5'],                                       cls:'hl-in' },
+  post_left:    {ids:['cl-po2','cl-po3'],                              cls:'hl-post'},
+  post_right:   {ids:['cl-po4'],                                       cls:'hl-post'},
+  post_visit:   {ids:['cl-po5'],                                       cls:'hl-post'},
+  null_base:    {ids:['cl-pre2','cl-in2','cl-po2'],                    cls:'hl-done'},
+  backtrack:    {ids:['cl-pre5','cl-in5','cl-po6'],                    cls:'hl-done'},
+  done:         {ids:['cl-pre5','cl-in5','cl-po6'],                    cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────────
+function computeSteps(root, mode){
+  const steps=[];
+  const preArr=[], inArr=[], postArr=[];
+  const callStack=[]; // [{node, phase, depth}]
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    pre:[...preArr], inn:[...inArr], post:[...postArr],
+    callStack:callStack.map(f=>({...f})),
+    curNode:null, curPhase:null,
+    desc, type, explain, result:null, ...extra
+  });
+
+  snap(
+    `🚀 <strong>Starting.</strong> Three DFS traversals on the same tree. <span style="color:var(--pre-col)">Preorder</span> = Root→L→R. <span style="color:var(--in-col)">Inorder</span> = L→Root→R. <span style="color:var(--post-col)">Postorder</span> = L→R→Root. Watch all three outputs build in parallel.`,
+    'init', EXPLAIN.init(mode)
+  );
+
+  // Run all 3 traversals simultaneously, interleaved step by step
+  // We build steps for each event across all traversals
+  function runAll(node, depth){
+    if(!node){
+      snap(
+        `🔲 Null node — base case. Return.`,
+        'null_base', EXPLAIN.null_base('parent',depth===0?'root':'child'),
+        {curNode:null, curPhase:'null', callStack:callStack.map(f=>({...f}))}
+      );
+      return;
+    }
+
+    callStack.push({node:node.val, phase:'entering', depth});
+
+    // PREORDER: visit root
+    preArr.push(node.val);
+    snap(
+      `🔴 Node <strong>${node.val}</strong> — <span style="color:var(--pre-col)">PREORDER visit</span>: record ${node.val} (Root first). pre=[${preArr.join(',')}]`,
+      'pre_visit', EXPLAIN.pre_visit(node.val, depth),
+      {curNode:node.val, curPhase:'pre', callStack:callStack.map(f=>({...f}))}
+    );
+
+    // Recurse LEFT
+    if(node.left){
+      callStack[callStack.length-1].phase='go-left';
+      snap(
+        `⬅️ From <strong>${node.val}</strong>: recurse LEFT to <strong>${node.left.val}</strong>. (All 3 traversals go left now.)`,
+        'pre_left', EXPLAIN.recurse_left(node.val,node.left.val),
+        {curNode:node.val, curPhase:'left', callStack:callStack.map(f=>({...f}))}
+      );
+    }
+    runAll(node.left, depth+1);
+
+    // INORDER: visit root (after left, before right)
+    inArr.push(node.val);
+    callStack[callStack.length-1].phase='inorder';
+    snap(
+      `🔵 Back at <strong>${node.val}</strong> — <span style="color:var(--in-col)">INORDER visit</span>: left done, record ${node.val}. in=[${inArr.join(',')}]`,
+      'in_visit', EXPLAIN.in_visit(node.val, depth),
+      {curNode:node.val, curPhase:'in', callStack:callStack.map(f=>({...f}))}
+    );
+
+    // Recurse RIGHT
+    if(node.right){
+      callStack[callStack.length-1].phase='go-right';
+      snap(
+        `➡️ From <strong>${node.val}</strong>: recurse RIGHT to <strong>${node.right.val}</strong>.`,
+        'in_right', EXPLAIN.recurse_right(node.val,node.right.val),
+        {curNode:node.val, curPhase:'right', callStack:callStack.map(f=>({...f}))}
+      );
+    }
+    runAll(node.right, depth+1);
+
+    // POSTORDER: visit root (after both children)
+    postArr.push(node.val);
+    callStack[callStack.length-1].phase='postorder';
+    snap(
+      `🟢 Back at <strong>${node.val}</strong> — <span style="color:var(--post-col)">POSTORDER visit</span>: both children done, record ${node.val}. post=[${postArr.join(',')}]`,
+      'post_visit', EXPLAIN.post_visit(node.val, depth),
+      {curNode:node.val, curPhase:'post', callStack:callStack.map(f=>({...f}))}
+    );
+
+    callStack.pop();
+    if(callStack.length>0){
+      snap(
+        `⬆️ Return from <strong>${node.val}</strong>. Back to parent <strong>${callStack[callStack.length-1].node}</strong>.`,
+        'backtrack', EXPLAIN.backtrack(node.val),
+        {curNode:node.val, curPhase:'done', callStack:callStack.map(f=>({...f}))}
+      );
+    }
+  }
+
+  runAll(root, 0);
+
+  // Final
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">All traversals complete!</span><br>`
+    +`<span style="color:var(--pre-col)">Pre:</span> [${preArr.join(', ')}]<br>`
+    +`<span style="color:var(--in-col)">In:</span>  [${inArr.join(', ')}]<br>`
+    +`<span style="color:var(--post-col)">Post:</span> [${postArr.join(', ')}]`,
+    'done', EXPLAIN.done(preArr,inArr,postArr),
+    {curNode:null,curPhase:null,callStack:[],result:{pre:[...preArr],inn:[...inArr],post:[...postArr]}}
+  );
+  return steps;
+}
+
+// ─── TREE SVG ──────────────────────────────────────────────────────────────────
+let treeRoot=null, nodePositions={}, allNodes=[];
+let currentMode='all';
+
+function setMode(m){
+  currentMode=m;
+  ['pre','in','post','all'].forEach(id=>{
+    document.getElementById('mode'+id.charAt(0).toUpperCase()+id.slice(1)).className='mode-btn'+(
+      id===m?` active-${id}`:'');
+  });
+  // show/hide strips
+  const strips=['pre','in','post'];
+  strips.forEach(s=>{
+    document.getElementById('strip'+s.charAt(0).toUpperCase()+s.slice(1)).style.display=
+      (m==='all'||m===s)?'block':'none';
+  });
+  if(steps.length) renderStep(currentStep);
+}
+
+function buildTreeSvg(root, pos){
+  const svg=document.getElementById('treeSvg');
+  svg.innerHTML='';
+  if(!root) return;
+
+  // Edges
+  const eg=document.createElementNS('http://www.w3.org/2000/svg','g');
+  eg.id='edgeGroup';
+  function drawEdges(node){
+    if(!node)return;
+    const p=pos[node.id];
+    if(node.left){
+      const c=pos[node.left.id];
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.id=`edge-${node.id}-${node.left.id}`;
+      line.setAttribute('x1',p.px+20);line.setAttribute('y1',p.py+20);
+      line.setAttribute('x2',c.px+20);line.setAttribute('y2',c.py+20);
+      line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+      eg.appendChild(line);
+    }
+    if(node.right){
+      const c=pos[node.right.id];
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.id=`edge-${node.id}-${node.right.id}`;
+      line.setAttribute('x1',p.px+20);line.setAttribute('y1',p.py+20);
+      line.setAttribute('x2',c.px+20);line.setAttribute('y2',c.py+20);
+      line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+      eg.appendChild(line);
+    }
+    drawEdges(node.left);drawEdges(node.right);
+  }
+  drawEdges(root);
+  svg.appendChild(eg);
+
+  // Nodes
+  const ng=document.createElementNS('http://www.w3.org/2000/svg','g');
+  ng.id='nodeGroup';
+  allNodes.forEach(node=>{
+    const p=pos[node.id];
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.id=`gnode-${node.id}`;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',p.px+20);c.setAttribute('cy',p.py+20);c.setAttribute('r',18);
+    c.setAttribute('fill','var(--surface)');c.setAttribute('stroke','#ccc');c.setAttribute('stroke-width','2');
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',p.px+20);t.setAttribute('y',p.py+20);
+    t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-family','Space Mono,monospace');t.setAttribute('font-size','12');t.setAttribute('font-weight','700');
+    t.setAttribute('fill','#bbb');t.textContent=node.val;
+    g.appendChild(c);g.appendChild(t);ng.appendChild(g);
+  });
+  svg.appendChild(ng);
+}
+
+function updateTreeSvg(st){
+  if(!allNodes.length)return;
+  const preSet=new Set(st.pre);
+  const inSet=new Set(st.inn);
+  const postSet=new Set(st.post);
+  const stackVals=new Set((st.callStack||[]).map(f=>f.node));
+
+  allNodes.forEach(node=>{
+    const g=document.getElementById(`gnode-${node.id}`);
+    if(!g)return;
+    const circle=g.querySelector('circle');
+    const text=g.querySelector('text');
+    const isCur=st.curNode===node.val&&st.curNode!==null;
+    const onStack=stackVals.has(node.val);
+    const isResult=st.result;
+
+    // Determine color based on traversal progress
+    const doneAll=postSet.has(node.val);
+    const doneIn=inSet.has(node.val);
+    const donePre=preSet.has(node.val);
+
+    if(isCur){
+      const phaseColor=st.curPhase==='pre'?'#e63946':st.curPhase==='in'?'#2196f3':st.curPhase==='post'?'#06d6a0':'#ffd166';
+      circle.setAttribute('fill',`${phaseColor}22`);
+      circle.setAttribute('stroke',phaseColor);circle.setAttribute('stroke-width','3');
+      circle.setAttribute('filter',`drop-shadow(0 0 8px ${phaseColor})`);
+      text.setAttribute('fill',phaseColor);
+    } else if(isResult){
+      circle.setAttribute('fill','rgba(6,214,160,0.15)');
+      circle.setAttribute('stroke','#06d6a0');circle.setAttribute('stroke-width','2.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#028a5b');
+    } else if(doneAll){
+      circle.setAttribute('fill','rgba(6,214,160,0.12)');
+      circle.setAttribute('stroke','#06d6a0');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#028a5b');
+    } else if(doneIn){
+      circle.setAttribute('fill','rgba(33,150,243,0.12)');
+      circle.setAttribute('stroke','#2196f3');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#1565c0');
+    } else if(donePre){
+      circle.setAttribute('fill','rgba(230,57,70,0.10)');
+      circle.setAttribute('stroke','#e63946');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','var(--pre-col)');
+    } else if(onStack){
+      circle.setAttribute('fill','rgba(255,209,102,0.12)');
+      circle.setAttribute('stroke','#ffd166');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#7a5a00');
+    } else {
+      circle.setAttribute('fill','var(--surface)');
+      circle.setAttribute('stroke','#ccc');circle.setAttribute('stroke-width','1.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#bbb');
+    }
+  });
+
+  // Edge colouring
+  allNodes.forEach(node=>{
+    const p=nodePositions[node.id];
+    [node.left,node.right].forEach(child=>{
+      if(!child)return;
+      const line=document.getElementById(`edge-${node.id}-${child.id}`);
+      if(!line)return;
+      if(postSet.has(node.val)&&postSet.has(child.val)){
+        line.setAttribute('stroke','#06d6a0');line.setAttribute('stroke-width','2.5');line.setAttribute('opacity','0.6');
+      } else if(inSet.has(node.val)||inSet.has(child.val)){
+        line.setAttribute('stroke','#2196f3');line.setAttribute('stroke-width','2');line.setAttribute('opacity','0.5');
+      } else if(preSet.has(node.val)||preSet.has(child.val)){
+        line.setAttribute('stroke','#e63946');line.setAttribute('stroke-width','2');line.setAttribute('opacity','0.4');
+      } else {
+        line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');line.setAttribute('opacity','1');
+      }
+    });
+  });
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+
+function parseTreeInput(){
+  return document.getElementById('inputTree').value
+    .split(',').map(v=>v.trim()==='null'||v.trim()===''?null:parseInt(v.trim()))
+    .filter((v,i,a)=>i<a.length);
+}
+
+function buildUI(){
+  const vals=parseTreeInput();
+  treeRoot=buildTree(vals);
+  if(!treeRoot)return;
+  allNodes=collectNodes(treeRoot);
+  nodePositions=treeLayout(treeRoot);
+  buildTreeSvg(treeRoot,nodePositions);
+
+  steps=computeSteps(treeRoot,currentMode);
+  currentStep=0;
+
+  // Reset strips
+  ['Pre','In','Post'].forEach(n=>{
+    document.getElementById('chips'+n).innerHTML='<span class="tstrip-empty">waiting…</span>';
+  });
+  ['Pre','In','Post'].forEach(n=>{
+    document.getElementById('strip'+n).className='tstrip';
+  });
+  setMode(currentMode);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('stackFrames').innerHTML='<div class="stack-empty">Press RUN</div>';
+  document.getElementById('rsRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderChips(containerId, arr, colorClass, latestIsNew){
+  const c=document.getElementById(containerId);
+  if(!arr||!arr.length){c.innerHTML='<span class="tstrip-empty">waiting…</span>';return;}
+  c.innerHTML='';
+  arr.forEach((v,i)=>{
+    const chip=document.createElement('div');
+    const isNew=latestIsNew&&i===arr.length-1;
+    chip.className=`tstrip-chip ${colorClass}${isNew?' tc-current':''}`;
+    chip.textContent=v;
+    c.appendChild(chip);
+  });
+}
+
+function renderOutChips(containerId, arr, colorClass, latestIsNew){
+  const c=document.getElementById(containerId);
+  c.innerHTML='';
+  (arr||[]).forEach((v,i)=>{
+    const chip=document.createElement('div');
+    const isNew=latestIsNew&&i===arr.length-1;
+    chip.className=`out-chip ${colorClass}${isNew?' oc-new':''}`;
+    chip.textContent=v;
+    c.appendChild(chip);
+  });
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const isNewPre=st.type==='pre_visit';
+  const isNewIn =st.type==='in_visit';
+  const isNewPost=st.type==='post_visit';
+
+  // Tree SVG
+  updateTreeSvg(st);
+
+  // Traversal strips
+  const stripPre=document.getElementById('stripPre');
+  const stripIn =document.getElementById('stripIn');
+  const stripPost=document.getElementById('stripPost');
+  stripPre.className='tstrip'+(isNewPre?' ts-pre':'');
+  stripIn .className='tstrip'+(isNewIn ?' ts-in' :'');
+  stripPost.className='tstrip'+(isNewPost?' ts-post':'');
+  renderChips('chipsPre', st.pre, 'tc-pre', isNewPre);
+  renderChips('chipsIn',  st.inn, 'tc-in',  isNewIn);
+  renderChips('chipsPost',st.post,'tc-post', isNewPost);
+
+  // Output chips (right)
+  renderOutChips('outPre', st.pre, 'oc-pre', isNewPre);
+  renderOutChips('outIn',  st.inn, 'oc-in',  isNewIn);
+  renderOutChips('outPost',st.post,'oc-post', isNewPost);
+
+  // Call stack (left)
+  const sf=document.getElementById('stackFrames');
+  const stack=st.callStack||[];
+  if(!stack.length){
+    sf.innerHTML=isFinal?'<div class="stack-empty">Complete ✓</div>':'<div class="stack-empty">Stack empty</div>';
+  } else {
+    sf.innerHTML='';
+    [...stack].reverse().forEach((frame,i)=>{
+      const isActive=i===0;
+      const phaseLabel=frame.phase==='pre_visit'?'PRE':frame.phase==='inorder'?'IN':frame.phase==='postorder'?'POST':frame.phase;
+      const phaseClass=frame.phase==='inorder'?'sp-in':frame.phase==='postorder'?'sp-post':'sp-pre';
+      const div=document.createElement('div');
+      div.className=`stack-frame${isActive?' sf-active':''}`;
+      div.innerHTML=`<div class="sf-node">${frame.node}</div><div class="sf-phase ${phaseClass}">${frame.phase}</div><div class="sf-depth">d=${frame.depth}</div>`;
+      sf.appendChild(div);
+    });
+  }
+  document.getElementById('stackDepthLabel').textContent=`depth ${stack.length}`;
+
+  // Call stack right
+  const rsr=document.getElementById('rsRows');
+  rsr.innerHTML='';
+  [...stack].reverse().forEach((frame,i)=>{
+    const isActive=i===0;
+    const phaseClass=frame.phase==='inorder'?'rp-in':frame.phase==='postorder'?'rp-post':'rp-pre';
+    rsr.innerHTML+=`<div class="rs-row${isActive?' rs-active':''}">
+      <div class="rs-node">${frame.node}</div>
+      <div class="rs-phase ${phaseClass}">${frame.phase}</div>
+      <div class="rs-depth">d=${frame.depth}</div>
+    </div>`;
+  });
+
+  // Vars
+  setVar('vNode','vcNode',st.curNode!==null&&st.curNode!==undefined?st.curNode:'—');
+  setVar('vPhase','vcPhase',st.curPhase||'—');
+  const phaseEl=document.getElementById('vPhase');
+  phaseEl.style.color=st.curPhase==='pre'?'#ff6b6b':st.curPhase==='in'?'#4fc3f7':st.curPhase==='post'?'var(--accent3)':'#e2e8f0';
+  setVar('vDepth','vcDepth',(st.callStack||[]).length);
+  setVar('vPreN','vcPreN',(st.pre||[]).length);
+  setVar('vInN', 'vcInN', (st.inn||[]).length);
+  setVar('vPoN', 'vcPoN', (st.post||[]).length);
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent='✓ ALL TRAVERSALS COMPLETE';
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.className='best-box show';
+    document.getElementById('bestVal').innerHTML=
+      `<span style="color:#ff6b6b">Pre:</span>  [${st.result.pre.join(',')}]<br>`
+      +`<span style="color:#4fc3f7">In:</span>   [${st.result.inn.join(',')}]<br>`
+      +`<span style="color:var(--accent3)">Post:</span> [${st.result.post.join(',')}]`;
+    document.getElementById('bestMeta').textContent=`${allNodes.length} nodes · O(n) each · O(h) stack space`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TAB SWITCHER ──────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={
+    init:'ep-pre',pre_visit:'ep-pre',pre_left:'ep-pre',pre_right:'ep-pre',
+    in_left:'ep-in',in_visit:'ep-in',in_right:'ep-in',
+    post_left:'ep-post',post_right:'ep-post',post_visit:'ep-post',
+    null_base:'ep-done',backtrack:'ep-done',done:'ep-done'
+  };
+  ep.className='explain-panel '+(cls[st.type]||'ep-pre');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ──────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

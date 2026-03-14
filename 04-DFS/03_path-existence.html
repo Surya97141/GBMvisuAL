@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Path Existence · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(6,214,160,0.15);border:1px solid var(--accent3);color:var(--accent3);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  .controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:230px;} .field input.small{width:64px;}
+  .field input:focus{border-color:var(--accent3);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent3);color:#0a2e22;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  .zone-legend{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* GRAPH */
+  .graph-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;position:relative;}
+  #graphSvg{width:100%;display:block;}
+
+  /* SOURCE / TARGET INDICATOR */
+  .st-row{display:flex;gap:10px;margin-bottom:14px;}
+  .st-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;transition:all 0.3s;}
+  .st-card.st-active{transform:translateY(-3px);}
+  .st-card.st-source{border-color:var(--accent3);background:rgba(6,214,160,0.08);}
+  .st-card.st-target{border-color:var(--accent4);background:rgba(255,209,102,0.10);}
+  .st-card.st-reached{border-color:var(--accent3);background:rgba(6,214,160,0.15);animation:stPop 0.4s ease;}
+  @keyframes stPop{0%{transform:scale(0.95)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+  .st-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .st-val{font-family:'Space Mono',monospace;font-size:1.8rem;font-weight:700;color:var(--ink);}
+  .st-sub{font-size:0.7rem;color:var(--muted);margin-top:3px;}
+
+  /* DFS PATH TRACKER */
+  .path-section{margin-bottom:14px;}
+  .path-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .path-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .path-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .path-status{font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;}
+  .path-status.ps-searching{color:var(--accent2);}
+  .path-status.ps-found    {color:var(--accent3);animation:flashGreen 0.5s ease infinite alternate;}
+  .path-status.ps-notfound {color:var(--accent);}
+  @keyframes flashGreen{from{opacity:1}to{opacity:0.4}}
+  .path-chain{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:44px;}
+  .path-node{
+    font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;
+    width:36px;height:36px;border-radius:50%;border:2px solid;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);flex-shrink:0;
+  }
+  .path-node.pn-source {background:rgba(6,214,160,0.2);  border-color:#06d6a0;color:#028a5b;}
+  .path-node.pn-target {background:rgba(255,209,102,0.25);border-color:#ffd166;color:#7a5a00;box-shadow:0 0 12px rgba(255,209,102,0.5);animation:tgtPulse 0.8s ease infinite alternate;}
+  @keyframes tgtPulse{from{box-shadow:0 0 6px rgba(255,209,102,0.4)}to{box-shadow:0 0 16px rgba(255,209,102,0.7)}}
+  .path-node.pn-visited{background:rgba(33,150,243,0.12); border-color:#2196f3;color:var(--accent2);}
+  .path-node.pn-current{background:rgba(6,214,160,0.12);  border-color:#06d6a0;color:#028a5b;transform:scale(1.1) translateY(-3px);box-shadow:0 6px 14px rgba(6,214,160,0.25);}
+  .path-node.pn-path   {background:rgba(6,214,160,0.2);   border-color:#06d6a0;color:#028a5b;}
+  .path-node.pn-backtrack{background:rgba(230,57,70,0.1); border-color:#e63946;color:var(--accent);opacity:0.7;}
+  .path-arrow{font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);flex-shrink:0;}
+  .path-arrow.pa-tree {color:var(--accent3);}
+  .path-arrow.pa-back {color:var(--accent);font-weight:700;}
+  .found-label{display:none;background:rgba(6,214,160,0.1);border:1.5px solid var(--accent3);border-radius:6px;padding:8px 12px;margin-top:10px;font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--accent3);animation:fadeUp 0.4s ease;}
+  .found-label.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* VISITED GRID */
+  .state-grid-section{margin-bottom:14px;}
+  .state-grid-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .state-grid{display:flex;flex-wrap:wrap;gap:6px;}
+  .sg-cell{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+  .sg-cell .sgc-node{font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;}
+  .sg-cell .sgc-state{font-family:'Space Mono',monospace;font-size:0.5rem;text-transform:uppercase;letter-spacing:0.5px;}
+  .sg-cell.sgc-unvisited .sgc-node{color:#bbb;} .sg-cell.sgc-unvisited .sgc-state{color:#ccc;}
+  .sg-cell.sgc-current{background:rgba(6,214,160,0.12);border-color:#06d6a0;transform:translateY(-3px);}
+  .sg-cell.sgc-current .sgc-node{color:#028a5b;} .sg-cell.sgc-current .sgc-state{color:#028a5b;}
+  .sg-cell.sgc-visited {background:rgba(33,150,243,0.09);border-color:#2196f3;}
+  .sg-cell.sgc-visited  .sgc-node{color:var(--accent2);} .sg-cell.sgc-visited  .sgc-state{color:#1565c0;}
+  .sg-cell.sgc-source  {background:rgba(6,214,160,0.18);border-color:#06d6a0;box-shadow:0 0 8px rgba(6,214,160,0.3);}
+  .sg-cell.sgc-source   .sgc-node{color:#028a5b;} .sg-cell.sgc-source   .sgc-state{color:#028a5b;}
+  .sg-cell.sgc-target  {background:rgba(255,209,102,0.18);border-color:#ffd166;box-shadow:0 0 8px rgba(255,209,102,0.3);}
+  .sg-cell.sgc-target   .sgc-node{color:#7a5a00;} .sg-cell.sgc-target   .sgc-state{color:#7a5a00;}
+  .sg-cell.sgc-onpath  {background:rgba(6,214,160,0.18);border-color:#06d6a0;}
+  .sg-cell.sgc-onpath   .sgc-node{color:#028a5b;} .sg-cell.sgc-onpath   .sgc-state{color:#028a5b;}
+  .state-legend{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;}
+  .sl-item{display:flex;align-items:center;gap:5px;font-size:0.7rem;color:var(--muted);}
+  .sl-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid;}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent3);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent3);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;} .prob-hi-red{color:var(--accent);font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init  {border-color:var(--accent3);}
+  .explain-panel.ep-visit {border-color:var(--accent3);}
+  .explain-panel.ep-recurse{border-color:var(--accent2);}
+  .explain-panel.ep-backtrack{border-color:var(--accent);}
+  .explain-panel.ep-found {border-color:var(--accent3);}
+  .explain-panel.ep-done  {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent3);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;} .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;} .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-visit   {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-recurse {border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-back    {border-left-color:var(--accent); background:rgba(230,57,70,0.06);}
+  .ep-why-block.why-found   {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-why-block.why-done    {border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur {background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur  .inv-text strong{color:var(--pur-dark);}
+
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp2 0.4s ease;}
+  .done-banner.found    {background:var(--accent3);color:#0a2e22;}
+  .done-banner.notfound {background:var(--accent);color:white;}
+  @keyframes fadeUp2{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init   {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-visit  {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-recurse{background:rgba(33,150,243,0.16);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-back   {background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-found  {background:rgba(255,209,102,0.2); border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-done   {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);} .var-value.blu{color:#4fc3f7;}
+
+  /* VISITED SET */
+  .visited-set-wrap{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .visited-chips{display:flex;gap:4px;flex-wrap:wrap;}
+  .v-chip{min-width:28px;height:28px;border-radius:4px;border:1px solid #2a2a3e;background:#0d0d18;padding:0 5px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all 0.3s;}
+  .v-chip.vc-visited{border-color:rgba(33,150,243,0.5);background:rgba(33,150,243,0.12);color:#4fc3f7;}
+  .v-chip.vc-onpath {border-color:rgba(6,214,160,0.5);background:rgba(6,214,160,0.12);color:var(--accent3);}
+
+  /* PATH RESULT */
+  .path-result-wrap{margin-bottom:12px;}
+  .pr-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;}
+  .pr-chip{min-width:28px;height:28px;border-radius:4px;border:1px solid rgba(6,214,160,0.4);background:rgba(6,214,160,0.1);padding:0 6px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--accent3);display:flex;align-items:center;justify-content:center;}
+  .pr-arrow{color:#028a5b;font-family:'Space Mono',monospace;font-size:0.75rem;}
+
+  /* ADJ LIST */
+  .adj-list-wrap{margin-bottom:12px;}
+  .adj-row{display:flex;align-items:center;gap:6px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:4px;padding:5px 8px;margin-bottom:4px;transition:all 0.25s;}
+  .adj-row.adj-current{border-color:#06d6a0;background:rgba(6,214,160,0.07);}
+  .adj-node-lbl{font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;width:20px;flex-shrink:0;color:#e2e8f0;}
+  .adj-neighbors{font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b7280;flex:1;}
+  .an-chip{display:inline-block;padding:1px 6px;border-radius:8px;margin:1px;font-size:0.62rem;font-weight:700;}
+  .an-unvisited{color:#4a5568;background:#0d0d18;}
+  .an-visited  {color:#4fc3f7;background:rgba(33,150,243,0.1);}
+  .an-target   {color:#ffd166;background:rgba(255,209,102,0.12);border:1px solid rgba(255,209,102,0.3);}
+  .an-onpath   {color:var(--accent3);background:rgba(6,214,160,0.1);}
+
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-box.has-path  {background:rgba(6,214,160,0.08); border:1px solid rgba(6,214,160,0.3);}
+  .best-box.no-path   {background:rgba(230,57,70,0.07);  border:1px solid rgba(230,57,70,0.25);}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .best-box.has-path .best-label{color:var(--accent3);}
+  .best-box.no-path  .best-label{color:var(--accent);}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show.found   {display:block;background:var(--accent3);color:#000;}
+  .done-bar.show.notfound{display:block;background:var(--accent);color:white;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Path Existence</h1>
+    <div class="sub">Can we reach node B from node A? · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·03 · Graph</div>
+</div>
+
+<div class="main">
+
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Edges (u-v pairs)</label>
+      <input type="text" id="inputEdges" value="0-1,1-2,2-4,0-3,3-5,5-6" class="wide">
+    </div>
+    <div class="field">
+      <label>Nodes</label>
+      <input type="text" id="inputNodes" value="7" class="small">
+    </div>
+    <div class="field">
+      <label>Source</label>
+      <input type="number" id="inputSrc" value="0" class="small" min="0">
+    </div>
+    <div class="field">
+      <label>Target</label>
+      <input type="number" id="inputTgt" value="6" class="small" min="0">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="400">2×</button>
+        <button class="speed-btn" data-ms="160">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.2);border-color:#06d6a0"></div>Source (S)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>Target (T)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.12);border-color:#06d6a0"></div>On DFS path</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.12);border-color:#2196f3"></div>Visited (explored)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.1);border-color:#e63946"></div>Backtracked</div>
+  </div>
+
+  <!-- GRAPH -->
+  <div class="section-label">Graph</div>
+  <div class="graph-wrap">
+    <svg id="graphSvg" viewBox="0 0 580 260"></svg>
+  </div>
+
+  <!-- SOURCE / TARGET CARDS -->
+  <div class="st-row">
+    <div class="st-card st-source" id="stcSource">
+      <div class="st-label">Source (S)</div>
+      <div class="st-val" id="stcSrcVal">0</div>
+      <div class="st-sub">start DFS here</div>
+    </div>
+    <div class="st-card" id="stcMid" style="flex:0.4;display:flex;align-items:center;justify-content:center;">
+      <div style="font-family:'Space Mono',monospace;font-size:1.5rem;color:var(--muted)" id="stcArrow">→?</div>
+    </div>
+    <div class="st-card st-target" id="stcTarget">
+      <div class="st-label">Target (T)</div>
+      <div class="st-val" id="stcTgtVal">6</div>
+      <div class="st-sub">find this node</div>
+    </div>
+  </div>
+
+  <!-- DFS PATH TRACKER -->
+  <div class="path-section">
+    <div class="section-label">Current DFS Stack (path from S)</div>
+    <div class="path-wrap">
+      <div class="path-header">
+        <div class="path-title">nodes on active DFS path</div>
+        <div class="path-status ps-searching" id="pathStatus">searching…</div>
+      </div>
+      <div class="path-chain" id="pathChain">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN</div>
+      </div>
+      <div class="found-label" id="foundLabel"></div>
+    </div>
+  </div>
+
+  <!-- NODE STATE GRID -->
+  <div class="state-grid-section">
+    <div class="section-label">Node States</div>
+    <div class="state-grid-wrap">
+      <div class="state-grid" id="stateGrid"></div>
+      <div class="state-legend">
+        <div class="sl-item"><div class="sl-dot" style="background:var(--surface);border-color:#ccc"></div>unvisited</div>
+        <div class="sl-item"><div class="sl-dot" style="background:rgba(6,214,160,0.12);border-color:#06d6a0"></div>on path</div>
+        <div class="sl-item"><div class="sl-dot" style="background:rgba(33,150,243,0.1);border-color:#2196f3"></div>visited</div>
+        <div class="sl-item"><div class="sl-dot" style="background:rgba(255,209,102,0.18);border-color:#ffd166"></div>target</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given an <strong>undirected graph</strong> and two nodes <span class="prob-hi">S</span> and <span class="prob-hi">T</span>,
+      determine if a path exists from S to T.
+      <br><br>
+      <strong>Algorithm:</strong> DFS from S. Mark each node visited as we go.
+      If we ever reach T → <span class="prob-hi">path exists</span>.
+      If DFS exhausts all reachable nodes without finding T → <span class="prob-hi-red">no path</span>.
+      <br><br>
+      <strong>Key insight:</strong> DFS explores as deep as possible before backtracking.
+      Every node reachable from S will eventually be visited.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-main"><span class="ck">bool</span> <span class="cf">hasPath</span>(<span class="ck">int</span> s, <span class="ck">int</span> t, adj) {</span>
+<span class="code-line" id="cl-init">  visited.clear(); <span class="cc">// mark none visited</span></span>
+<span class="code-line" id="cl-call">  <span class="ck">return</span> <span class="cf">dfs</span>(s, t);</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-dfn"><span class="ck">bool</span> <span class="cf">dfs</span>(<span class="ck">int</span> u, <span class="ck">int</span> t) {</span>
+<span class="code-line" id="cl-base">  <span class="ck">if</span>(u == t) <span class="ck">return true</span>; <span class="cc">// reached!</span></span>
+<span class="code-line" id="cl-mark">  visited[u] = <span class="cn">true</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span>(<span class="ck">int</span> v : adj[u]){</span>
+<span class="code-line" id="cl-ifnot">    <span class="ck">if</span>(!visited[v])</span>
+<span class="code-line" id="cl-rec">      <span class="ck">if</span>(<span class="cf">dfs</span>(v, t)) <span class="ck">return true</span>;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-back">  <span class="ck">return false</span>; <span class="cc">// dead end, backtrack</span></span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcU">   <div class="var-name">u (current)</div>  <div class="var-value grn" id="vU">—</div></div>
+      <div class="var-card" id="vcT">   <div class="var-name">target t</div>     <div class="var-value yel" id="vT">—</div></div>
+      <div class="var-card" id="vcV">   <div class="var-name">v (neighbor)</div> <div class="var-value blu" id="vV">—</div></div>
+      <div class="var-card" id="vcVis"> <div class="var-name">visited[v]</div>   <div class="var-value"    id="vVis" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">stack depth</div> <div class="var-value" style="color:var(--pur)" id="vDepth">0</div></div>
+      <div class="var-card" id="vcVisN"><div class="var-name">visited count</div><div class="var-value blu" id="vVisN">0</div></div>
+      <div class="var-card" id="vcRes" style="grid-column:1/3"><div class="var-name">result</div><div class="var-value" id="vRes" style="color:#e2e8f0">—</div></div>
+    </div>
+
+    <!-- VISITED SET -->
+    <div class="visited-set-wrap">
+      <div class="arr-state-title">visited[] set</div>
+      <div class="visited-chips" id="visitedChips"></div>
+    </div>
+
+    <!-- PATH FOUND -->
+    <div class="path-result-wrap">
+      <div class="arr-state-title">path found (S → T)</div>
+      <div class="pr-row" id="pathResultRow">
+        <span style="font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b6b8a;">not yet found</span>
+      </div>
+    </div>
+
+    <!-- ADJ LIST -->
+    <div class="adj-list-wrap">
+      <div class="arr-state-title">Adjacency List</div>
+      <div id="adjList"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar"></div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN LIBRARY ──────────────────────────────────────────────────────────
+const EXPLAIN = {
+  init:(src,tgt,n)=>({
+    why:`<div class="ep-why-block why-visit">DFS is perfect for reachability: we just explore as deep as possible from the source. If we ever land on the target, we immediately return true. If we exhaust every reachable node without finding it, we return false. O(V+E) — every node and edge visited at most once.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> visited[] is empty. We DFS from node ${src} looking for node ${tgt}. Every reachable node from ${src} will be visited exactly once.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The invariant:</strong> At any point, visited[v]=true means v is reachable from ${src} AND has already been processed. If ${tgt} is reachable, DFS will find it. If not, DFS completes without finding it.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why visited[]?</strong> Without marking visited nodes, DFS could loop forever in a cyclic graph (0→1→0→1…). visited[] ensures each node is processed at most once — guaranteeing O(V+E).`},
+    ]
+  }),
+  visit:(u,tgt,path)=>({
+    why:`<div class="ep-why-block why-visit">We arrive at node ${u}. First check: is u == ${tgt}? ${u===tgt?`<strong>YES — path found!</strong>`:'No. Mark it visited and explore its neighbors.'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>visited[${u}] = true.</strong> Node ${u} is now on the active DFS path. Stack depth = ${path.length}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Order matters:</strong> Check base case (u==t) BEFORE marking visited. This way we immediately return true the instant we reach the target.`},
+    ]
+  }),
+  found:(u,tgt,path)=>({
+    why:`<div class="ep-why-block why-found">🎉 u == ${tgt}! We've reached the target. Return true immediately — bubble up through the recursion stack. Every recursive call that's waiting returns true too. Path: ${path.join(' → ')}.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Path exists:</strong> ${path.join(' → ')}. Length = ${path.length-1} edges.`},
+      {icon:'⚡',cls:'inv-warn',text:`<strong>Early termination:</strong> We stop as soon as we find the target — no need to explore the rest of the graph. Best case O(path length), worst case O(V+E).`},
+    ]
+  }),
+  recurse:(u,v,tgt)=>({
+    why:`<div class="ep-why-block why-recurse">Neighbor ${v} of ${u} is not visited. Recurse into ${v} — explore its subtree. If any path from ${v} reaches ${tgt}, return true all the way up.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>visited[${v}] = false.</strong> Safe to recurse. If ${v}==${tgt} or ${tgt} is reachable from ${v}, we'll find it here.`},
+    ]
+  }),
+  skip_visited:(u,v)=>({
+    why:`<div class="ep-why-block why-recurse">Neighbor ${v} of ${u} is already visited. Skipping — we've already fully explored ${v}'s subtree. Revisiting it cannot help (no new paths discovered).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>visited[${v}] = true</strong> — already explored. If ${v} could reach the target, we would have found it already. Skip to avoid loops.`},
+    ]
+  }),
+  backtrack:(u)=>({
+    why:`<div class="ep-why-block why-back">Dead end at ${u}. All neighbors either visited or not leading to the target. Backtrack — return false to the caller. The DFS path shrinks by one node.</div>`,
+    inv:[
+      {icon:'⬅️',cls:'inv-warn',text:`<strong>Backtracking from ${u}.</strong> The subtree rooted at ${u} does not contain the target. Return false — let the parent node try the next neighbor.`},
+    ]
+  }),
+  done_found:(src,tgt,path)=>({
+    why:`<div class="ep-why-block why-found">Path found: ${path.join(' → ')}. DFS succeeded. The graph is connected between ${src} and ${tgt}.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Path: ${path.join(' → ')}</strong>. Length = ${path.length-1} edges. O(V+E) worst case — we may have explored many dead ends before finding the path.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Note:</strong> DFS finds A path, not necessarily the SHORTEST one. For shortest path use BFS (which explores level by level).`},
+    ]
+  }),
+  done_notfound:(src,tgt,n)=>({
+    why:`<div class="ep-why-block why-done">All reachable nodes from ${src} have been visited — none of them was ${tgt}. The graph is disconnected between ${src} and ${tgt}.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>No path from ${src} to ${tgt}.</strong> ${tgt} is in a different connected component. DFS explored the entire component containing ${src} without finding ${tgt}.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E)</strong> — the entire component reachable from ${src} was explored. All those nodes are now marked visited.`},
+    ]
+  }),
+};
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init:         {ids:['cl-main','cl-init','cl-call'],         cls:'hl-init'   },
+  visit:        {ids:['cl-dfn','cl-base','cl-mark'],          cls:'hl-visit'  },
+  found:        {ids:['cl-base'],                             cls:'hl-found'  },
+  recurse:      {ids:['cl-loop','cl-ifnot','cl-rec'],         cls:'hl-recurse'},
+  skip_visited: {ids:['cl-loop','cl-ifnot'],                  cls:'hl-back'   },
+  backtrack:    {ids:['cl-back'],                             cls:'hl-back'   },
+  done_found:   {ids:['cl-rec','cl-call'],                    cls:'hl-found'  },
+  done_notfound:{ids:['cl-back','cl-close'],                  cls:'hl-done'   },
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(n, adj, src, tgt){
+  const steps=[], visited=new Array(n).fill(false);
+  let pathFound=false, foundPath=[];
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0)/2;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    visited:[...visited], n, adj, src, tgt,
+    curU:null,curV:null,dfsPath:[],
+    pathFound, foundPath:[...foundPath],
+    desc, type, explain, result:null, ...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} nodes, ${numEdges} edges. Source = <span style="color:#06d6a0;font-weight:700">${src}</span>, Target = <span style="color:#ffd166;font-weight:700">${tgt}</span>. Mark all unvisited. Start DFS from ${src}.`,
+    'init', EXPLAIN.init(src,tgt,n)
+  );
+
+  // iterative DFS preserving path
+  const dfsStack=[{node:src, nIdx:0}];
+  const path=[src];
+  visited[src]=true;
+
+  snap(
+    `🟢 Start DFS at node <strong>${src}</strong>. Is ${src}==${tgt}? ${src===tgt?'YES!':'No.'}. Mark visited[${src}]=true.`,
+    src===tgt?'found':'visit',
+    src===tgt?EXPLAIN.found(src,tgt,[src]):EXPLAIN.visit(src,tgt,[src]),
+    {curU:src, curV:null, dfsPath:[...path]}
+  );
+
+  if(src===tgt){
+    pathFound=true; foundPath=[...path];
+    snap(
+      `🎉 <span style="color:#06d6a0;font-weight:700">Path found!</span> Source = Target = ${src}. Path: <strong>${path.join(' → ')}</strong>.`,
+      'done_found', EXPLAIN.done_found(src,tgt,path),
+      {curU:src, curV:null, dfsPath:[...path], pathFound:true, foundPath:[...path], result:{hasPath:true,path:[...path]}}
+    );
+    return steps;
+  }
+
+  while(dfsStack.length>0&&!pathFound){
+    const top=dfsStack[dfsStack.length-1];
+    const u=top.node;
+    const neighbors=adj[u]||[];
+
+    if(top.nIdx>=neighbors.length){
+      // backtrack
+      dfsStack.pop(); path.pop();
+      snap(
+        `⬅️ Dead end at <strong>${u}</strong>. No unvisited neighbors lead to target. <span style="color:var(--accent)">Backtrack</span>.`,
+        'backtrack', EXPLAIN.backtrack(u),
+        {curU:u, curV:null, dfsPath:[...path]}
+      );
+      continue;
+    }
+
+    const v=neighbors[top.nIdx]; top.nIdx++;
+
+    if(visited[v]){
+      snap(
+        `⏭ From <strong>${u}</strong>: neighbor <strong>${v}</strong> already visited — skip.`,
+        'skip_visited', EXPLAIN.skip_visited(u,v),
+        {curU:u, curV:v, dfsPath:[...path]}
+      );
+      continue;
+    }
+
+    // visit v
+    visited[v]=true;
+    dfsStack.push({node:v, nIdx:0});
+    path.push(v);
+
+    if(v===tgt){
+      pathFound=true; foundPath=[...path];
+      snap(
+        `🎉 <span style="color:#06d6a0;font-weight:700">TARGET REACHED!</span> Arrived at node <strong>${v}</strong> = target ${tgt}. Path: <strong>${path.join(' → ')}</strong>.`,
+        'found', EXPLAIN.found(u,tgt,path),
+        {curU:v, curV:null, dfsPath:[...path], pathFound:true, foundPath:[...path]}
+      );
+    } else {
+      snap(
+        `➡️ From <strong>${u}</strong>: recurse into <strong>${v}</strong>. visited[${v}]=true. Is ${v}==${tgt}? No. Continue deeper.`,
+        'recurse', EXPLAIN.recurse(u,v,tgt),
+        {curU:v, curV:null, dfsPath:[...path]}
+      );
+    }
+  }
+
+  if(pathFound){
+    snap(
+      `🎉 <span style="color:#06d6a0;font-weight:700">Path exists!</span> ${src} → ${tgt} via <strong>${foundPath.join(' → ')}</strong>. DFS found a path of length ${foundPath.length-1}.`,
+      'done_found', EXPLAIN.done_found(src,tgt,foundPath),
+      {pathFound:true, foundPath:[...foundPath], dfsPath:[...foundPath], result:{hasPath:true,path:[...foundPath]}}
+    );
+  } else {
+    snap(
+      `❌ <span style="color:var(--accent);font-weight:700">No path found.</span> All reachable nodes from ${src} explored. Target ${tgt} is not reachable. Return false.`,
+      'done_notfound', EXPLAIN.done_notfound(src,tgt,n),
+      {pathFound:false, foundPath:[], dfsPath:[], result:{hasPath:false,path:[]}}
+    );
+  }
+  return steps;
+}
+
+// ─── GRAPH LAYOUT ─────────────────────────────────────────────────────────────
+function layoutNodes(n, adj){
+  const W=560,H=240,cx=W/2,cy=H/2;
+  const pos=[];
+  for(let i=0;i<n;i++){
+    const a=(2*Math.PI*i/n)-(Math.PI/2);
+    const r=Math.min(W,H)*0.36;
+    pos.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});
+  }
+  for(let iter=0;iter<80;iter++){
+    const f=pos.map(()=>({x:0,y:0}));
+    for(let a=0;a<n;a++) for(let b=a+1;b<n;b++){
+      const dx=pos[a].x-pos[b].x,dy=pos[a].y-pos[b].y;
+      const d=Math.max(Math.sqrt(dx*dx+dy*dy),1);
+      const k=1200/(d*d);
+      f[a].x+=k*dx/d;f[a].y+=k*dy/d;f[b].x-=k*dx/d;f[b].y-=k*dy/d;
+    }
+    for(const[u,vs] of Object.entries(adj)){
+      for(const v of vs){
+        const dx=pos[v].x-pos[+u].x,dy=pos[v].y-pos[+u].y;
+        const d=Math.sqrt(dx*dx+dy*dy)||1,k=(d-90)*0.05;
+        f[+u].x+=k*dx/d;f[+u].y+=k*dy/d;f[v].x-=k*dx/d;f[v].y-=k*dy/d;
+      }
+    }
+    for(let i=0;i<n;i++){f[i].x+=(cx-pos[i].x)*0.02;f[i].y+=(cy-pos[i].y)*0.02;}
+    for(let i=0;i<n;i++){pos[i].x=Math.max(28,Math.min(W-28,pos[i].x+f[i].x*0.3));pos[i].y=Math.max(28,Math.min(H-28,pos[i].y+f[i].y*0.3));}
+  }
+  return pos;
+}
+
+function buildSvgGraph(n, adj, pos, src, tgt){
+  const svg=document.getElementById('graphSvg');
+  svg.innerHTML='';
+  const eg=document.createElementNS('http://www.w3.org/2000/svg','g');
+  eg.id='edgeGroup';
+  const drawn=new Set();
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue; drawn.add(key);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.id=`edge-${key}`;
+      line.setAttribute('x1',pos[+u].x);line.setAttribute('y1',pos[+u].y);
+      line.setAttribute('x2',pos[v].x);  line.setAttribute('y2',pos[v].y);
+      line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+      eg.appendChild(line);
+    }
+  }
+  svg.appendChild(eg);
+  const ng=document.createElementNS('http://www.w3.org/2000/svg','g');
+  ng.id='nodeGroup';
+  for(let i=0;i<n;i++){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.id=`gnode-${i}`;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',pos[i].x);c.setAttribute('cy',pos[i].y);c.setAttribute('r',22);
+    const isSrc=i===src, isTgt=i===tgt;
+    c.setAttribute('fill',isSrc?'rgba(6,214,160,0.18)':isTgt?'rgba(255,209,102,0.18)':'var(--surface)');
+    c.setAttribute('stroke',isSrc?'#06d6a0':isTgt?'#ffd166':'#ccc');
+    c.setAttribute('stroke-width',isSrc||isTgt?'2.5':'1.5');
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pos[i].x);t.setAttribute('y',pos[i].y);
+    t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-family','Space Mono,monospace');t.setAttribute('font-size','13');t.setAttribute('font-weight','700');
+    t.setAttribute('fill',isSrc?'#028a5b':isTgt?'#7a5a00':'#bbb');
+    t.textContent=i;
+    // S/T labels
+    if(isSrc||isTgt){
+      const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl.setAttribute('x',pos[i].x+16);lbl.setAttribute('y',pos[i].y-16);
+      lbl.setAttribute('font-family','Space Mono,monospace');lbl.setAttribute('font-size','10');lbl.setAttribute('font-weight','700');
+      lbl.setAttribute('fill',isSrc?'#028a5b':'#7a5a00');
+      lbl.textContent=isSrc?'S':'T';
+      g.appendChild(lbl);
+    }
+    g.appendChild(c);g.appendChild(t);ng.appendChild(g);
+  }
+  svg.appendChild(ng);
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let nGlobal=0, adjGlobal={}, nodePos=[], srcGlobal=0, tgtGlobal=0;
+
+function parseInput(){
+  const n=parseInt(document.getElementById('inputNodes').value.trim());
+  if(isNaN(n)||n<1) return null;
+  const adj={};
+  for(let i=0;i<n;i++) adj[i]=[];
+  const edgeStr=document.getElementById('inputEdges').value.trim();
+  if(edgeStr){
+    edgeStr.split(',').forEach(tok=>{
+      tok=tok.trim();
+      if(tok.includes('-')){
+        const[a,b]=tok.split('-').map(Number);
+        if(!isNaN(a)&&!isNaN(b)&&a<n&&b<n&&a!==b){adj[a].push(b);adj[b].push(a);}
+      }
+    });
+  }
+  for(let i=0;i<n;i++) adj[i]=[...new Set(adj[i])].sort((a,b)=>a-b);
+  const src=parseInt(document.getElementById('inputSrc').value)||0;
+  const tgt=parseInt(document.getElementById('inputTgt').value)||0;
+  return{n,adj,src:Math.min(src,n-1),tgt:Math.min(tgt,n-1)};
+}
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput(); if(!parsed) return;
+  const{n,adj,src,tgt}=parsed;
+  nGlobal=n; adjGlobal=adj; srcGlobal=src; tgtGlobal=tgt;
+  nodePos=layoutNodes(n,adj);
+  buildSvgGraph(n,adj,nodePos,src,tgt);
+  steps=computeSteps(n,adj,src,tgt);
+  currentStep=0;
+
+  // src/tgt display
+  document.getElementById('stcSrcVal').textContent=src;
+  document.getElementById('stcTgtVal').textContent=tgt;
+  document.getElementById('stcArrow').textContent='→?';
+  document.getElementById('stcSource').className='st-card st-source';
+  document.getElementById('stcTarget').className='st-card st-target';
+
+  // state grid
+  const sg=document.getElementById('stateGrid');
+  sg.innerHTML='';
+  for(let i=0;i<n;i++){
+    const cell=document.createElement('div');
+    const isSrc=i===src, isTgt=i===tgt;
+    cell.className=`sg-cell ${isSrc?'sgc-source':isTgt?'sgc-target':'sgc-unvisited'}`;
+    cell.id=`sgc-${i}`;
+    cell.innerHTML=`<div class="sgc-node">${i}</div><div class="sgc-state">${isSrc?'S':isTgt?'T':'—'}</div>`;
+    sg.appendChild(cell);
+  }
+
+  // visited chips
+  const vc=document.getElementById('visitedChips');
+  vc.innerHTML='';
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');
+    d.className='v-chip'; d.id=`vc-${i}`; d.textContent=i;
+    vc.appendChild(d);
+  }
+
+  // adjacency list
+  const al=document.getElementById('adjList');
+  al.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');
+    row.className='adj-row'; row.id=`ar-${i}`;
+    row.innerHTML=`<div class="adj-node-lbl">${i}</div>`
+      +`<div class="adj-neighbors" id="an-${i}">${(adj[i]||[]).map(v=>`<span class="an-chip ${v===tgt?'an-target':'an-unvisited'}">${v}</span>`).join(' ')||'<span style="color:#333">—</span>'}</div>`;
+    al.appendChild(row);
+  }
+
+  // problem example
+  const res=steps[steps.length-1].result;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">${n} nodes · src=${src} · tgt=${tgt} → ${res.hasPath?'PATH EXISTS':'NO PATH'}</span>`
+    +(res.hasPath?`Path: ${res.path.join(' → ')}`:`Node ${tgt} is not reachable from ${src}`);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('pathChain').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN</div>`;
+  document.getElementById('foundLabel').className='found-label';
+  document.getElementById('pathResultRow').innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b6b8a;">not yet found</span>`;
+  document.getElementById('pathStatus').className='path-status ps-searching';
+  document.getElementById('pathStatus').textContent='searching…';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const n=st.n, adj=st.adj, src=st.src, tgt=st.tgt;
+  const pathSet=new Set(st.dfsPath||[]);
+  const isFinal=!!st.result;
+
+  // ── SVG nodes ──
+  for(let i=0;i<n;i++){
+    const g=document.getElementById(`gnode-${i}`);
+    if(!g)continue;
+    const circle=g.querySelector('circle');
+    const text=g.querySelector('text');
+    const isSrc=i===src, isTgNode=i===tgt;
+    const isCur=st.curU===i&&!isFinal;
+    const onPath=pathSet.has(i)&&!isFinal;
+    const isFound=st.pathFound&&(st.foundPath||[]).includes(i);
+
+    if(isFound){
+      circle.setAttribute('fill','rgba(6,214,160,0.25)');
+      circle.setAttribute('stroke','#06d6a0');circle.setAttribute('stroke-width','3');
+      circle.setAttribute('filter','drop-shadow(0 0 8px #06d6a0)');
+      text.setAttribute('fill','#028a5b');
+    } else if(isTgNode&&!st.pathFound){
+      circle.setAttribute('fill','rgba(255,209,102,0.25)');
+      circle.setAttribute('stroke','#ffd166');circle.setAttribute('stroke-width',isCur?'3':'2.5');
+      circle.setAttribute('filter','drop-shadow(0 0 8px #ffd166)');
+      text.setAttribute('fill','#7a5a00');
+    } else if(isCur||onPath){
+      circle.setAttribute('fill','rgba(6,214,160,0.15)');
+      circle.setAttribute('stroke','#06d6a0');circle.setAttribute('stroke-width',isCur?'3':'2');
+      circle.setAttribute('filter',isCur?'drop-shadow(0 0 8px #06d6a0)':'none');
+      text.setAttribute('fill','#028a5b');
+    } else if(st.visited[i]){
+      circle.setAttribute('fill','rgba(33,150,243,0.12)');
+      circle.setAttribute('stroke','#2196f3');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#1565c0');
+    } else if(isSrc){
+      circle.setAttribute('fill','rgba(6,214,160,0.18)');
+      circle.setAttribute('stroke','#06d6a0');circle.setAttribute('stroke-width','2.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#028a5b');
+    } else {
+      circle.setAttribute('fill','var(--surface)');
+      circle.setAttribute('stroke','#ccc');circle.setAttribute('stroke-width','1.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#bbb');
+    }
+  }
+
+  // ── SVG edges ──
+  const drawn=new Set();
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue; drawn.add(key);
+      const line=document.getElementById(`edge-${key}`);
+      if(!line)continue;
+      const bothOnPath=pathSet.has(+u)&&pathSet.has(v);
+      const bothFound=st.pathFound&&(st.foundPath||[]).includes(+u)&&(st.foundPath||[]).includes(v);
+      if(bothFound){
+        line.setAttribute('stroke','#06d6a0');line.setAttribute('stroke-width','3');line.setAttribute('opacity','0.8');
+      } else if(bothOnPath&&!isFinal){
+        line.setAttribute('stroke','#06d6a0');line.setAttribute('stroke-width','2.5');line.setAttribute('opacity','0.5');
+      } else if(st.visited[+u]&&st.visited[v]){
+        line.setAttribute('stroke','#2196f3');line.setAttribute('stroke-width','2');line.setAttribute('opacity','0.4');
+      } else {
+        line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');line.setAttribute('opacity','1');
+      }
+    }
+  }
+
+  // ── Path chain ──
+  const pc=document.getElementById('pathChain');
+  const fl=document.getElementById('foundLabel');
+  const ps=document.getElementById('pathStatus');
+  if(isFinal){
+    ps.className='path-status '+(st.result.hasPath?'ps-found':'ps-notfound');
+    ps.textContent=st.result.hasPath?'✓ PATH EXISTS':'✗ No path';
+  } else if(st.pathFound){
+    ps.className='path-status ps-found';ps.textContent='✓ PATH EXISTS';
+  } else {
+    ps.className='path-status ps-searching';ps.textContent='searching…';
+  }
+
+  const displayPath=st.pathFound?st.foundPath:st.dfsPath;
+  if(displayPath&&displayPath.length){
+    pc.innerHTML='';
+    displayPath.forEach((node,i)=>{
+      const isSrcN=node===src, isTgtN=node===tgt, isCurN=node===st.curU&&!isFinal;
+      const div=document.createElement('div');
+      div.className='path-node '+(isTgtN&&st.pathFound?'pn-target':isSrcN?'pn-source':isCurN?'pn-current':'pn-path');
+      div.textContent=node;
+      pc.appendChild(div);
+      if(i<displayPath.length-1){
+        const arr=document.createElement('div');
+        arr.className='path-arrow pa-tree';arr.textContent='→';
+        pc.appendChild(arr);
+      }
+    });
+  } else if(!isFinal){
+    pc.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>`;
+  }
+
+  if(st.pathFound&&st.foundPath&&st.foundPath.length){
+    fl.className='found-label show';
+    fl.textContent=`✓ Path: ${st.foundPath.join(' → ')}`;
+  } else {
+    fl.className='found-label';
+  }
+
+  // ── State grid ──
+  for(let i=0;i<n;i++){
+    const cell=document.getElementById(`sgc-${i}`);
+    if(!cell)continue;
+    const isSrcN=i===src, isTgtN=i===tgt;
+    const onP=pathSet.has(i)&&!isFinal;
+    const isFoundNode=st.pathFound&&(st.foundPath||[]).includes(i);
+    let cls='sgc-unvisited', lbl='—';
+    if(isFoundNode){cls='sgc-onpath';lbl='PATH';}
+    else if(isTgtN&&!st.pathFound){cls='sgc-target';lbl='T';}
+    else if(isSrcN&&!onP){cls='sgc-source';lbl='S';}
+    else if(onP){cls='sgc-current';lbl='→T';}
+    else if(st.visited[i]){cls='sgc-visited';lbl='done';}
+    cell.className=`sg-cell ${cls}`;
+    cell.querySelector('.sgc-state').textContent=lbl;
+  }
+
+  // ── Visited chips ──
+  for(let i=0;i<n;i++){
+    const chip=document.getElementById(`vc-${i}`);
+    if(!chip)continue;
+    const onP=pathSet.has(i)&&!isFinal;
+    const isFoundNode=st.pathFound&&(st.foundPath||[]).includes(i);
+    chip.className='v-chip'+(isFoundNode?' vc-onpath':onP?' vc-onpath':st.visited[i]?' vc-visited':'');
+  }
+
+  // ── Path result (right panel) ──
+  const prr=document.getElementById('pathResultRow');
+  const fp=st.pathFound?st.foundPath:null;
+  if(fp&&fp.length){
+    prr.innerHTML=fp.map((node,i)=>{
+      const isSrcN=node===src, isTgtN=node===tgt;
+      return `<div class="pr-chip" style="${isTgtN?'border-color:#ffd166;color:#7a5a00;background:rgba(255,209,102,0.12)':''}">${node}</div>`
+        +(i<fp.length-1?`<span class="pr-arrow">→</span>`:'');
+    }).join('');
+  } else {
+    prr.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b6b8a;">not yet found</span>`;
+  }
+
+  // ── Adjacency list ──
+  for(let i=0;i<n;i++){
+    const row=document.getElementById(`ar-${i}`);
+    const nn=document.getElementById(`an-${i}`);
+    if(!row||!nn)continue;
+    row.className='adj-row'+(st.curU===i&&!isFinal?' adj-current':'');
+    nn.innerHTML=(adj[i]||[]).map(v=>{
+      const isFoundEdge=st.pathFound&&(st.foundPath||[]).includes(i)&&(st.foundPath||[]).includes(v);
+      const onPathEdge=pathSet.has(i)&&pathSet.has(v)&&!isFinal;
+      const cls=v===tgt?'an-target':isFoundEdge||onPathEdge?'an-onpath':st.visited[v]?'an-visited':'an-unvisited';
+      return `<span class="an-chip ${cls}">${v}</span>`;
+    }).join(' ')||'<span style="color:#333">—</span>';
+  }
+
+  // ── source/target cards ──
+  if(st.pathFound){
+    document.getElementById('stcArrow').textContent='✓';
+    document.getElementById('stcArrow').style.color='#06d6a0';
+    document.getElementById('stcTarget').className='st-card st-target st-reached';
+  } else if(isFinal&&!st.result.hasPath){
+    document.getElementById('stcArrow').textContent='✗';
+    document.getElementById('stcArrow').style.color='var(--accent)';
+  }
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── vars ──
+  setVar('vU','vcU',st.curU!=null?st.curU:'—');
+  setVar('vT','vcT',tgt);
+  setVar('vV','vcV',st.curV!=null?st.curV:'—');
+  setVar('vVis','vcVis',st.curV!=null?(st.visited[st.curV]?'true':'false'):'—');
+  setVar('vDepth','vcDepth',(st.dfsPath||[]).length);
+  setVar('vVisN','vcVisN',st.visited.filter(Boolean).length);
+  const resEl=document.getElementById('vRes');
+  resEl.textContent=st.pathFound?'true':isFinal&&!st.result.hasPath?'false':'—';
+  resEl.style.color=st.pathFound?'#06d6a0':isFinal&&!st.result.hasPath?'#ff6b6b':'#e2e8f0';
+
+  // ── done ──
+  if(isFinal){
+    const has=st.result.hasPath;
+    document.getElementById('doneBanner').className=`done-banner show ${has?'found':'notfound'}`;
+    document.getElementById('doneBanner').textContent=has?`✓ PATH EXISTS: ${st.result.path.join(' → ')}`:`✗ NO PATH FROM ${src} TO ${tgt}`;
+    document.getElementById('doneBar').className=`done-bar show ${has?'found':'notfound'}`;
+    document.getElementById('doneBar').textContent=has?`✓ PATH FOUND · O(V+E)`:`✗ DISCONNECTED · O(V+E)`;
+    const bb=document.getElementById('bestBox');
+    bb.className=`best-box show ${has?'has-path':'no-path'}`;
+    document.getElementById('bestVal').textContent=has?`${src} → ${tgt}`:'No path';
+    document.getElementById('bestMeta').textContent=has
+      ?`${st.result.path.join(' → ')} · length ${st.result.path.length-1}`
+      :`${tgt} unreachable from ${src} · O(V+E)`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TAB SWITCHER ─────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',visit:'ep-visit',found:'ep-found',
+    recurse:'ep-recurse',skip_visited:'ep-recurse',
+    backtrack:'ep-backtrack',done_found:'ep-found',done_notfound:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

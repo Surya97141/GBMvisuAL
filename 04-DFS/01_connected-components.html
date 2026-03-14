@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Connected Components · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+    /* component palette */
+    --c0:#2196f3; --c1:#06d6a0; --c2:#ffd166; --c3:#e63946;
+    --c4:#c084fc; --c5:#ff9f43; --c6:#48dbfb; --c7:#ff6b81;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(230,57,70,0.2);border:1px solid var(--accent);color:var(--accent);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:260px;} .field input.small{width:80px;}
+  .field input:focus{border-color:var(--accent);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: SVG GRAPH CANVAS
+     Nodes as circles, edges as lines.
+     DFS traversal animates in real time.
+  ══════════════════════════════════════ */
+  .graph-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;position:relative;}
+  #graphSvg{width:100%;display:block;}
+  /* SVG node states via classes applied in JS */
+  .gnode-unvisited circle{fill:var(--surface);stroke:#aaa;stroke-width:2;}
+  .gnode-unvisited text{fill:#aaa;}
+  .gnode-current circle{stroke-width:3;filter:drop-shadow(0 0 8px currentColor);}
+  .gnode-current text{font-weight:700;}
+  .gnode-visited circle{stroke-width:2.5;}
+  .gnode-backtrack circle{stroke-width:2.5;opacity:0.8;}
+  /* edge states */
+  .gedge-unvisited{stroke:#d4ccb8;stroke-width:1.5;}
+  .gedge-traversed{stroke-width:2.5;}
+  .gedge-tree{stroke-width:3;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: DFS CALL STACK
+     Live stack with push/pop animation.
+  ══════════════════════════════════════ */
+  .stack-section{margin-bottom:14px;}
+  .stack-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .stack-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .stack-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .stack-depth{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;color:var(--accent);}
+  .stack-frames{display:flex;align-items:flex-end;gap:6px;flex-wrap:wrap;min-height:44px;}
+  .stack-frame{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-width:40px;height:40px;border-radius:7px;
+    font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;
+    border:2px solid;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    padding:0 8px;
+  }
+  .sf-label{font-size:0.46rem;color:inherit;opacity:0.7;margin-bottom:1px;}
+  .stack-frame.sf-top{transform:translateY(-4px);box-shadow:0 6px 16px rgba(0,0,0,0.15);}
+  .stack-arrow{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:4px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: COMPONENT TRACKER
+     Shows each found component as a group
+     of colored node chips.
+  ══════════════════════════════════════ */
+  .comp-section{margin-bottom:14px;}
+  .comp-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .comp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .comp-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .comp-count{font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--accent3);}
+  .comp-groups{display:flex;flex-direction:column;gap:7px;}
+  .comp-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .comp-group-label{font-family:'Space Mono',monospace;font-size:0.6rem;font-weight:700;min-width:30px;flex-shrink:0;}
+  .comp-chip{
+    font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;
+    padding:3px 9px;border-radius:12px;border:1.5px solid;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .comp-chip.chip-current{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,0.15);}
+  .comp-group-sep{width:100%;height:1px;background:var(--border);margin:2px 0;}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(230,57,70,0.04);border:1px solid rgba(230,57,70,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init    {border-color:var(--accent3);}
+  .explain-panel.ep-start   {border-color:var(--accent);}
+  .explain-panel.ep-visit   {border-color:var(--accent);}
+  .explain-panel.ep-back    {border-color:var(--accent4);}
+  .explain-panel.ep-newcomp {border-color:var(--accent3);}
+  .explain-panel.ep-done    {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;} .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;} .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init   {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-visit  {border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-back   {border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-newcomp{border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-why-block.why-done   {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-visit{background:rgba(230,57,70,0.16); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-back {background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* VISITED NODES MINI LIST */
+  .mini-visited{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .visited-chips{display:flex;flex-wrap:wrap;gap:4px;}
+  .vis-chip{font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;padding:3px 8px;border-radius:10px;border:1px solid;transition:all 0.25s;background:#0d0d18;color:#4a5568;border-color:#2a2a3e;}
+  .vis-chip.vc-visited{color:#e2e8f0;}
+  .vis-chip.vc-current{transform:scale(1.1);}
+
+  /* ADJACENCY LIST */
+  .adj-list-wrap{margin-bottom:12px;}
+  .adj-row{display:flex;align-items:center;gap:6px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:4px;padding:5px 8px;margin-bottom:4px;transition:all 0.25s;}
+  .adj-row.adj-current{border-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .adj-node{font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;width:20px;flex-shrink:0;}
+  .adj-neighbors{font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b7280;flex:1;}
+  .adj-neighbor{display:inline-block;padding:1px 5px;border-radius:8px;margin:1px;font-size:0.62rem;font-weight:700;}
+  .an-visited{color:#e2e8f0;}
+  .an-unvisited{color:#4a5568;}
+  .an-current{color:#ffd166;background:rgba(255,209,102,0.15);border-radius:8px;}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);letter-spacing:3px;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Connected Components</h1>
+    <div class="sub">Depth-First Search · Graph Traversal · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·01 · Graph</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Edges  (u-v pairs, comma-separated)</label>
+      <input type="text" id="inputEdges" value="0-1,0-2,3-4,5" class="wide">
+    </div>
+    <div class="field">
+      <label>Nodes</label>
+      <input type="text" id="inputNodes" value="6" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:#f5f0e8;border-color:#aaa"></div>Unvisited</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.2);border-color:#e63946"></div>Currently Visiting</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.2);border-color:#06d6a0"></div>Visited (in component)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>Backtracking</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: SVG GRAPH -->
+  <div class="section-label">Graph</div>
+  <div class="graph-wrap">
+    <svg id="graphSvg" viewBox="0 0 580 260"></svg>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DFS CALL STACK -->
+  <div class="stack-section">
+    <div class="section-label">DFS Call Stack</div>
+    <div class="stack-wrap">
+      <div class="stack-header">
+        <div class="stack-title">← bottom &nbsp;&nbsp; top →</div>
+        <div class="stack-depth">depth: <span id="stackDepth">0</span></div>
+      </div>
+      <div class="stack-frames" id="stackFrames">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Stack empty — press RUN</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: COMPONENT TRACKER -->
+  <div class="comp-section">
+    <div class="section-label">Connected Components Found</div>
+    <div class="comp-wrap">
+      <div class="comp-header">
+        <div class="comp-title">Components discovered so far</div>
+        <div class="comp-count"><span id="compCount">0</span> found</div>
+      </div>
+      <div class="comp-groups" id="compGroups">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN to discover…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given an <strong>undirected graph</strong> with <strong id="probN">n</strong> nodes and some edges,
+      find the <span class="prob-hi">number of connected components</span> — groups of nodes where every node
+      can reach every other node in the same group.
+      <br><br>
+      <strong>Approach:</strong> For each unvisited node, launch a DFS that marks all reachable nodes as
+      belonging to the same component. Count how many times we launch a fresh DFS.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-main"><span class="ck">int</span> <span class="cf">countComponents</span>(</span>
+<span class="code-line" id="cl-main2">    <span class="ck">int</span> n, vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; edges) {</span>
+<span class="code-line" id="cl-vis">  vector&lt;<span class="ck">bool</span>&gt; vis(n, <span class="cn">false</span>);</span>
+<span class="code-line" id="cl-cnt">  <span class="ck">int</span> components = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> i=0; i&lt;n; i++) {</span>
+<span class="code-line" id="cl-ifvis">    <span class="ck">if</span> (!vis[i]) {</span>
+<span class="code-line" id="cl-dfs">      <span class="cf">dfs</span>(i, adj, vis);</span>
+<span class="code-line" id="cl-inc">      components++;          <span class="cc">// new component</span></span>
+<span class="code-line" id="cl-forend">    }</span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> components;</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-dfn"><span class="ck">void</span> <span class="cf">dfs</span>(<span class="ck">int</span> u, adj, vis) {</span>
+<span class="code-line" id="cl-mark">  vis[u] = <span class="cn">true</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">int</span> v : adj[u])</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span> (!vis[v])</span>
+<span class="code-line" id="cl-rec">      <span class="cf">dfs</span>(v, adj, vis);</span>
+<span class="code-line" id="cl-dfend">}  <span class="cc">// backtrack</span></span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcNode"> <div class="var-name">current node</div>  <div class="var-value red"  id="vNode">—</div></div>
+      <div class="var-card" id="vcComp"> <div class="var-name">components</div>    <div class="var-value grn"  id="vComp">0</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">stack depth</div>   <div class="var-value yel"  id="vDepth">0</div></div>
+      <div class="var-card" id="vcVisited"><div class="var-name">visited</div>     <div class="var-value pur"  id="vVisited">0</div></div>
+      <div class="var-card" id="vcScanI" style="grid-column:1/3"><div class="var-name">outer loop i</div><div class="var-value" id="vScanI" style="color:#e2e8f0;">—</div></div>
+    </div>
+
+    <!-- VISITED CHIPS -->
+    <div class="mini-visited">
+      <div class="arr-state-title">Visited Status</div>
+      <div class="visited-chips" id="visitedChips"></div>
+    </div>
+
+    <!-- ADJACENCY LIST -->
+    <div class="adj-list-wrap">
+      <div class="arr-state-title">Adjacency List</div>
+      <div id="adjList"></div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Connected Components</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// COMPONENT COLOURS
+// ─────────────────────────────────────────────
+const COMP_COLORS=[
+  {fill:'rgba(33,150,243,0.18)',stroke:'#2196f3',text:'#1565c0',light:'#bbdefb'},
+  {fill:'rgba(6,214,160,0.18)', stroke:'#06d6a0',text:'#014d3a',light:'#b2dfdb'},
+  {fill:'rgba(255,209,102,0.22)',stroke:'#ffd166',text:'#7a5a00',light:'#fff9c4'},
+  {fill:'rgba(230,57,70,0.15)', stroke:'#e63946',text:'#b71c1c',light:'#ffcdd2'},
+  {fill:'rgba(192,84,252,0.15)',stroke:'#c084fc',text:'#6a1b9a',light:'#e1bee7'},
+  {fill:'rgba(255,159,67,0.18)',stroke:'#ff9f43',text:'#7a3900',light:'#ffe0b2'},
+  {fill:'rgba(72,219,251,0.18)',stroke:'#48dbfb',text:'#006064',light:'#b2ebf2'},
+  {fill:'rgba(255,107,129,0.18)',stroke:'#ff6b81',text:'#880e4f',light:'#fce4ec'},
+];
+function cc(i){return COMP_COLORS[i%COMP_COLORS.length];}
+
+// ─────────────────────────────────────────────
+// EXPLANATION LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(n,numEdges)=>({
+    why:`<div class="ep-why-block why-init">We iterate over every node 0..${n-1}. For each unvisited node, we launch a DFS that explores all reachable nodes — marking them visited. Each fresh DFS launch = one new connected component. Total time: O(V+E) = O(${n}+${numEdges}).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> ${n} nodes, all unvisited. components=0. We scan nodes 0..${n-1} in order.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The key invariant:</strong> After processing node i, every node 0..i is visited AND assigned to a component. No node gets counted twice.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why O(V+E)?</strong> Each node is visited exactly once (visited[] prevents re-entry). Each edge is explored exactly twice (once from each endpoint). Total work = O(V) + O(2E) = O(V+E).`},
+    ]
+  }),
+  new_comp:(node,comp)=>({
+    why:`<div class="ep-why-block why-newcomp">Node ${node} is unvisited and no previous DFS reached it — it must be in a new, separate component. We increment components to ${comp} and start a fresh DFS from node ${node} to discover all nodes in this component.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>New component #${comp}:</strong> Node ${node} is unreachable from all previously visited nodes. This is a new isolated group.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Why start from unvisited nodes?</strong> If a node were reachable from any previous component, it would already be visited. An unvisited node proves it's in a new component.`},
+    ]
+  }),
+  visit:(node,from,comp,stack)=>({
+    why:`<div class="ep-why-block why-visit">${from!=null?`DFS recurse into node ${node} from node ${from}.`:`Starting DFS at root node ${node}.`} Mark ${node} as visited (component #${comp}). Now explore all unvisited neighbors of ${node}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>vis[${node}] = true.</strong> Node ${node} now permanently belongs to component #${comp}. Stack depth = ${stack.length}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Mark BEFORE recursing:</strong> We mark visited immediately on entry, before exploring neighbors. This prevents infinite loops on cycles.`},
+    ]
+  }),
+  neighbor_skip:(node,neighbor)=>({
+    why:`<div class="ep-why-block why-back">Neighbor ${neighbor} of node ${node} is already visited. Skip it — it's already in the same component. No need to recurse.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Already visited:</strong> Node ${neighbor} was seen in a previous DFS call. Skipping prevents re-processing and infinite loops in cyclic graphs.`},
+    ]
+  }),
+  backtrack:(node,parent)=>({
+    why:`<div class="ep-why-block why-back">All neighbors of node ${node} have been explored. Backtrack — pop ${node} from the call stack and return to ${parent!=null?`node ${parent}`:'the outer loop'}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Backtrack from ${node}:</strong> Every neighbor is either visited or doesn't exist. Node ${node}'s contribution to this component is complete.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>DFS completeness:</strong> By the time we backtrack from a node, ALL nodes reachable from it are marked visited. The component is fully discovered.`},
+    ]
+  }),
+  done:(comps,n,e)=>({
+    why:`<div class="ep-why-block why-done">All ${n} nodes scanned. ${comps} separate DFS launches = ${comps} connected component${comps!==1?'s':''}. O(V+E) = O(${n}+${e}) total time.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> Every node was visited exactly once. Every component was discovered by exactly one DFS launch. The count is exact.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E) time, O(V) space</strong> — the visited array uses O(V) space, the recursion stack uses O(V) in the worst case (path graph).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The pattern:</strong> This outer-loop + DFS structure works for any "count groups" problem: islands, provinces, friend circles. The graph may be implicit (grid cells) or explicit (adjacency list).`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:          {ids:['cl-main','cl-main2','cl-vis','cl-cnt','cl-for'],  cls:'hl-init'},
+  new_comp:      {ids:['cl-ifvis','cl-dfs','cl-inc'],                     cls:'hl-init'},
+  visit:         {ids:['cl-dfn','cl-mark','cl-loop','cl-check','cl-rec'], cls:'hl-visit'},
+  neighbor_skip: {ids:['cl-loop','cl-check'],                             cls:'hl-back'},
+  backtrack:     {ids:['cl-dfend'],                                       cls:'hl-back'},
+  scan:          {ids:['cl-for','cl-ifvis'],                              cls:'hl-init'},
+  done:          {ids:['cl-ret'],                                         cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps  — iterative DFS simulation
+// ─────────────────────────────────────────────
+function computeSteps(n, adj){
+  const steps=[];
+  const visited=new Array(n).fill(-1); // -1=unvisited, >=0 = component id
+  let components=0;
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0)/2;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    visited:[...visited], components, n, adj,
+    stack:[], curNode:null, scanI:null,
+    desc, type, explain, ...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} nodes, ${numEdges} edges. All nodes unvisited. `
+    +`Scan nodes 0..${n-1}: for each unvisited node, launch a DFS — all reachable nodes form one component.`,
+    'init', EXPLAIN.init(n,numEdges)
+  );
+
+  for(let i=0;i<n;i++){
+    snap(
+      `🔎 Outer loop: checking node <strong>${i}</strong>. `
+      +(visited[i]>=0?`Already visited (component #${visited[i]+1}) — skip.`:`Unvisited! Starting new component…`),
+      'scan', EXPLAIN.init(n,numEdges), {scanI:i,curNode:i}
+    );
+
+    if(visited[i]>=0) continue;
+
+    // New component — iterative DFS
+    const comp=components;
+    components++;
+    snap(
+      `🆕 Node <strong>${i}</strong> is unvisited → <span style="color:#028a5b;font-weight:700">Component #${comp+1}</span> starts here!`,
+      'new_comp', EXPLAIN.new_comp(i,comp+1), {scanI:i, curNode:i, stack:[i]}
+    );
+
+    // Iterative DFS using explicit stack
+    const dfsStack=[i];
+    const iterStack=[i]; // track for display
+
+    while(dfsStack.length>0){
+      const u=dfsStack[dfsStack.length-1];
+
+      if(visited[u]<0){
+        // First visit
+        visited[u]=comp;
+        const parent=iterStack.length>1?iterStack[iterStack.length-2]:null;
+        snap(
+          `📍 Visit node <strong>${u}</strong> (component #${comp+1}). `
+          +(parent!=null?`Came from node ${parent}. `:'Root of this DFS. ')
+          +`Neighbors: [${(adj[u]||[]).join(', ')||'none'}]`,
+          'visit', EXPLAIN.visit(u,parent,comp+1,[...iterStack]),
+          {scanI:i, curNode:u, stack:[...iterStack]}
+        );
+      }
+
+      // Find next unvisited neighbor
+      const neighbors=adj[u]||[];
+      let pushed=false;
+      for(const v of neighbors){
+        if(visited[v]<0){
+          dfsStack.push(v);
+          iterStack.push(v);
+          pushed=true;
+          break;
+        } else {
+          snap(
+            `⏭️ Neighbor <strong>${v}</strong> of node ${u} already visited (component #${visited[v]+1}) — skip.`,
+            'neighbor_skip', EXPLAIN.neighbor_skip(u,v),
+            {scanI:i, curNode:u, stack:[...iterStack]}
+          );
+        }
+      }
+
+      if(!pushed){
+        // Backtrack
+        dfsStack.pop();
+        iterStack.pop();
+        const parent=iterStack.length>0?iterStack[iterStack.length-1]:null;
+        snap(
+          `⬆️ All neighbors of <strong>${u}</strong> explored. Backtrack${parent!=null?` to node ${parent}`:`— DFS complete for component #${comp+1}`}.`,
+          'backtrack', EXPLAIN.backtrack(u,parent),
+          {scanI:i, curNode:parent, stack:[...iterStack]}
+        );
+      }
+    }
+  }
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> Found <span style="color:#028a5b;font-weight:700">${components}</span> connected component${components!==1?'s':''}. `
+    +`All ${n} nodes visited exactly once. O(V+E) = O(${n}+${numEdges}).`,
+    'done', EXPLAIN.done(components,n,numEdges),
+    {result:{components}}
+  );
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GRAPH LAYOUT — force-like positioning
+// ─────────────────────────────────────────────
+function layoutNodes(n, adj){
+  const W=560, H=240, R=22, cx=W/2, cy=H/2;
+  // Arrange in a circle with slight jitter, then relax
+  const pos=[];
+  for(let i=0;i<n;i++){
+    const angle=(2*Math.PI*i/n)-(Math.PI/2);
+    const r=Math.min(W,H)*0.36;
+    pos.push({x:cx+r*Math.cos(angle), y:cy+r*Math.sin(angle)});
+  }
+  // Simple force relaxation
+  for(let iter=0;iter<80;iter++){
+    const forces=pos.map(()=>({x:0,y:0}));
+    // Repulsion
+    for(let a=0;a<n;a++) for(let b=a+1;b<n;b++){
+      const dx=pos[a].x-pos[b].x, dy=pos[a].y-pos[b].y;
+      const d=Math.max(Math.sqrt(dx*dx+dy*dy),1);
+      const f=1200/(d*d);
+      forces[a].x+=f*dx/d; forces[a].y+=f*dy/d;
+      forces[b].x-=f*dx/d; forces[b].y-=f*dy/d;
+    }
+    // Attraction along edges
+    for(const [u,vs] of Object.entries(adj)){
+      for(const v of vs){
+        const a=+u;
+        const dx=pos[v].x-pos[a].x, dy=pos[v].y-pos[a].y;
+        const d=Math.sqrt(dx*dx+dy*dy)||1;
+        const f=(d-90)*0.05;
+        forces[a].x+=f*dx/d; forces[a].y+=f*dy/d;
+        forces[v].x-=f*dx/d; forces[v].y-=f*dy/d;
+      }
+    }
+    // Center pull
+    for(let i=0;i<n;i++){
+      forces[i].x+=(cx-pos[i].x)*0.02;
+      forces[i].y+=(cy-pos[i].y)*0.02;
+    }
+    for(let i=0;i<n;i++){
+      pos[i].x=Math.max(R+10,Math.min(W-R-10,pos[i].x+forces[i].x*0.3));
+      pos[i].y=Math.max(R+10,Math.min(H-R-10,pos[i].y+forces[i].y*0.3));
+    }
+  }
+  return pos;
+}
+
+// ─────────────────────────────────────────────
+// BUILD SVG GRAPH
+// ─────────────────────────────────────────────
+let nodePos=[], nGlobal=0, adjGlobal={};
+
+function buildSvgGraph(n, adj, pos){
+  const svg=document.getElementById('graphSvg');
+  svg.innerHTML='';
+  // Defs: markers
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  svg.appendChild(defs);
+
+  // Edges
+  const edgeGroup=document.createElementNS('http://www.w3.org/2000/svg','g');
+  edgeGroup.id='edgeGroup';
+  const drawn=new Set();
+  for(const [u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue; drawn.add(key);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('id',`edge-${key}`);
+      line.setAttribute('x1',pos[+u].x); line.setAttribute('y1',pos[+u].y);
+      line.setAttribute('x2',pos[v].x);  line.setAttribute('y2',pos[v].y);
+      line.setAttribute('class','gedge-unvisited');
+      line.setAttribute('stroke','#d4ccb8');
+      line.setAttribute('stroke-width','1.5');
+      edgeGroup.appendChild(line);
+    }
+  }
+  svg.appendChild(edgeGroup);
+
+  // Nodes
+  const nodeGroup=document.createElementNS('http://www.w3.org/2000/svg','g');
+  nodeGroup.id='nodeGroup';
+  for(let i=0;i<n;i++){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('id',`gnode-${i}`);
+    g.setAttribute('class','gnode-unvisited');
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',pos[i].x); circle.setAttribute('cy',pos[i].y);
+    circle.setAttribute('r',22);
+    circle.setAttribute('fill','var(--surface)');
+    circle.setAttribute('stroke','#aaa'); circle.setAttribute('stroke-width','2');
+    const text=document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x',pos[i].x); text.setAttribute('y',pos[i].y);
+    text.setAttribute('text-anchor','middle'); text.setAttribute('dominant-baseline','central');
+    text.setAttribute('font-family','Space Mono,monospace');
+    text.setAttribute('font-size','13'); text.setAttribute('font-weight','700');
+    text.setAttribute('fill','#aaa');
+    text.textContent=i;
+    g.appendChild(circle); g.appendChild(text);
+    nodeGroup.appendChild(g);
+  }
+  svg.appendChild(nodeGroup);
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+
+// ─────────────────────────────────────────────
+// PARSE INPUT
+// ─────────────────────────────────────────────
+function parseInput(){
+  const n=parseInt(document.getElementById('inputNodes').value.trim());
+  if(isNaN(n)||n<1)return null;
+  const adj={};
+  for(let i=0;i<n;i++)adj[i]=[];
+  const edgeStr=document.getElementById('inputEdges').value.trim();
+  if(edgeStr){
+    // edges: "0-1,0-2,3-4" or standalone node "5"
+    edgeStr.split(',').forEach(tok=>{
+      tok=tok.trim();
+      if(tok.includes('-')){
+        const [a,b]=tok.split('-').map(Number);
+        if(!isNaN(a)&&!isNaN(b)&&a<n&&b<n&&a!==b){
+          adj[a].push(b); adj[b].push(a);
+        }
+      }
+    });
+  }
+  // Deduplicate
+  for(let i=0;i<n;i++) adj[i]=[...new Set(adj[i])].sort((a,b)=>a-b);
+  return{n,adj};
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput();
+  if(!parsed)return;
+  const{n,adj}=parsed;
+  nGlobal=n; adjGlobal=adj;
+
+  // Layout graph
+  nodePos=layoutNodes(n,adj);
+  buildSvgGraph(n,adj,nodePos);
+
+  // Compute steps
+  steps=computeSteps(n,adj);
+  currentStep=0;
+
+  // Build visited chips
+  const vc=document.getElementById('visitedChips');
+  vc.innerHTML='';
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');
+    d.className='vis-chip'; d.id=`vc-${i}`;
+    d.textContent=i;
+    vc.appendChild(d);
+  }
+
+  // Build adjacency list
+  const al=document.getElementById('adjList');
+  al.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');
+    row.className='adj-row'; row.id=`ar-${i}`;
+    row.innerHTML=`<div class="adj-node" style="color:#e2e8f0;">${i}</div>`
+      +`<div class="adj-neighbors" id="an-${i}">${adj[i].length?adj[i].map(v=>`<span class="adj-neighbor an-unvisited">${v}</span>`).join(' '):'<span style="color:#333;">—</span>'}</div>`;
+    al.appendChild(row);
+  }
+
+  // Problem example
+  const ans=steps[steps.length-1].result.components;
+  document.getElementById('probN').textContent=n;
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0)/2;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">${n} nodes, ${numEdges} edge${numEdges!==1?'s':''}</span>`
+    +`Adjacency: ${Object.entries(adj).map(([u,vs])=>`${u}→[${vs.join(',')}]`).join('  ')}<br>`
+    +`→ Answer: <strong>${ans}</strong> connected component${ans!==1?'s':''}`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('compGroups').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN to discover…</div>`;
+  document.getElementById('compCount').textContent='0';
+  document.getElementById('stackFrames').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Stack empty</div>`;
+  document.getElementById('stackDepth').textContent='0';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n, adj=st.adj;
+
+  // ── SVG Graph nodes ──
+  for(let i=0;i<n;i++){
+    const g=document.getElementById(`gnode-${i}`);
+    if(!g)continue;
+    const circle=g.querySelector('circle');
+    const text=g.querySelector('text');
+    const compId=st.visited[i];
+    const isCurrent=st.curNode===i&&!isFinal;
+
+    if(isCurrent){
+      const col=compId>=0?cc(compId).stroke:'#e63946';
+      circle.setAttribute('fill',compId>=0?cc(compId).fill:'rgba(230,57,70,0.18)');
+      circle.setAttribute('stroke',col); circle.setAttribute('stroke-width','3');
+      circle.setAttribute('filter',`drop-shadow(0 0 8px ${col})`);
+      text.setAttribute('fill',compId>=0?cc(compId).text:'#b71c1c');
+    } else if(compId>=0){
+      const col=cc(compId);
+      // backtrack = slightly dimmer
+      const isBacktrack=st.type==='backtrack'&&st.stack&&st.stack.length===0;
+      circle.setAttribute('fill',col.fill);
+      circle.setAttribute('stroke',col.stroke); circle.setAttribute('stroke-width','2.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill',col.text);
+    } else {
+      circle.setAttribute('fill','var(--surface)');
+      circle.setAttribute('stroke','#ccc'); circle.setAttribute('stroke-width','1.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#bbb');
+    }
+  }
+
+  // ── SVG Edges ──
+  const drawn=new Set();
+  for(const [u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue; drawn.add(key);
+      const line=document.getElementById(`edge-${key}`);
+      if(!line)continue;
+      const cu=st.visited[+u], cv=st.visited[v];
+      if(cu>=0&&cv>=0&&cu===cv){
+        const col=cc(cu);
+        line.setAttribute('stroke',col.stroke);
+        line.setAttribute('stroke-width','2.5');
+        line.setAttribute('opacity','0.7');
+      } else {
+        line.setAttribute('stroke','#d4ccb8');
+        line.setAttribute('stroke-width','1.5');
+        line.setAttribute('opacity','1');
+      }
+    }
+  }
+
+  // ── DFS Call Stack ──
+  const sf=document.getElementById('stackFrames');
+  document.getElementById('stackDepth').textContent=st.stack?st.stack.length:0;
+  if(!st.stack||st.stack.length===0){
+    sf.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Stack empty</div>`;
+  } else {
+    sf.innerHTML='';
+    st.stack.forEach((node,i)=>{
+      const isTop=i===st.stack.length-1;
+      const compId=st.visited[node]>=0?st.visited[node]:st.components-1;
+      const col=cc(compId);
+      const frame=document.createElement('div');
+      frame.className='stack-frame'+(isTop?' sf-top':'');
+      frame.style.cssText=`background:${col.fill};border-color:${col.stroke};color:${col.text};`;
+      frame.innerHTML=`<div class="sf-label">${isTop?'TOP':''}</div>${node}`;
+      sf.appendChild(frame);
+      if(!isTop){
+        const arr=document.createElement('div');
+        arr.className='stack-arrow'; arr.textContent='→';
+        sf.appendChild(arr);
+      }
+    });
+  }
+
+  // ── Component Tracker ──
+  document.getElementById('compCount').textContent=st.components;
+  const cg=document.getElementById('compGroups');
+  if(st.components===0){
+    cg.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">No components yet…</div>`;
+  } else {
+    cg.innerHTML='';
+    for(let c=0;c<st.components;c++){
+      const members=[];
+      for(let i=0;i<n;i++) if(st.visited[i]===c) members.push(i);
+      if(!members.length)continue;
+      const col=cc(c);
+      const row=document.createElement('div');
+      row.className='comp-group';
+      const label=document.createElement('div');
+      label.className='comp-group-label';
+      label.style.color=col.text;
+      label.textContent=`C${c+1}:`;
+      row.appendChild(label);
+      members.forEach(m=>{
+        const chip=document.createElement('div');
+        const isCurr=st.curNode===m&&!isFinal;
+        chip.className='comp-chip'+(isCurr?' chip-current':'');
+        chip.style.cssText=`background:${col.fill};border-color:${col.stroke};color:${col.text};`;
+        chip.textContent=m;
+        row.appendChild(chip);
+      });
+      cg.appendChild(row);
+      if(c<st.components-1){
+        const sep=document.createElement('div');sep.className='comp-group-sep';
+        cg.appendChild(sep);
+      }
+    }
+  }
+
+  // ── Visited chips ──
+  for(let i=0;i<n;i++){
+    const chip=document.getElementById(`vc-${i}`);
+    if(!chip)continue;
+    const compId=st.visited[i];
+    chip.className='vis-chip';
+    if(compId>=0){
+      chip.classList.add('vc-visited');
+      if(st.curNode===i&&!isFinal)chip.classList.add('vc-current');
+      const col=cc(compId);
+      chip.style.cssText=`background:${col.fill};border-color:${col.stroke};color:${col.text};`;
+    } else {
+      chip.style.cssText='';
+    }
+  }
+
+  // ── Adjacency list ──
+  for(let i=0;i<n;i++){
+    const row=document.getElementById(`ar-${i}`);
+    if(!row)continue;
+    row.className='adj-row'+(st.curNode===i&&!isFinal?' adj-current':'');
+    const nn=document.getElementById(`an-${i}`);
+    if(nn){
+      nn.innerHTML=(adj[i]||[]).length
+        ? (adj[i]||[]).map(v=>{
+            const cls=st.visited[v]>=0?'an-visited':(st.curNode===v?'an-current':'an-unvisited');
+            const col=st.visited[v]>=0?cc(st.visited[v]).text:'inherit';
+            return `<span class="adj-neighbor ${cls}" style="color:${col}">${v}</span>`;
+          }).join(' ')
+        : '<span style="color:#333;">—</span>';
+    }
+  }
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Variables ──
+  setVar('vNode',   'vcNode',   st.curNode!=null?st.curNode:'—');
+  setVar('vComp',   'vcComp',   st.components);
+  setVar('vDepth',  'vcDepth',  st.stack?st.stack.length:0);
+  setVar('vVisited','vcVisited',st.visited.filter(v=>v>=0).length);
+  setVar('vScanI',  'vcScanI',  st.scanI!=null?st.scanI:'—');
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').className='done-banner show';
+    document.getElementById('doneBanner').textContent=`✓ ${st.result.components} CONNECTED COMPONENT${st.result.components!==1?'S':''}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ COMPONENTS = ${st.result.components} — O(V+E)`;
+    const bb=document.getElementById('bestBox');
+    bb.className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.components);
+    document.getElementById('bestMeta').textContent=`${nGlobal} nodes · ${steps.length} steps · O(V+E)`;
+  }
+
+  // ── Progress ──
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',scan:'ep-init',new_comp:'ep-newcomp',
+    visit:'ep-visit',neighbor_skip:'ep-back',backtrack:'ep-back',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

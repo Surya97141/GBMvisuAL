@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Cycle Detection · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(230,57,70,0.2);border:1px solid var(--accent);color:var(--accent);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:260px;} .field input.small{width:80px;}
+  .field input:focus{border-color:var(--accent);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: SVG GRAPH CANVAS
+     WHITE/GRAY/BLACK node states.
+     Tree edges = blue, back-edge = red flash.
+     Cycle path highlighted in red.
+  ══════════════════════════════════════ */
+  .graph-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;position:relative;}
+  #graphSvg{width:100%;display:block;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: DFS PATH TRACKER
+     Current DFS path shown as a chain of
+     node chips. Parent[] visualised live.
+     Back-edge detection highlighted red.
+  ══════════════════════════════════════ */
+  .path-section{margin-bottom:14px;}
+  .path-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .path-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .path-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .path-status{font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;}
+  .path-status.ps-searching{color:var(--accent2);}
+  .path-status.ps-cycle    {color:var(--accent);animation:flashRed 0.5s ease infinite alternate;}
+  .path-status.ps-clean    {color:var(--accent3);}
+  @keyframes flashRed{from{opacity:1}to{opacity:0.4}}
+  .path-chain{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-height:40px;}
+  .path-node{
+    font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;
+    width:36px;height:36px;border-radius:50%;border:2px solid;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);flex-shrink:0;
+  }
+  .path-node.pn-gray  {background:rgba(255,209,102,0.2);border-color:#ffd166;color:#7a5a00;}
+  .path-node.pn-black {background:rgba(100,100,100,0.1);border-color:#888;color:#555;opacity:0.6;}
+  .path-node.pn-cycle {background:rgba(230,57,70,0.18);border-color:#e63946;color:#b71c1c;transform:scale(1.15);box-shadow:0 0 12px rgba(230,57,70,0.4);}
+  .path-node.pn-cur   {transform:scale(1.1) translateY(-3px);box-shadow:0 6px 16px rgba(255,209,102,0.35);}
+  .path-arrow{font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);flex-shrink:0;}
+  .path-arrow.pa-tree  {color:var(--accent2);}
+  .path-arrow.pa-back  {color:var(--accent);font-weight:700;}
+  /* back-edge label */
+  .back-edge-label{
+    display:none;background:rgba(230,57,70,0.1);border:1.5px solid var(--accent);
+    border-radius:6px;padding:8px 12px;margin-top:10px;
+    font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--accent);
+    animation:fadeUp 0.4s ease;
+  }
+  .back-edge-label.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: NODE STATE PANEL
+     WHITE/GRAY/BLACK status for each node.
+     Mirrors the 3-color DFS classification.
+  ══════════════════════════════════════ */
+  .state-grid-section{margin-bottom:14px;}
+  .state-grid-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .state-grid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .state-grid-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .state-grid{display:flex;flex-wrap:wrap;gap:6px;}
+  .sg-cell{
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    min-width:44px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);
+    background:var(--surface);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .sg-cell .sgc-node{font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;}
+  .sg-cell .sgc-state{font-family:'Space Mono',monospace;font-size:0.5rem;text-transform:uppercase;letter-spacing:0.5px;}
+  .sg-cell.sgc-white{background:var(--surface);border-color:var(--border);}
+  .sg-cell.sgc-white .sgc-node{color:#bbb;} .sg-cell.sgc-white .sgc-state{color:#ccc;}
+  .sg-cell.sgc-gray {background:rgba(255,209,102,0.15);border-color:#ffd166;transform:translateY(-3px);}
+  .sg-cell.sgc-gray  .sgc-node{color:#7a5a00;} .sg-cell.sgc-gray  .sgc-state{color:#a07030;}
+  .sg-cell.sgc-black{background:rgba(33,150,243,0.09);border-color:#2196f3;}
+  .sg-cell.sgc-black .sgc-node{color:var(--accent2);} .sg-cell.sgc-black .sgc-state{color:#1565c0;}
+  .sg-cell.sgc-cycle{background:rgba(230,57,70,0.15);border-color:#e63946;box-shadow:0 0 10px rgba(230,57,70,0.3);}
+  .sg-cell.sgc-cycle .sgc-node{color:#b71c1c;} .sg-cell.sgc-cycle .sgc-state{color:var(--accent);}
+  /* legend row */
+  .state-legend{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;}
+  .sl-item{display:flex;align-items:center;gap:5px;font-size:0.7rem;color:var(--muted);}
+  .sl-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid;}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-hi-red{color:var(--accent);font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(230,57,70,0.04);border:1px solid rgba(230,57,70,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init  {border-color:var(--accent3);}
+  .explain-panel.ep-visit {border-color:var(--accent4);}
+  .explain-panel.ep-parent{border-color:var(--accent2);}
+  .explain-panel.ep-back  {border-color:var(--accent);}
+  .explain-panel.ep-black {border-color:var(--accent2);}
+  .explain-panel.ep-done  {border-color:var(--accent3);}
+  .explain-panel.ep-cycle {border-color:var(--accent);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;} .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;} .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-visit {border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-back  {border-left-color:var(--accent); background:rgba(230,57,70,0.07);}
+  .ep-why-block.why-black {border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-why-block.why-init  {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp2 0.4s ease;}
+  .done-banner.cycle  {background:var(--accent);color:white;}
+  .done-banner.nocycle{background:var(--accent3);color:var(--ink);}
+  @keyframes fadeUp2{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-gray {background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-back {background:rgba(230,57,70,0.18); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-black{background:rgba(33,150,243,0.16);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* PARENT ARRAY (right panel) */
+  .parent-arr-wrap{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .parent-cells{display:flex;gap:4px;flex-wrap:wrap;}
+  .parent-cell{min-width:36px;border-radius:5px;border:1px solid #2a2a3e;background:#0d0d18;padding:5px 6px;font-family:'Space Mono',monospace;font-size:0.6rem;transition:all 0.25s;}
+  .parent-cell .pc-node{color:#6b7280;font-size:0.5rem;margin-bottom:2px;}
+  .parent-cell .pc-par {font-weight:700;color:#4a5568;font-size:0.72rem;}
+  .parent-cell.pc-gray {border-color:#ffd166;background:rgba(255,209,102,0.12);}
+  .parent-cell.pc-gray .pc-par{color:#ffd166;}
+  .parent-cell.pc-black{border-color:#2196f3;background:rgba(33,150,243,0.1);}
+  .parent-cell.pc-black .pc-par{color:#4fc3f7;}
+  .parent-cell.pc-cycle{border-color:#e63946;background:rgba(230,57,70,0.12);}
+  .parent-cell.pc-cycle .pc-par{color:#ff6b6b;}
+
+  /* ADJACENCY LIST */
+  .adj-list-wrap{margin-bottom:12px;}
+  .adj-row{display:flex;align-items:center;gap:6px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:4px;padding:5px 8px;margin-bottom:4px;transition:all 0.25s;}
+  .adj-row.adj-current{border-color:#ffd166;background:rgba(255,209,102,0.07);}
+  .adj-node-lbl{font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;width:20px;flex-shrink:0;color:#e2e8f0;}
+  .adj-neighbors{font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b7280;flex:1;}
+  .an-chip{display:inline-block;padding:1px 6px;border-radius:8px;margin:1px;font-size:0.62rem;font-weight:700;}
+  .an-white{color:#4a5568;background:#0d0d18;}
+  .an-gray {color:#ffd166;background:rgba(255,209,102,0.1);border:1px solid rgba(255,209,102,0.3);}
+  .an-black{color:#4fc3f7;background:rgba(33,150,243,0.1);}
+  .an-parent{color:#888;}
+  .an-back  {color:#ff6b6b;background:rgba(230,57,70,0.12);border:1px solid rgba(230,57,70,0.3);}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-box.has-cycle{background:rgba(230,57,70,0.08);border:1px solid rgba(230,57,70,0.3);}
+  .best-box.no-cycle {background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .best-box.has-cycle .best-label{color:var(--accent);}
+  .best-box.no-cycle  .best-label{color:var(--accent3);}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show.cycle  {display:block;background:var(--accent);color:white;animation:fadeUp2 0.4s ease;}
+  .done-bar.show.nocycle{display:block;background:var(--accent3);color:#000;animation:fadeUp2 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Cycle Detection</h1>
+    <div class="sub">Depth-First Search · Back-Edge Detection · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·02 · Graph</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Edges  (u-v pairs, comma-separated)</label>
+      <input type="text" id="inputEdges" value="0-1,1-2,2-3,3-1" class="wide">
+    </div>
+    <div class="field">
+      <label>Nodes</label>
+      <input type="text" id="inputNodes" value="4" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:var(--surface);border-color:#ccc"></div>WHITE — unvisited</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>GRAY — on DFS path</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.15);border-color:#2196f3"></div>BLACK — fully explored</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.2);border-color:#e63946"></div>CYCLE detected!</div>
+  </div>
+
+  <!-- GRAPH -->
+  <div class="section-label">Graph</div>
+  <div class="graph-wrap">
+    <svg id="graphSvg" viewBox="0 0 580 260"></svg>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DFS PATH TRACKER -->
+  <div class="path-section">
+    <div class="section-label">Current DFS Path  (GRAY nodes = on stack)</div>
+    <div class="path-wrap">
+      <div class="path-header">
+        <div class="path-title">path from root → current node</div>
+        <div class="path-status ps-searching" id="pathStatus">searching…</div>
+      </div>
+      <div class="path-chain" id="pathChain">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN</div>
+      </div>
+      <div class="back-edge-label" id="backEdgeLabel"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: NODE STATE GRID -->
+  <div class="state-grid-section">
+    <div class="section-label">Node State  (WHITE → GRAY → BLACK)</div>
+    <div class="state-grid-wrap">
+      <div class="state-grid-header">
+        <div class="state-grid-title">3-color DFS classification</div>
+      </div>
+      <div class="state-grid" id="stateGrid"></div>
+      <div class="state-legend">
+        <div class="sl-item"><div class="sl-dot" style="background:var(--surface);border-color:#ccc"></div>WHITE = unvisited</div>
+        <div class="sl-item"><div class="sl-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>GRAY = in stack</div>
+        <div class="sl-item"><div class="sl-dot" style="background:rgba(33,150,243,0.1);border-color:#2196f3"></div>BLACK = done</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given an <strong>undirected graph</strong> with <strong id="probN">n</strong> nodes and edges,
+      determine if the graph contains <span class="prob-hi-red">any cycle</span>.
+      <br><br>
+      <strong>Key insight:</strong> During DFS, color nodes WHITE (unvisited) → GRAY (in current path) → BLACK (fully explored).
+      A cycle exists if and only if we encounter a <strong>back-edge</strong> — an edge from a GRAY node to another GRAY node
+      that is <em>not</em> the direct parent.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-main"><span class="ck">bool</span> <span class="cf">hasCycle</span>(<span class="ck">int</span> n, adj) {</span>
+<span class="code-line" id="cl-color">  color[v] = WHITE; <span class="cc">// 0=W 1=G 2=B</span></span>
+<span class="code-line" id="cl-outer">  <span class="ck">for</span>(<span class="ck">int</span> i=0; i&lt;n; i++)</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span>(color[i]==WHITE)</span>
+<span class="code-line" id="cl-call">      <span class="ck">if</span>(<span class="cf">dfs</span>(i,-1)) <span class="ck">return true</span>;</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return false</span>;</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-dfn"><span class="ck">bool</span> <span class="cf">dfs</span>(<span class="ck">int</span> u, <span class="ck">int</span> par) {</span>
+<span class="code-line" id="cl-gray">  color[u] = GRAY;   <span class="cc">// on stack</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span>(<span class="ck">int</span> v : adj[u]) {</span>
+<span class="code-line" id="cl-ifwhite">    <span class="ck">if</span>(color[v]==WHITE)</span>
+<span class="code-line" id="cl-recurse">      <span class="ck">if</span>(<span class="cf">dfs</span>(v,u)) <span class="ck">return true</span>;</span>
+<span class="code-line" id="cl-ifgray">    <span class="ck">else if</span>(color[v]==GRAY</span>
+<span class="code-line" id="cl-notpar">             &amp;&amp; v!=par) <span class="cc">// back-edge!</span></span>
+<span class="code-line" id="cl-found">      <span class="ck">return true</span>;  <span class="cc">// CYCLE FOUND</span></span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-black">  color[u] = BLACK;  <span class="cc">// done</span></span>
+<span class="code-line" id="cl-false">  <span class="ck">return false</span>;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcU">   <div class="var-name">u (current)</div>  <div class="var-value yel"  id="vU">—</div></div>
+      <div class="var-card" id="vcPar"> <div class="var-name">parent</div>        <div class="var-value"      id="vPar" style="color:#e2e8f0;">—</div></div>
+      <div class="var-card" id="vcV">   <div class="var-name">v (neighbor)</div> <div class="var-value red"  id="vV">—</div></div>
+      <div class="var-card" id="vcColV"><div class="var-name">color[v]</div>      <div class="var-value"      id="vColV" style="color:#e2e8f0;">—</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">stack depth</div> <div class="var-value pur"  id="vDepth">0</div></div>
+      <div class="var-card" id="vcGray"><div class="var-name">gray nodes</div>   <div class="var-value yel"  id="vGray">0</div></div>
+      <div class="var-card" id="vcCycle" style="grid-column:1/3"><div class="var-name">cycle found?</div><div class="var-value" id="vCycle" style="color:#e2e8f0;">—</div></div>
+    </div>
+
+    <!-- PARENT ARRAY -->
+    <div class="parent-arr-wrap">
+      <div class="arr-state-title">parent[] array</div>
+      <div class="parent-cells" id="parentCells"></div>
+    </div>
+
+    <!-- ADJACENCY LIST -->
+    <div class="adj-list-wrap">
+      <div class="arr-state-title">Adjacency List</div>
+      <div id="adjList"></div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// EXPLAIN LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(n,e)=>({
+    why:`<div class="ep-why-block why-init">We use 3-color DFS: WHITE (unvisited), GRAY (currently on the DFS call stack = ancestor path), BLACK (fully explored). A cycle in an undirected graph exists if and only if we find a back-edge — an edge from a GRAY node to another GRAY non-parent node.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> All ${n} nodes WHITE. parent[i]=-1. Scan nodes 0..${n-1}. O(V+E) = O(${n}+${e}).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The 3-color invariant:</strong> GRAY = node is on the active DFS recursion stack (ancestor of current node). BLACK = all neighbors explored, no cycle through this node. If we reach a GRAY non-parent neighbor → cycle!`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why not just "visited"?</strong> In an undirected graph, every tree edge appears from both ends. Without parent tracking, we'd falsely detect cycles on every edge (e.g. 0→1 then 1's neighbor 0 is "visited" but that's just the parent). The GRAY + parent check prevents false positives.`},
+    ]
+  }),
+  visit:(u,par,path)=>({
+    why:`<div class="ep-why-block why-visit">Node ${u} enters the DFS stack: color[${u}] = GRAY. Parent = ${par!==-1?par:'none (root)'}. Node ${u} is now an ancestor — any GRAY neighbor ${u} has (other than parent ${par}) creates a cycle.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>GRAY invariant:</strong> color[${u}]=GRAY. Node ${u} is now on the active DFS path. Stack depth = ${path.length}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Record parent:</strong> parent[${u}]=${par!==-1?par:'−1'}. Needed to distinguish the "go back on the same edge" (not a cycle) from a true back-edge (cycle).`},
+    ]
+  }),
+  check_white:(u,v)=>({
+    why:`<div class="ep-why-block why-visit">Neighbor ${v} of ${u} is WHITE (unvisited). Recurse into ${v} — explore its subtree. If the subtree contains a cycle, bubble up true.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Safe to recurse:</strong> color[${v}]=WHITE. Node ${v} is fresh — no risk of false cycle detection here.`},
+    ]
+  }),
+  check_gray_parent:(u,v,par)=>({
+    why:`<div class="ep-why-block why-black">Neighbor ${v} of ${u} is GRAY, but ${v}==${par} (direct parent). This is just the edge we came from — NOT a back-edge. In an undirected graph every edge appears in both directions. Skip.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Not a cycle:</strong> ${v} is the parent of ${u}. We arrived at ${u} via the edge ${par}–${u}. Seeing it again from ${u}'s side is expected — skip it.`},
+    ]
+  }),
+  back_edge:(u,v,cycleNodes)=>({
+    why:`<div class="ep-why-block why-back">🚨 BACK-EDGE FOUND! Node ${v} is GRAY (on the DFS stack) AND ${v} ≠ parent of ${u}. This means ${v} is an ancestor of ${u} in the DFS tree. The path ${v}→…→${u}→${v} forms a cycle!</div>`,
+    inv:[
+      {icon:'🚨',cls:'inv-key',text:`<strong>CYCLE DETECTED:</strong> Edge ${u}–${v} is a back-edge. color[${v}]=GRAY and ${v}≠parent[${u}]. The cycle is: ${cycleNodes.join(' → ')}.`},
+      {icon:'🔑',cls:'inv-warn',text:`<strong>Why GRAY matters:</strong> If ${v} were BLACK, it would be fully explored — no active path to it. Only GRAY nodes are ancestors of ${u} in the current DFS path.`},
+    ]
+  }),
+  blacken:(u)=>({
+    why:`<div class="ep-why-block why-black">All neighbors of ${u} explored, no cycle found through ${u}. Color[${u}] = BLACK. Node ${u} pops from the DFS stack — it's no longer an ancestor.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>BLACK invariant:</strong> color[${u}]=BLACK. Every descendant of ${u} in the DFS tree is also BLACK (or never visited via ${u}). No cycle found in ${u}'s subtree.`},
+    ]
+  }),
+  done_cycle:(cycleNodes)=>({
+    why:`<div class="ep-why-block why-back">Cycle confirmed. The back-edge created a loop: ${cycleNodes.join(' → ')}. Return true — no need to explore further.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> A back-edge in an undirected DFS always creates a cycle. The cycle length = distance from ancestor to current node + 1.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E)</strong> — we found the cycle without exploring the entire graph. Early termination as soon as the first back-edge is found.`},
+    ]
+  }),
+  done_clean:(n,e)=>({
+    why:`<div class="ep-why-block why-done">All nodes BLACK. No back-edge was found anywhere in the graph. The graph is a forest (collection of trees) — no cycle exists.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>No cycle:</strong> Every edge was a tree edge (WHITE neighbor) or a parent edge (GRAY parent). No non-parent GRAY neighbor was ever found.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E) = O(${n}+${e})</strong> — full graph explored. O(V) space for color[] and parent[] arrays.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:             {ids:['cl-main','cl-color','cl-outer','cl-check','cl-call'],cls:'hl-init'},
+  visit:            {ids:['cl-dfn','cl-gray'],                                  cls:'hl-gray'},
+  check_white:      {ids:['cl-loop','cl-ifwhite','cl-recurse'],                 cls:'hl-gray'},
+  check_gray_parent:{ids:['cl-loop','cl-ifgray','cl-notpar'],                   cls:'hl-black'},
+  back_edge:        {ids:['cl-ifgray','cl-notpar','cl-found'],                  cls:'hl-back'},
+  blacken:          {ids:['cl-black','cl-false'],                               cls:'hl-black'},
+  done_cycle:       {ids:['cl-found','cl-call','cl-ret'],                       cls:'hl-back'},
+  done_clean:       {ids:['cl-ret'],                                            cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps
+// ─────────────────────────────────────────────
+// color: 0=WHITE, 1=GRAY, 2=BLACK
+function computeSteps(n, adj){
+  const steps=[];
+  const color=new Array(n).fill(0);
+  const parent=new Array(n).fill(-1);
+  let cycleFound=false;
+  const cycleNodes=[];
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0)/2;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    color:[...color], parent:[...parent], n, adj,
+    curU:null, curV:null, curPar:null,
+    dfsPath:[], cycleNodes:[...cycleNodes], cycleFound,
+    desc, type, explain, result:null, ...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} nodes, ${numEdges} edges. All nodes WHITE. `
+    +`Scan 0..${n-1}: for each WHITE node, launch DFS. Cycle = back-edge to a GRAY non-parent node.`,
+    'init', EXPLAIN.init(n,numEdges)
+  );
+
+  // Iterative DFS with explicit stack to track path
+  for(let start=0;start<n&&!cycleFound;start++){
+    if(color[start]!==0) continue;
+
+    // stack entries: {node, parent, neighborIdx}
+    const dfsStack=[{node:start,par:-1,nIdx:0}];
+    const path=[start];
+    color[start]=1; parent[start]=-1;
+
+    snap(
+      `🔍 Node <strong>${start}</strong> is WHITE — start DFS. color[${start}] = <span style="color:#ffd166;font-weight:700">GRAY</span>. Parent = none.`,
+      'visit', EXPLAIN.visit(start,-1,[start]),
+      {curU:start, curV:null, curPar:-1, dfsPath:[...path]}
+    );
+
+    while(dfsStack.length>0&&!cycleFound){
+      const top=dfsStack[dfsStack.length-1];
+      const u=top.node;
+      const neighbors=adj[u]||[];
+
+      if(top.nIdx>=neighbors.length){
+        // Done with u — blacken
+        color[u]=2;
+        dfsStack.pop();
+        path.pop();
+        snap(
+          `⬛ All neighbors of <strong>${u}</strong> explored. color[${u}] = <span style="color:#4fc3f7;font-weight:700">BLACK</span>. Backtrack.`,
+          'blacken', EXPLAIN.blacken(u),
+          {curU:u, curV:null, curPar:top.par, dfsPath:[...path]}
+        );
+        continue;
+      }
+
+      const v=neighbors[top.nIdx];
+      top.nIdx++;
+
+      if(color[v]===0){
+        // WHITE — recurse
+        snap(
+          `➡️ From <strong>${u}</strong>: neighbor <strong>${v}</strong> is <span style="color:#e2e8f0;font-weight:700">WHITE</span>. Recurse — color[${v}] = <span style="color:#ffd166;font-weight:700">GRAY</span>.`,
+          'check_white', EXPLAIN.check_white(u,v),
+          {curU:u, curV:v, curPar:top.par, dfsPath:[...path]}
+        );
+        color[v]=1; parent[v]=u;
+        dfsStack.push({node:v,par:u,nIdx:0});
+        path.push(v);
+        snap(
+          `📍 Visit node <strong>${v}</strong>. color[${v}] = GRAY. Parent = ${u}. Path: ${path.join(' → ')}.`,
+          'visit', EXPLAIN.visit(v,u,[...path]),
+          {curU:v, curV:null, curPar:u, dfsPath:[...path]}
+        );
+      } else if(color[v]===1){
+        if(v===top.par){
+          // Parent edge — skip
+          snap(
+            `↩️ From <strong>${u}</strong>: neighbor <strong>${v}</strong> is GRAY but <span style="color:#ffd166;font-weight:700">v=${v} == parent</span>. Just the edge we came from — skip.`,
+            'check_gray_parent', EXPLAIN.check_gray_parent(u,v,top.par),
+            {curU:u, curV:v, curPar:top.par, dfsPath:[...path]}
+          );
+        } else {
+          // BACK EDGE — cycle!
+          cycleFound=true;
+          // Trace cycle: v → ... → u → v
+          const cycleStart=path.indexOf(v);
+          const cycle=[...path.slice(cycleStart), v];
+          cycleNodes.push(...cycle);
+          snap(
+            `🚨 <span style="color:var(--accent);font-weight:700">BACK-EDGE!</span> From <strong>${u}</strong>: neighbor <strong>${v}</strong> is <span style="color:var(--accent);font-weight:700">GRAY</span> and v≠parent. `
+            +`CYCLE FOUND: <strong>${cycle.join(' → ')}</strong>`,
+            'back_edge', EXPLAIN.back_edge(u,v,cycle),
+            {curU:u, curV:v, curPar:top.par, dfsPath:[...path], cycleNodes:[...cycle], cycleFound:true}
+          );
+        }
+      }
+      // BLACK neighbor — skip silently (cross-edge, no action needed)
+    }
+  }
+
+  // Final step
+  if(cycleFound){
+    snap(
+      `🎉 <span style="color:var(--accent);font-weight:700">Cycle detected!</span> Graph contains a cycle: <strong>${cycleNodes.join(' → ')}</strong>. Return <strong>true</strong>.`,
+      'done_cycle', EXPLAIN.done_cycle(cycleNodes),
+      {cycleNodes:[...cycleNodes], cycleFound:true, result:{hasCycle:true,cycleNodes:[...cycleNodes]}}
+    );
+  } else {
+    snap(
+      `✅ <span style="color:#028a5b;font-weight:700">No cycle found.</span> All nodes BLACK. Graph is acyclic. Return <strong>false</strong>.`,
+      'done_clean', EXPLAIN.done_clean(n,numEdges),
+      {cycleFound:false, result:{hasCycle:false,cycleNodes:[]}}
+    );
+  }
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GRAPH LAYOUT (same force-layout as connected components)
+// ─────────────────────────────────────────────
+function layoutNodes(n,adj){
+  const W=560,H=240,cx=W/2,cy=H/2;
+  const pos=[];
+  for(let i=0;i<n;i++){
+    const a=(2*Math.PI*i/n)-(Math.PI/2);
+    const r=Math.min(W,H)*0.36;
+    pos.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});
+  }
+  for(let iter=0;iter<80;iter++){
+    const f=pos.map(()=>({x:0,y:0}));
+    for(let a=0;a<n;a++) for(let b=a+1;b<n;b++){
+      const dx=pos[a].x-pos[b].x,dy=pos[a].y-pos[b].y;
+      const d=Math.max(Math.sqrt(dx*dx+dy*dy),1);
+      const k=1200/(d*d);
+      f[a].x+=k*dx/d;f[a].y+=k*dy/d;f[b].x-=k*dx/d;f[b].y-=k*dy/d;
+    }
+    for(const[u,vs] of Object.entries(adj)){
+      for(const v of vs){
+        const dx=pos[v].x-pos[+u].x,dy=pos[v].y-pos[+u].y;
+        const d=Math.sqrt(dx*dx+dy*dy)||1,k=(d-90)*0.05;
+        f[+u].x+=k*dx/d;f[+u].y+=k*dy/d;f[v].x-=k*dx/d;f[v].y-=k*dy/d;
+      }
+    }
+    for(let i=0;i<n;i++){f[i].x+=(cx-pos[i].x)*0.02;f[i].y+=(cy-pos[i].y)*0.02;}
+    for(let i=0;i<n;i++){pos[i].x=Math.max(28,Math.min(W-28,pos[i].x+f[i].x*0.3));pos[i].y=Math.max(28,Math.min(H-28,pos[i].y+f[i].y*0.3));}
+  }
+  return pos;
+}
+
+// ─────────────────────────────────────────────
+// BUILD SVG
+// ─────────────────────────────────────────────
+let nodePos=[], nGlobal=0, adjGlobal={};
+
+function buildSvgGraph(n,adj,pos){
+  const svg=document.getElementById('graphSvg');
+  svg.innerHTML='';
+  // Edges
+  const eg=document.createElementNS('http://www.w3.org/2000/svg','g');
+  eg.id='edgeGroup';
+  const drawn=new Set();
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue;drawn.add(key);
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.id=`edge-${key}`;
+      line.setAttribute('x1',pos[+u].x);line.setAttribute('y1',pos[+u].y);
+      line.setAttribute('x2',pos[v].x);line.setAttribute('y2',pos[v].y);
+      line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+      eg.appendChild(line);
+    }
+  }
+  svg.appendChild(eg);
+  // Nodes
+  const ng=document.createElementNS('http://www.w3.org/2000/svg','g');
+  ng.id='nodeGroup';
+  for(let i=0;i<n;i++){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.id=`gnode-${i}`;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',pos[i].x);c.setAttribute('cy',pos[i].y);c.setAttribute('r',22);
+    c.setAttribute('fill','var(--surface)');c.setAttribute('stroke','#ccc');c.setAttribute('stroke-width','2');
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pos[i].x);t.setAttribute('y',pos[i].y);
+    t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-family','Space Mono,monospace');t.setAttribute('font-size','13');t.setAttribute('font-weight','700');
+    t.setAttribute('fill','#bbb');t.textContent=i;
+    g.appendChild(c);g.appendChild(t);ng.appendChild(g);
+  }
+  svg.appendChild(ng);
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+
+function parseInput(){
+  const n=parseInt(document.getElementById('inputNodes').value.trim());
+  if(isNaN(n)||n<1)return null;
+  const adj={};
+  for(let i=0;i<n;i++)adj[i]=[];
+  const edgeStr=document.getElementById('inputEdges').value.trim();
+  if(edgeStr){
+    edgeStr.split(',').forEach(tok=>{
+      tok=tok.trim();
+      if(tok.includes('-')){
+        const[a,b]=tok.split('-').map(Number);
+        if(!isNaN(a)&&!isNaN(b)&&a<n&&b<n&&a!==b){adj[a].push(b);adj[b].push(a);}
+      }
+    });
+  }
+  for(let i=0;i<n;i++)adj[i]=[...new Set(adj[i])].sort((a,b)=>a-b);
+  return{n,adj};
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput();
+  if(!parsed)return;
+  const{n,adj}=parsed;
+  nGlobal=n;adjGlobal=adj;
+  nodePos=layoutNodes(n,adj);
+  buildSvgGraph(n,adj,nodePos);
+  steps=computeSteps(n,adj);
+  currentStep=0;
+
+  // State grid cells
+  const sg=document.getElementById('stateGrid');
+  sg.innerHTML='';
+  for(let i=0;i<n;i++){
+    const cell=document.createElement('div');
+    cell.className='sg-cell sgc-white';cell.id=`sgc-${i}`;
+    cell.innerHTML=`<div class="sgc-node">${i}</div><div class="sgc-state">WHITE</div>`;
+    sg.appendChild(cell);
+  }
+
+  // Parent cells
+  const pc=document.getElementById('parentCells');
+  pc.innerHTML='';
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');
+    d.className='parent-cell';d.id=`prc-${i}`;
+    d.innerHTML=`<div class="pc-node">${i}</div><div class="pc-par" id="prv-${i}">−1</div>`;
+    pc.appendChild(d);
+  }
+
+  // Adjacency list
+  const al=document.getElementById('adjList');
+  al.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');
+    row.className='adj-row';row.id=`ar-${i}`;
+    row.innerHTML=`<div class="adj-node-lbl">${i}</div>`
+      +`<div class="adj-neighbors" id="an-${i}">${(adj[i]||[]).map(v=>`<span class="an-chip an-white">${v}</span>`).join(' ')||'<span style="color:#333">—</span>'}</div>`;
+    al.appendChild(row);
+  }
+
+  // Problem example
+  const res=steps[steps.length-1].result;
+  document.getElementById('probN').textContent=n;
+  const numE=Object.values(adj).reduce((s,a)=>s+a.length,0)/2;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">${n} nodes, ${numE} edges → ${res.hasCycle?'CYCLE FOUND':'NO CYCLE'}</span>`
+    +(res.hasCycle?`Cycle: ${res.cycleNodes.join(' → ')}`:`Graph is a tree/forest — no cycle`);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('pathChain').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN</div>`;
+  document.getElementById('backEdgeLabel').className='back-edge-label';
+  document.getElementById('pathStatus').className='path-status ps-searching';
+  document.getElementById('pathStatus').textContent='searching…';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+const COLOR_NAME=['WHITE','GRAY','BLACK'];
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n, adj=st.adj;
+  const cycleSet=new Set(st.cycleNodes);
+
+  // ── SVG nodes ──
+  for(let i=0;i<n;i++){
+    const g=document.getElementById(`gnode-${i}`);
+    if(!g)continue;
+    const circle=g.querySelector('circle');
+    const text=g.querySelector('text');
+    const isCur=st.curU===i&&!isFinal;
+    const inCycle=st.cycleFound&&cycleSet.has(i);
+
+    if(inCycle){
+      circle.setAttribute('fill','rgba(230,57,70,0.2)');
+      circle.setAttribute('stroke','#e63946');circle.setAttribute('stroke-width','3');
+      circle.setAttribute('filter','drop-shadow(0 0 10px #e63946)');
+      text.setAttribute('fill','#b71c1c');
+    } else if(st.color[i]===1){// GRAY
+      circle.setAttribute('fill','rgba(255,209,102,0.22)');
+      circle.setAttribute('stroke','#ffd166');circle.setAttribute('stroke-width',isCur?'3':'2.5');
+      circle.setAttribute('filter',isCur?'drop-shadow(0 0 8px #ffd166)':'none');
+      text.setAttribute('fill','#7a5a00');
+    } else if(st.color[i]===2){// BLACK
+      circle.setAttribute('fill','rgba(33,150,243,0.12)');
+      circle.setAttribute('stroke','#2196f3');circle.setAttribute('stroke-width','2');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#1565c0');
+    } else {// WHITE
+      circle.setAttribute('fill','var(--surface)');
+      circle.setAttribute('stroke','#ccc');circle.setAttribute('stroke-width','1.5');
+      circle.removeAttribute('filter');
+      text.setAttribute('fill','#bbb');
+    }
+  }
+
+  // ── SVG edges ──
+  const drawn=new Set();
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const key=[Math.min(+u,v),Math.max(+u,v)].join('-');
+      if(drawn.has(key))continue;drawn.add(key);
+      const line=document.getElementById(`edge-${key}`);
+      if(!line)continue;
+      const bothCycle=st.cycleFound&&cycleSet.has(+u)&&cycleSet.has(v);
+      const isBackEdge=st.cycleFound&&st.curU===+u&&st.curV===v||st.curU===v&&st.curV===+u;
+      if(bothCycle){
+        line.setAttribute('stroke','#e63946');line.setAttribute('stroke-width','3');line.setAttribute('opacity','0.8');
+      } else if(st.color[+u]>=1&&st.color[v]>=1&&(st.color[+u]===1||st.color[v]===1)){
+        line.setAttribute('stroke','#ffd166');line.setAttribute('stroke-width','2.5');line.setAttribute('opacity','0.6');
+      } else if(st.color[+u]===2&&st.color[v]===2){
+        line.setAttribute('stroke','#2196f3');line.setAttribute('stroke-width','2');line.setAttribute('opacity','0.5');
+      } else {
+        line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');line.setAttribute('opacity','1');
+      }
+    }
+  }
+
+  // ── DFS Path chain ──
+  const pc=document.getElementById('pathChain');
+  const bel=document.getElementById('backEdgeLabel');
+  const ps=document.getElementById('pathStatus');
+  if(isFinal){
+    ps.className='path-status '+(st.result.hasCycle?'ps-cycle':'ps-clean');
+    ps.textContent=st.result.hasCycle?'⚠ CYCLE FOUND':'✓ No cycle';
+  } else if(st.cycleFound){
+    ps.className='path-status ps-cycle';ps.textContent='⚠ CYCLE FOUND';
+  } else {
+    ps.className='path-status ps-searching';ps.textContent='searching…';
+  }
+
+  if(st.dfsPath&&st.dfsPath.length){
+    pc.innerHTML='';
+    st.dfsPath.forEach((node,i)=>{
+      const inC=st.cycleFound&&cycleSet.has(node);
+      const isCur=node===st.curU&&!isFinal;
+      const div=document.createElement('div');
+      div.className='path-node '+(inC?'pn-cycle':st.color[node]===1?'pn-gray pn-cur':'pn-black');
+      if(isCur&&!inC)div.classList.add('pn-cur');
+      div.textContent=node;
+      pc.appendChild(div);
+      if(i<st.dfsPath.length-1){
+        const arr=document.createElement('div');
+        arr.className='path-arrow pa-tree';arr.textContent='→';
+        pc.appendChild(arr);
+      }
+    });
+    if(st.type==='back_edge'&&st.curV!=null){
+      const arr=document.createElement('div');
+      arr.className='path-arrow pa-back';arr.textContent='↩';
+      pc.appendChild(arr);
+      const div=document.createElement('div');
+      div.className='path-node pn-cycle';div.textContent=st.curV;
+      pc.appendChild(div);
+    }
+  } else if(!isFinal){
+    pc.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>`;
+  }
+
+  if(st.cycleFound&&st.cycleNodes.length){
+    bel.className='back-edge-label show';
+    bel.textContent=`Cycle: ${st.cycleNodes.join(' → ')}`;
+  } else {
+    bel.className='back-edge-label';
+  }
+
+  // ── State grid ──
+  for(let i=0;i<n;i++){
+    const cell=document.getElementById(`sgc-${i}`);
+    if(!cell)continue;
+    const inC=st.cycleFound&&cycleSet.has(i);
+    const stateNames=['WHITE','GRAY','BLACK'];
+    cell.className='sg-cell '+(inC?'sgc-cycle':['sgc-white','sgc-gray','sgc-black'][st.color[i]]);
+    cell.querySelector('.sgc-state').textContent=inC?'CYCLE':stateNames[st.color[i]];
+  }
+
+  // ── Parent cells ──
+  for(let i=0;i<n;i++){
+    const cell=document.getElementById(`prc-${i}`);
+    const val=document.getElementById(`prv-${i}`);
+    if(!cell||!val)continue;
+    const inC=st.cycleFound&&cycleSet.has(i);
+    cell.className='parent-cell'+(inC?' pc-cycle':st.color[i]===1?' pc-gray':st.color[i]===2?' pc-black':'');
+    val.textContent=st.parent[i]!==-1?st.parent[i]:'−1';
+  }
+
+  // ── Adjacency list colors ──
+  for(let i=0;i<n;i++){
+    const row=document.getElementById(`ar-${i}`);
+    const nn=document.getElementById(`an-${i}`);
+    if(!row||!nn)continue;
+    row.className='adj-row'+(st.curU===i&&!isFinal?' adj-current':'');
+    nn.innerHTML=(adj[i]||[]).map(v=>{
+      const inC=st.cycleFound&&cycleSet.has(i)&&cycleSet.has(v);
+      const isBackEdge=st.type==='back_edge'&&((st.curU===i&&st.curV===v)||(st.curU===v&&st.curV===i));
+      const cls=inC||isBackEdge?'an-back':st.color[v]===1?'an-gray':st.color[v]===2?'an-black':'an-white';
+      return `<span class="an-chip ${cls}">${v}</span>`;
+    }).join(' ')||'<span style="color:#333">—</span>';
+  }
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Variables ──
+  setVar('vU',    'vcU',     st.curU!=null?st.curU:'—');
+  setVar('vPar',  'vcPar',   st.curPar!=null?st.curPar:'−1');
+  setVar('vV',    'vcV',     st.curV!=null?st.curV:'—');
+  setVar('vColV', 'vcColV',  st.curV!=null?COLOR_NAME[st.color[st.curV]]:'—');
+  setVar('vDepth','vcDepth', st.dfsPath?st.dfsPath.length:0);
+  setVar('vGray', 'vcGray',  st.color.filter(c=>c===1).length);
+  const cycleEl=document.getElementById('vCycle');
+  cycleEl.textContent=st.cycleFound?'YES':'NO';
+  cycleEl.style.color=st.cycleFound?'#ff6b6b':'#06d6a0';
+
+  // ── Done ──
+  if(isFinal){
+    const has=st.result.hasCycle;
+    document.getElementById('doneBanner').className=`done-banner show ${has?'cycle':'nocycle'}`;
+    document.getElementById('doneBanner').textContent=has?`⚠ CYCLE DETECTED`:`✓ GRAPH IS ACYCLIC`;
+    document.getElementById('doneBar').className=`done-bar show ${has?'cycle':'nocycle'}`;
+    document.getElementById('doneBar').textContent=has?`⚠ CYCLE FOUND — O(V+E)`:`✓ ACYCLIC — O(V+E)`;
+    const bb=document.getElementById('bestBox');
+    bb.className=`best-box show ${has?'has-cycle':'no-cycle'}`;
+    document.getElementById('bestVal').textContent=has?'CYCLE':'ACYCLIC';
+    document.getElementById('bestMeta').textContent=has
+      ?`Cycle: ${st.result.cycleNodes.join('→')} · ${steps.length} steps`
+      :`No back-edges found · ${steps.length} steps · O(V+E)`;
+  }
+
+  // ── Progress ──
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={
+    init:'ep-init',visit:'ep-visit',check_white:'ep-visit',
+    check_gray_parent:'ep-black',back_edge:'ep-cycle',
+    blacken:'ep-black',done_cycle:'ep-cycle',done_clean:'ep-done'
+  };
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
