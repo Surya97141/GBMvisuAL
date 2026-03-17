@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GBMvisuAL — Algorithm Visualizer</title>
+<meta name="description" content="Interactive visualizations for 47 DSA algorithms. Two Pointers to Suffix Arrays — see every algorithm think."/>
+<meta property="og:title" content="GBMvisuAL — Algorithm Visualizer"/>
+<meta property="og:description" content="See 47 DSA algorithms think in real time."/>
+<meta property="og:type" content="website"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#080c10;
+  --bg2:#0d1117;
+  --bg3:#111820;
+  --ink:#e8edf3;
+  --ink2:#8b97a8;
+  --ink3:#4a5568;
+  --accent:#3b82f6;
+  --accent2:#06b6d4;
+  --accent3:#8b5cf6;
+  --green:#10b981;
+  --yellow:#f59e0b;
+  --red:#ef4444;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.12);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;font-size:16px}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'JetBrains Mono',monospace;
+  overflow-x:hidden;
+  cursor:none;
+}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#000}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px}
+
+/* ── CURSOR ── */
+#cur{position:fixed;width:8px;height:8px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .1s,background .2s;mix-blend-mode:screen}
+#cur-trail{position:fixed;width:24px;height:24px;border:1px solid rgba(59,130,246,.4);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:all .15s ease}
+
+/* ── CANVAS ── */
+#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.35}
+
+/* ── PAGE ── */
+#page{position:relative;z-index:1}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:16px clamp(20px,5vw,80px);
+  border-bottom:1px solid transparent;
+  transition:all .3s;
+}
+nav.scrolled{
+  background:rgba(8,12,16,.85);
+  backdrop-filter:blur(12px);
+  border-color:var(--border);
+}
+.nav-logo{
+  font-family:'Syne',sans-serif;
+  font-size:18px;font-weight:800;
+  letter-spacing:1px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{
+  font-size:12px;color:var(--ink2);letter-spacing:1px;
+  text-decoration:none;transition:color .2s;
+}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;letter-spacing:2px;
+  padding:8px 18px;
+  background:transparent;
+  border:1px solid var(--accent);
+  color:var(--accent);
+  text-decoration:none;
+  transition:all .2s;
+}
+.nav-cta:hover{background:var(--accent);color:#000}
+
+/* ── HERO ── */
+#hero{
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  justify-content:center;
+  padding:120px clamp(20px,5vw,80px) 80px;
+}
+.hero-eyebrow{
+  font-size:11px;color:var(--accent);letter-spacing:4px;
+  margin-bottom:24px;display:flex;align-items:center;gap:12px;
+}
+.hero-eyebrow::before{content:'';width:32px;height:1px;background:var(--accent)}
+.hero-title{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(44px,8vw,96px);
+  font-weight:800;
+  line-height:.92;
+  letter-spacing:-2px;
+  margin-bottom:24px;
+}
+.hero-title .line1{display:block;color:var(--ink)}
+.hero-title .line2{
+  display:block;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 50%,var(--accent3) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.hero-sub{
+  font-size:15px;color:var(--ink2);
+  line-height:1.7;max-width:520px;
+  margin-bottom:40px;font-weight:300;
+}
+.hero-sub strong{color:var(--ink);font-weight:400}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:60px}
+.btn-primary{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;letter-spacing:2px;
+  padding:14px 28px;
+  background:var(--accent);color:#000;font-weight:600;
+  text-decoration:none;border:none;cursor:pointer;
+  transition:all .2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+}
+.btn-primary:hover{background:#60a5fa;transform:translateY(-2px)}
+.btn-secondary{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;letter-spacing:2px;
+  padding:14px 28px;
+  background:transparent;color:var(--ink2);
+  border:1px solid var(--border2);
+  text-decoration:none;cursor:pointer;
+  transition:all .2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+}
+.btn-secondary:hover{border-color:var(--ink2);color:var(--ink)}
+
+/* ── HERO STATS ── */
+.hero-stats{
+  display:flex;gap:0;
+  border-top:1px solid var(--border);
+  padding-top:40px;
+}
+.stat{
+  flex:1;padding-right:32px;
+  border-right:1px solid var(--border);
+  margin-right:32px;
+}
+.stat:last-child{border:none;margin:0}
+.stat-num{
+  font-family:'Syne',sans-serif;
+  font-size:36px;font-weight:800;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.stat-lbl{font-size:11px;color:var(--ink3);letter-spacing:2px;margin-top:4px}
+
+/* ── SECTION COMMON ── */
+.section{
+  padding:clamp(60px,8vh,120px) clamp(20px,5vw,80px);
+  max-width:1280px;margin:0 auto;
+}
+.sec-label{
+  font-size:10px;color:var(--accent);letter-spacing:5px;
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:48px;text-transform:uppercase;
+}
+.sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
+.sec-title{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(28px,4vw,48px);
+  font-weight:800;letter-spacing:-1px;
+  color:var(--ink);margin-bottom:12px;
+}
+.sec-desc{
+  font-size:13px;color:var(--ink2);
+  line-height:1.7;max-width:560px;
+  margin-bottom:48px;font-weight:300;
+}
+
+/* ── ALGORITHM GRID ── */
+.algo-categories{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  margin-bottom:32px;
+}
+.algo-cat{
+  background:var(--bg2);
+  padding:20px 18px;
+  cursor:pointer;
+  transition:background .2s;
+  position:relative;overflow:hidden;
+}
+.algo-cat::before{
+  content:'';position:absolute;top:0;left:0;
+  width:0;height:2px;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  transition:width .3s;
+}
+.algo-cat:hover{background:var(--bg3)}
+.algo-cat:hover::before{width:100%}
+.cat-num{font-size:10px;color:var(--ink3);letter-spacing:2px;margin-bottom:8px}
+.cat-name{font-size:13px;color:var(--ink);font-weight:600;margin-bottom:4px;line-height:1.3}
+.cat-tag{
+  font-size:9px;letter-spacing:1px;padding:2px 7px;
+  border-radius:2px;display:inline-block;margin-top:6px;
+}
+.tag-arrays{background:rgba(59,130,246,.15);color:var(--accent)}
+.tag-graphs{background:rgba(6,182,212,.15);color:var(--accent2)}
+.tag-trees{background:rgba(139,92,246,.15);color:var(--accent3)}
+.tag-dp{background:rgba(16,185,129,.15);color:var(--green)}
+.tag-strings{background:rgba(245,158,11,.15);color:var(--yellow)}
+.tag-math{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-geo{background:rgba(16,185,129,.15);color:var(--green)}
+
+/* featured row */
+.featured-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;margin-bottom:16px;
+}
+@media(max-width:768px){.featured-grid{grid-template-columns:1fr}}
+.feat-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  padding:28px 24px;
+  position:relative;overflow:hidden;
+  transition:border-color .25s,transform .25s;
+}
+.feat-card:hover{border-color:var(--border2);transform:translateY(-3px)}
+.feat-card .feat-icon{
+  font-size:28px;margin-bottom:16px;display:block;
+}
+.feat-card .feat-title{
+  font-family:'Syne',sans-serif;
+  font-size:18px;font-weight:700;
+  color:var(--ink);margin-bottom:8px;letter-spacing:-.5px;
+}
+.feat-card .feat-desc{font-size:12px;color:var(--ink2);line-height:1.7;font-weight:300}
+.feat-card .feat-link{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:11px;color:var(--accent);letter-spacing:1px;
+  margin-top:16px;text-decoration:none;transition:gap .2s;
+}
+.feat-card .feat-link:hover{gap:10px}
+.feat-card.highlight{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.05)}
+.feat-card.highlight::before{
+  content:'';position:absolute;top:0;right:0;
+  width:80px;height:80px;
+  background:radial-gradient(circle,rgba(59,130,246,.15),transparent 70%);
+}
+
+/* ── HOW IT WORKS ── */
+.steps-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:24px;
+}
+.step-card{padding:24px 0;border-top:1px solid var(--border);position:relative}
+.step-card::before{
+  content:attr(data-n);
+  font-family:'Syne',sans-serif;
+  font-size:64px;font-weight:800;
+  color:rgba(255,255,255,.04);
+  position:absolute;top:-10px;right:0;
+  line-height:1;
+}
+.step-num-badge{
+  width:28px;height:28px;
+  background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#000;
+  margin-bottom:16px;
+  clip-path:polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%);
+}
+.step-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:8px}
+.step-desc{font-size:12px;color:var(--ink2);line-height:1.7;font-weight:300}
+
+/* ── FULL ALGO LIST ── */
+.algo-table{width:100%;border-collapse:collapse}
+.algo-table th{
+  text-align:left;font-size:10px;letter-spacing:3px;
+  color:var(--ink3);padding:12px 16px;
+  border-bottom:1px solid var(--border);font-weight:400;
+}
+.algo-table td{
+  padding:12px 16px;font-size:12px;color:var(--ink2);
+  border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.algo-table tr:hover td{background:var(--bg3);color:var(--ink)}
+.algo-table td:first-child{color:var(--ink3);font-size:10px;letter-spacing:1px}
+.algo-table td:nth-child(2){color:var(--ink);font-weight:600}
+.algo-table td a{color:inherit;text-decoration:none}
+.complexity{
+  font-size:10px;padding:2px 8px;
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:2px;letter-spacing:1px;
+  font-family:'JetBrains Mono',monospace;
+}
+.complexity.green{border-color:rgba(16,185,129,.3);color:var(--green)}
+.complexity.yellow{border-color:rgba(245,158,11,.3);color:var(--yellow)}
+.complexity.red{border-color:rgba(239,68,68,.3);color:var(--red)}
+
+/* ── CTA ── */
+#cta{
+  border-top:1px solid var(--border);
+  padding:clamp(80px,10vh,140px) clamp(20px,5vw,80px);
+  text-align:center;
+}
+.cta-title{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(32px,5vw,64px);
+  font-weight:800;letter-spacing:-2px;
+  margin-bottom:16px;
+}
+.cta-sub{font-size:14px;color:var(--ink2);max-width:480px;margin:0 auto 36px;line-height:1.7;font-weight:300}
+.cta-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border);
+  padding:24px clamp(20px,5vw,80px);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:12px;
+  font-size:11px;color:var(--ink3);
+}
+footer a{color:var(--ink3);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--accent)}
+.footer-links{display:flex;gap:20px}
+
+/* ── DIVIDER ── */
+.glow-divider{
+  width:100%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);
+  opacity:.3;margin:0;
+}
+
+/* ── REVEAL ── */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:640px){
+  .hero-stats{flex-direction:column;gap:20px}
+  .stat{border:none;margin:0;padding:0;border-bottom:1px solid var(--border);padding-bottom:20px}
+  .stat:last-child{border:none;padding:0}
+  .nav-links{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-trail"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo">GBMvisuAL</div>
+  <ul class="nav-links">
+    <li><a href="#algorithms">Algorithms</a></li>
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#reference">Reference</a></li>
+  </ul>
+  <a class="nav-cta" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">VIEW SOURCE</a>
+</nav>
+
+<div id="page">
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-eyebrow">ALGORITHM VISUALIZER</div>
+  <h1 class="hero-title">
+    <span class="line1">See every</span>
+    <span class="line2">algorithm think.</span>
+  </h1>
+  <p class="hero-sub">
+    <strong>47 DSA algorithms</strong> — visualized, step by step.
+    From Two Pointers to Suffix Arrays, Convex Hull to Aho-Corasick.
+    Built to make the invisible logic visible.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#algorithms">EXPLORE ALGORITHMS</a>
+    <a class="btn-secondary" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">GITHUB REPO ↗</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num">47</div><div class="stat-lbl">ALGORITHMS</div></div>
+    <div class="stat"><div class="stat-num">9</div><div class="stat-lbl">CATEGORIES</div></div>
+    <div class="stat"><div class="stat-num">100%</div><div class="stat-lbl">CLIENT SIDE</div></div>
+    <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">DEPENDENCIES</div></div>
+  </div>
+</section>
+
+<div class="glow-divider"></div>
+
+<!-- FEATURED -->
+<div class="section reveal" id="algorithms">
+  <div class="sec-label"><span>01</span> Highlights</div>
+  <h2 class="sec-title">Core algorithm families</h2>
+  <p class="sec-desc">Every visualization runs in your browser — no backend, no installs. Step through each algorithm at your own pace.</p>
+
+  <div class="featured-grid">
+    <div class="feat-card highlight">
+      <span class="feat-icon">⟶</span>
+      <div class="feat-title">Arrays & Searching</div>
+      <p class="feat-desc">Two Pointers, Sliding Window, Binary Search — the foundation of interview prep, visualized with live pointer movement and window highlighting.</p>
+      <a class="feat-link" href="./01-Two-Pointer/">Explore →</a>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">◈</span>
+      <div class="feat-title">Graphs & Trees</div>
+      <p class="feat-desc">DFS, BFS, Dijkstra, MST, SCC, Topological Sort — watch the frontier expand node by node through animated graph traversals.</p>
+      <a class="feat-link" href="./04-DFS/">Explore →</a>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">▦</span>
+      <div class="feat-title">Dynamic Programming</div>
+      <p class="feat-desc">Classic DP, Bitmask DP, Divide & Conquer DP, Knuth Optimization — see the table fill cell by cell with dependency highlighting.</p>
+      <a class="feat-link" href="./06-Dynamic-Programming/">Explore →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ALGO GRID -->
+<div class="section reveal">
+  <div class="sec-label"><span>02</span> All Topics</div>
+  <h2 class="sec-title">Every algorithm, organized</h2>
+  <p class="sec-desc">Click any card to jump straight to its visualization.</p>
+
+  <div class="algo-categories">
+    <div class="algo-cat" onclick="location.href='./01-Two-Pointer/'">
+      <div class="cat-num">01</div><div class="cat-name">Two Pointer</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./02-Sliding-Window/'">
+      <div class="cat-num">02</div><div class="cat-name">Sliding Window</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./03-Binary-Search/'">
+      <div class="cat-num">03</div><div class="cat-name">Binary Search</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./04-DFS/'">
+      <div class="cat-num">04</div><div class="cat-name">DFS</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./05-BFS/'">
+      <div class="cat-num">05</div><div class="cat-name">BFS</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./06-Dynamic-Programming/'">
+      <div class="cat-num">06</div><div class="cat-name">Dynamic Programming</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./07-Greedy/'">
+      <div class="cat-num">07</div><div class="cat-name">Greedy</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./08-Divide-and-Conquer/'">
+      <div class="cat-num">08</div><div class="cat-name">Divide & Conquer</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./09-Stack/'">
+      <div class="cat-num">09</div><div class="cat-name">Stack</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./10-Queue/'">
+      <div class="cat-num">10</div><div class="cat-name">Queue</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./11-Deque/'">
+      <div class="cat-num">11</div><div class="cat-name">Deque</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./12-Heap-Priority-Queue/'">
+      <div class="cat-num">12</div><div class="cat-name">Heap / Priority Queue</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./13-Hashing/'">
+      <div class="cat-num">13</div><div class="cat-name">Hashing</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./14-Union-Find-DSU/'">
+      <div class="cat-num">14</div><div class="cat-name">Union Find / DSU</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./15-Segment-Tree/'">
+      <div class="cat-num">15</div><div class="cat-name">Segment Tree</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./16-Fenwick-Tree-BIT/'">
+      <div class="cat-num">16</div><div class="cat-name">Fenwick Tree (BIT)</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./17-Trie/'">
+      <div class="cat-num">17</div><div class="cat-name">Trie</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./18-Bit-Manipulation/'">
+      <div class="cat-num">18</div><div class="cat-name">Bit Manipulation</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./19-Bitmask-DP/'">
+      <div class="cat-num">19</div><div class="cat-name">Bitmask DP</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./20-Topological-Sort/'">
+      <div class="cat-num">20</div><div class="cat-name">Topological Sort</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./21-Shortest-Path/'">
+      <div class="cat-num">21</div><div class="cat-name">Shortest Path</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./22-MST/'">
+      <div class="cat-num">22</div><div class="cat-name">MST</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./23-SCC/'">
+      <div class="cat-num">23</div><div class="cat-name">SCC</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./24-Network-Flow/'">
+      <div class="cat-num">24</div><div class="cat-name">Network Flow</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./25-Bipartite-Matching/'">
+      <div class="cat-num">25</div><div class="cat-name">Bipartite Matching</div><span class="cat-tag tag-graphs">Graphs</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./26-Sparse-Table-RMQ/'">
+      <div class="cat-num">26</div><div class="cat-name">Sparse Table / RMQ</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./27-Heavy-Light-Decomposition/'">
+      <div class="cat-num">27</div><div class="cat-name">Heavy Light Decomp.</div><span class="cat-tag tag-trees">Trees</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./28-Mos-Algorithm/'">
+      <div class="cat-num">28</div><div class="cat-name">Mo's Algorithm</div><span class="cat-tag tag-arrays">Arrays</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./29-KMP/'">
+      <div class="cat-num">29</div><div class="cat-name">KMP</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./30-Z-Algorithm/'">
+      <div class="cat-num">30</div><div class="cat-name">Z Algorithm</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./31-Rabin-Karp/'">
+      <div class="cat-num">31</div><div class="cat-name">Rabin-Karp</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./32-Aho-Corasick/'">
+      <div class="cat-num">32</div><div class="cat-name">Aho-Corasick</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./33-Suffix-Array/'">
+      <div class="cat-num">33</div><div class="cat-name">Suffix Array</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./34-Manachers-Algorithm/'">
+      <div class="cat-num">34</div><div class="cat-name">Manacher's Algorithm</div><span class="cat-tag tag-strings">Strings</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./35-Convex-Hull-Trick/'">
+      <div class="cat-num">35</div><div class="cat-name">Convex Hull Trick</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./36-Divide-Conquer-DP/'">
+      <div class="cat-num">36</div><div class="cat-name">Divide & Conquer DP</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./37-Knuth-Optimization/'">
+      <div class="cat-num">37</div><div class="cat-name">Knuth Optimization</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./38-Sieve-of-Eratosthenes/'">
+      <div class="cat-num">38</div><div class="cat-name">Sieve of Eratosthenes</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./39-Binary-Exponentiation/'">
+      <div class="cat-num">39</div><div class="cat-name">Binary Exponentiation</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./40-Modular-Arithmetic/'">
+      <div class="cat-num">40</div><div class="cat-name">Modular Arithmetic</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./41-Chinese-Remainder-Theorem/'">
+      <div class="cat-num">41</div><div class="cat-name">Chinese Remainder Thm.</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./42-Combinatorics/'">
+      <div class="cat-num">42</div><div class="cat-name">Combinatorics</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./43-Matrix-Exponentiation/'">
+      <div class="cat-num">43</div><div class="cat-name">Matrix Exponentiation</div><span class="cat-tag tag-math">Math</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./44-Convex-Hull-Geometry/'">
+      <div class="cat-num">44</div><div class="cat-name">Convex Hull Geometry</div><span class="cat-tag tag-geo">Geometry</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./45-Line-Sweep/'">
+      <div class="cat-num">45</div><div class="cat-name">Line Sweep</div><span class="cat-tag tag-geo">Geometry</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./46-Meet-in-the-Middle/'">
+      <div class="cat-num">46</div><div class="cat-name">Meet in the Middle</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+    <div class="algo-cat" onclick="location.href='./47-Backtracking-Bitmask-GameTheory/'">
+      <div class="cat-num">47</div><div class="cat-name">Backtracking & Game Theory</div><span class="cat-tag tag-dp">DP</span>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="section reveal" id="how">
+  <div class="sec-label"><span>03</span> How it works</div>
+  <h2 class="sec-title">Built different.</h2>
+  <p class="sec-desc">Pure HTML, CSS, and JavaScript. No frameworks, no dependencies. Every visualization runs entirely in the browser.</p>
+
+  <div class="steps-grid">
+    <div class="step-card" data-n="1">
+      <div class="step-num-badge">1</div>
+      <div class="step-title">Pick an algorithm</div>
+      <p class="step-desc">Choose from 47 algorithms across 9 categories — arrays, graphs, DP, strings, trees, math and geometry.</p>
+    </div>
+    <div class="step-card" data-n="2">
+      <div class="step-num-badge">2</div>
+      <div class="step-title">Set your input</div>
+      <p class="step-desc">Enter custom inputs or use presets. Each visualizer accepts real data so you can test your own cases.</p>
+    </div>
+    <div class="step-card" data-n="3">
+      <div class="step-num-badge">3</div>
+      <div class="step-title">Step through it</div>
+      <p class="step-desc">Use play, pause, and step controls. Watch pointers move, tables fill, trees expand — one operation at a time.</p>
+    </div>
+    <div class="step-card" data-n="4">
+      <div class="step-num-badge">4</div>
+      <div class="step-title">Read the code</div>
+      <p class="step-desc">Each visualization ships with annotated source code. The logic highlighted in sync with the animation.</p>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK REFERENCE TABLE -->
+<div class="section reveal" id="reference">
+  <div class="sec-label"><span>04</span> Quick Reference</div>
+  <h2 class="sec-title">Complexity at a glance</h2>
+  <p class="sec-desc">Common complexities for each algorithm family.</p>
+
+  <table class="algo-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Algorithm</th>
+        <th>Time</th>
+        <th>Space</th>
+        <th>Category</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>01</td><td>Two Pointer</td><td><span class="complexity green">O(n)</span></td><td><span class="complexity green">O(1)</span></td><td>Arrays</td></tr>
+      <tr><td>02</td><td>Sliding Window</td><td><span class="complexity green">O(n)</span></td><td><span class="complexity green">O(k)</span></td><td>Arrays</td></tr>
+      <tr><td>03</td><td>Binary Search</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity green">O(1)</span></td><td>Arrays</td></tr>
+      <tr><td>04</td><td>DFS</td><td><span class="complexity yellow">O(V+E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
+      <tr><td>05</td><td>BFS</td><td><span class="complexity yellow">O(V+E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
+      <tr><td>06</td><td>Dynamic Programming</td><td><span class="complexity yellow">O(n²)</span></td><td><span class="complexity yellow">O(n)</span></td><td>DP</td></tr>
+      <tr><td>12</td><td>Heap / Priority Queue</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Trees</td></tr>
+      <tr><td>14</td><td>Union Find (DSU)</td><td><span class="complexity green">O(α(n))</span></td><td><span class="complexity yellow">O(n)</span></td><td>Graphs</td></tr>
+      <tr><td>15</td><td>Segment Tree</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Trees</td></tr>
+      <tr><td>21</td><td>Dijkstra</td><td><span class="complexity yellow">O(E log V)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
+      <tr><td>22</td><td>Kruskal / Prim MST</td><td><span class="complexity yellow">O(E log E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
+      <tr><td>29</td><td>KMP</td><td><span class="complexity green">O(n+m)</span></td><td><span class="complexity green">O(m)</span></td><td>Strings</td></tr>
+      <tr><td>32</td><td>Aho-Corasick</td><td><span class="complexity yellow">O(n+m)</span></td><td><span class="complexity yellow">O(m·Σ)</span></td><td>Strings</td></tr>
+      <tr><td>38</td><td>Sieve of Eratosthenes</td><td><span class="complexity yellow">O(n log log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Math</td></tr>
+      <tr><td>43</td><td>Matrix Exponentiation</td><td><span class="complexity red">O(k³ log n)</span></td><td><span class="complexity yellow">O(k²)</span></td><td>Math</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- CTA -->
+<section id="cta">
+  <h2 class="cta-title reveal">Start visualizing.</h2>
+  <p class="cta-sub reveal">47 algorithms. Zero setup. Open the repo, pick a topic, and watch the logic unfold.</p>
+  <div class="cta-actions reveal">
+    <a class="btn-primary" href="#algorithms">BROWSE ALL 47 →</a>
+    <a class="btn-secondary" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">STAR ON GITHUB</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>GBMvisuAL — built by <a href="https://github.com/Surya97141" target="_blank">Surya97141</a></div>
+  <div class="footer-links">
+    <a href="https://github.com/Surya97141/GBMvisuAL" target="_blank">GitHub</a>
+    <a href="https://Surya97141.github.io" target="_blank">Portfolio</a>
+    <a href="https://linkedin.com/in/surya-singh-b575591b5" target="_blank">LinkedIn</a>
+  </div>
+</footer>
+
+</div>
+
+<script>
+/* ── CURSOR ── */
+const cur = document.getElementById('cur');
+const trail = document.getElementById('cur-trail');
+let mx=0,my=0,tx=0,ty=0;
+document.addEventListener('mousemove',e=>{
+  mx=e.clientX;my=e.clientY;
+  cur.style.left=mx+'px';cur.style.top=my+'px';
+});
+function animTrail(){
+  tx+=(mx-tx)*.18; ty+=(my-ty)*.18;
+  trail.style.left=tx+'px'; trail.style.top=ty+'px';
+  requestAnimationFrame(animTrail);
+}
+animTrail();
+document.querySelectorAll('a,button,.algo-cat,.feat-card').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{
+    cur.style.transform='translate(-50%,-50%) scale(2)';
+    cur.style.background='var(--accent2)';
+    trail.style.transform='translate(-50%,-50%) scale(1.5)';
+  });
+  el.addEventListener('mouseleave',()=>{
+    cur.style.transform='translate(-50%,-50%) scale(1)';
+    cur.style.background='var(--accent)';
+    trail.style.transform='translate(-50%,-50%) scale(1)';
+  });
+});
+
+/* ── NAV SCROLL ── */
+const nav = document.getElementById('nav');
+window.addEventListener('scroll',()=>{
+  nav.classList.toggle('scrolled',window.scrollY>40);
+});
+
+/* ── BACKGROUND PARTICLE CANVAS ── */
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W,H,nodes=[];
+function resize(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+}
+resize();
+window.addEventListener('resize',resize);
+
+class Node{
+  constructor(){this.reset()}
+  reset(){
+    this.x=Math.random()*W; this.y=Math.random()*H;
+    this.vx=(Math.random()-.5)*.3; this.vy=(Math.random()-.5)*.3;
+    this.r=Math.random()*1.5+.5;
+    this.a=Math.random()*.6+.2;
+  }
+  update(){
+    this.x+=this.vx; this.y+=this.vy;
+    if(this.x<0||this.x>W||this.y<0||this.y>H) this.reset();
+  }
+  draw(){
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(59,130,246,${this.a})`;
+    ctx.fill();
+  }
+}
+
+for(let i=0;i<80;i++) nodes.push(new Node());
+
+function drawParticles(){
+  ctx.clearRect(0,0,W,H);
+  nodes.forEach(n=>{n.update();n.draw()});
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<120){
+        ctx.beginPath();
+        ctx.moveTo(nodes[i].x,nodes[i].y);
+        ctx.lineTo(nodes[j].x,nodes[j].y);
+        ctx.strokeStyle=`rgba(59,130,246,${.15*(1-d/120)})`;
+        ctx.lineWidth=.5;
+        ctx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(drawParticles);
+}
+drawParticles();
+
+/* ── SCROLL REVEAL ── */
+const revEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}
+  });
+},{threshold:.1});
+revEls.forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
