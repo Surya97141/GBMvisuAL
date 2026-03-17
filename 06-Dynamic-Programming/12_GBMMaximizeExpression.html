@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximize Expression — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:0.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,0.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+/* controls */
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field input.wide{width:280px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+/* expression banner */
+.expr-banner{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:14px;flex-wrap:wrap;}
+.expr-part{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid transparent;transition:all .3s;}
+.ep-a{background:rgba(33,150,243,0.12);border-color:rgba(33,150,243,0.4);color:#0d47a1;}
+.ep-b{background:rgba(230,57,70,0.10);border-color:rgba(230,57,70,0.4);color:#9b0000;}
+.ep-c{background:rgba(6,214,160,0.12);border-color:rgba(6,214,160,0.4);color:#024d37;}
+.ep-d{background:rgba(192,84,252,0.10);border-color:rgba(192,84,252,0.4);color:var(--pur-dark);}
+.ep-op{color:var(--muted);font-family:'Space Mono',monospace;font-size:1rem;}
+.expr-part.active{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.expr-live{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;color:var(--accent4);margin-left:auto;}
+
+/* array display */
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.array-section{margin-bottom:12px;}
+
+.arr-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.arr-label{font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;width:120px;flex-shrink:0;padding:4px 8px;border-radius:5px;border:1.5px solid transparent;}
+.arr-label.lbl-input{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.3);color:var(--accent2);}
+.arr-label.lbl-a{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.3);color:#0d47a1;}
+.arr-label.lbl-b{background:rgba(230,57,70,.08);border-color:rgba(230,57,70,.3);color:#9b0000;}
+.arr-label.lbl-c{background:rgba(6,214,160,.08);border-color:rgba(6,214,160,.3);color:#024d37;}
+.arr-label.lbl-d{background:rgba(192,84,252,.08);border-color:rgba(192,84,252,.3);color:var(--pur-dark);}
+
+.arr-cells{display:flex;gap:4px;flex-wrap:nowrap;}
+.acell{
+  width:48px;height:42px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.acell.ac-input{background:rgba(33,150,243,.06);border-color:rgba(33,150,243,.25);color:var(--accent2);}
+.acell.ac-cur {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;color:#7a4800!important;transform:scale(1.12) translateY(-3px);box-shadow:0 6px 16px rgba(245,166,35,.4);animation:dpulse .8s ease infinite alternate;z-index:3;}
+@keyframes dpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.6);}}
+.acell.ac-filled-a{background:rgba(33,150,243,.12);border-color:rgba(33,150,243,.4);color:#0d47a1;}
+.acell.ac-filled-b{background:rgba(230,57,70,.10);border-color:rgba(230,57,70,.4);color:#9b0000;}
+.acell.ac-filled-c{background:rgba(6,214,160,.12);border-color:rgba(6,214,160,.4);color:#024d37;}
+.acell.ac-filled-d{background:rgba(192,84,252,.10);border-color:rgba(192,84,252,.4);color:var(--pur-dark);}
+.acell.ac-best{background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;box-shadow:0 4px 12px rgba(6,214,160,.3);}
+.acell.ac-empty{color:#ccc;}
+.acell-idx{position:absolute;top:2px;left:3px;font-size:.5rem;color:var(--muted);}
+
+/* SVG overlay on arrays */
+.arr-wrap{position:relative;display:inline-block;}
+.arr-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+
+/* decision panel */
+.dec-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;transition:border-color .3s;}
+.dec-panel.dp-a{border-color:var(--accent2);}
+.dec-panel.dp-b{border-color:var(--accent);}
+.dec-panel.dp-c{border-color:var(--accent3);}
+.dec-panel.dp-d{border-color:var(--pur);}
+.dec-panel.dp-done{border-color:var(--accent3);}
+.dec-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.dec-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.dec-box{flex:1;min-width:100px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.dec-box.db-win{border-width:2.5px;}
+.dec-box.db-a{border-color:rgba(33,150,243,.5);background:rgba(33,150,243,.06);}
+.dec-box.db-b{border-color:rgba(230,57,70,.5);background:rgba(230,57,70,.05);}
+.dec-box.db-c{border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.06);}
+.dec-box.db-d{border-color:rgba(192,84,252,.5);background:rgba(192,84,252,.06);}
+.dec-box .db-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.dec-box .db-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--ink);}
+.dec-box .db-sub{font-size:.65rem;color:var(--muted);margin-top:2px;}
+.dec-op{font-family:'Space Mono',monospace;font-size:.9rem;color:var(--muted);flex-shrink:0;}
+.dec-result{min-width:80px;border:2.5px solid var(--accent4);border-radius:7px;padding:7px 10px;text-align:center;background:rgba(255,209,102,.08);}
+.dec-result .db-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:#7a5a00;text-transform:uppercase;margin-bottom:3px;}
+.dec-result .db-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:#7a5a00;}
+
+/* complexity strip */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-card .cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-card .cx-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.cx-card .cx-sub{font-size:.62rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-a   {border-color:var(--accent2);}
+.explain-panel.ep-b   {border-color:var(--accent);}
+.explain-panel.ep-c   {border-color:var(--accent3);}
+.explain-panel.ep-d   {border-color:var(--pur);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-a{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-b{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-c{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-d{border-left-color:var(--pur);background:rgba(192,84,252,.06);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*9+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}.pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-a{background:rgba(33,150,243,.16);border-left-color:#2196f3;color:#e2e8f0;}
+.code-line.hl-b{background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-c{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-d{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--bg);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Maximize Expression</h1>
+    <div class="sub">Dynamic Programming · 4 Aux Arrays · a[a]−a[b]+a[c]−a[d]</div>
+  </div>
+  <div class="family-badge">DP · Greedy Decompose</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Array  (comma separated)</label>
+      <input type="text" id="inputArr" class="wide" value="3,6,1,-3,2,7">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="330">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- EXPRESSION BANNER -->
+  <div class="expr-banner" id="exprBanner">
+    <span class="expr-part ep-a" id="xpA">array[a]</span>
+    <span class="ep-op">−</span>
+    <span class="expr-part ep-b" id="xpB">array[b]</span>
+    <span class="ep-op">+</span>
+    <span class="expr-part ep-c" id="xpC">array[c]</span>
+    <span class="ep-op">−</span>
+    <span class="expr-part ep-d" id="xpD">array[d]</span>
+    <span class="expr-live" id="exprLive"></span>
+  </div>
+
+  <!-- ARRAYS -->
+  <div class="section-label">Arrays — built left to right, one pass each</div>
+  <div class="array-section">
+    <!-- input -->
+    <div class="arr-row">
+      <div class="arr-label lbl-input">input[]</div>
+      <div class="arr-wrap">
+        <div class="arr-cells" id="arrInput"></div>
+      </div>
+    </div>
+    <!-- dp1: best array[a] up to i -->
+    <div class="arr-row">
+      <div class="arr-label lbl-a">dp1[i]=max(a[i])</div>
+      <div class="arr-wrap" style="position:relative;display:inline-block;">
+        <div class="arr-cells" id="arr1"></div>
+        <svg style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;" id="ov1" width="1" height="1"></svg>
+      </div>
+    </div>
+    <!-- dp2 -->
+    <div class="arr-row">
+      <div class="arr-label lbl-b">dp2[i]=dp1−a[b]</div>
+      <div class="arr-wrap" style="position:relative;display:inline-block;">
+        <div class="arr-cells" id="arr2"></div>
+        <svg style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;" id="ov2" width="1" height="1"></svg>
+      </div>
+    </div>
+    <!-- dp3 -->
+    <div class="arr-row">
+      <div class="arr-label lbl-c">dp3[i]=dp2+a[c]</div>
+      <div class="arr-wrap" style="position:relative;display:inline-block;">
+        <div class="arr-cells" id="arr3"></div>
+        <svg style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;" id="ov3" width="1" height="1"></svg>
+      </div>
+    </div>
+    <!-- dp4 -->
+    <div class="arr-row">
+      <div class="arr-label lbl-d">dp4[i]=dp3−a[d]</div>
+      <div class="arr-wrap" style="position:relative;display:inline-block;">
+        <div class="arr-cells" id="arr4"></div>
+        <svg style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;" id="ov4" width="1" height="1"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div>
+      <div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">4 single passes</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div>
+      <div class="cx-val" style="color:var(--pur-dark)">O(n)</div>
+      <div class="cx-sub">4 aux arrays</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">vs Brute Force</div>
+      <div class="cx-val" style="color:#028a5b">O(n⁴)</div>
+      <div class="cx-sub">4 nested loops</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">This run</div>
+      <div class="cx-val" id="cxN" style="color:#7a5a00">—</div>
+      <div class="cx-sub" id="cxSub">n=?</div>
+    </div>
+  </div>
+
+  <!-- DECISION PANEL -->
+  <div class="dec-panel" id="decPanel">
+    <div class="dec-title" id="decTitle">Press RUN to start</div>
+    <div class="dec-body" id="decBody"></div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">maximizeExpr</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a) {</span>
+<span class="code-line" id="cl-chk">  <span class="ck">int</span> n=a.size(); <span class="ck">if</span>(n&lt;<span class="cn">4</span>) <span class="ck">return</span> <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-d1h">  <span class="cc">// dp1[i] = best a[a] for a in [0..i]</span></span>
+<span class="code-line" id="cl-d1l">  vector&lt;<span class="ck">int</span>&gt; dp1(n); dp1[<span class="cn">0</span>]=a[<span class="cn">0</span>];</span>
+<span class="code-line" id="cl-d1f">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">1</span>;i&lt;n;i++)</span>
+<span class="code-line" id="cl-d1b">    dp1[i]=max(dp1[i-<span class="cn">1</span>],a[i]);</span>
+<span class="code-line" id="cl-d2h">  <span class="cc">// dp2[i] = best dp1[b-1] - a[b]</span></span>
+<span class="code-line" id="cl-d2l">  vector&lt;<span class="ck">int</span>&gt; dp2(n); dp2[<span class="cn">1</span>]=dp1[<span class="cn">0</span>]-a[<span class="cn">1</span>];</span>
+<span class="code-line" id="cl-d2f">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">2</span>;i&lt;n;i++)</span>
+<span class="code-line" id="cl-d2b">    dp2[i]=max(dp2[i-<span class="cn">1</span>],dp1[i-<span class="cn">1</span>]-a[i]);</span>
+<span class="code-line" id="cl-d3h">  <span class="cc">// dp3[i] = best dp2[c-1] + a[c]</span></span>
+<span class="code-line" id="cl-d3l">  vector&lt;<span class="ck">int</span>&gt; dp3(n); dp3[<span class="cn">2</span>]=dp2[<span class="cn">1</span>]+a[<span class="cn">2</span>];</span>
+<span class="code-line" id="cl-d3f">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">3</span>;i&lt;n;i++)</span>
+<span class="code-line" id="cl-d3b">    dp3[i]=max(dp3[i-<span class="cn">1</span>],dp2[i-<span class="cn">1</span>]+a[i]);</span>
+<span class="code-line" id="cl-d4h">  <span class="cc">// dp4[i] = best dp3[d-1] - a[d]</span></span>
+<span class="code-line" id="cl-d4l">  vector&lt;<span class="ck">int</span>&gt; dp4(n); dp4[<span class="cn">3</span>]=dp3[<span class="cn">2</span>]-a[<span class="cn">3</span>];</span>
+<span class="code-line" id="cl-d4f">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">4</span>;i&lt;n;i++)</span>
+<span class="code-line" id="cl-d4b">    dp4[i]=max(dp4[i-<span class="cn">1</span>],dp3[i-<span class="cn">1</span>]-a[i]);</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp4[n-<span class="cn">1</span>]; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;letter-spacing:1px;">O(n) · 4 passes</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:280px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>  <span style="color:#374151;font-style:italic">// max compiler speed</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>               <span style="color:#374151;font-style:italic">// SIMD 256-bit</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>                <span style="color:#374151;font-style:italic">// all headers</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">solve</span>(vector&lt;<span style="color:#c084fc">int</span>&gt;&amp; a){
+  <span style="color:#c084fc">int</span> n=a.size();
+  <span style="color:#c084fc">if</span>(n&lt;<span style="color:#fda4af">4</span>) <span style="color:#c084fc">return</span> <span style="color:#fda4af">0</span>;
+  vector&lt;<span style="color:#c084fc">int</span>&gt; d1(n),d2(n),d3(n),d4(n);
+  d1[<span style="color:#fda4af">0</span>]=a[<span style="color:#fda4af">0</span>];
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;n;i++) d1[i]=max(d1[i-<span style="color:#fda4af">1</span>],a[i]);
+  d2[<span style="color:#fda4af">1</span>]=d1[<span style="color:#fda4af">0</span>]-a[<span style="color:#fda4af">1</span>];                        <span style="color:#374151;font-style:italic">// b starts at 1</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">2</span>;i&lt;n;i++) d2[i]=max(d2[i-<span style="color:#fda4af">1</span>],d1[i-<span style="color:#fda4af">1</span>]-a[i]);
+  d3[<span style="color:#fda4af">2</span>]=d2[<span style="color:#fda4af">1</span>]+a[<span style="color:#fda4af">2</span>];                        <span style="color:#374151;font-style:italic">// c starts at 2</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">3</span>;i&lt;n;i++) d3[i]=max(d3[i-<span style="color:#fda4af">1</span>],d2[i-<span style="color:#fda4af">1</span>]+a[i]);
+  d4[<span style="color:#fda4af">3</span>]=d3[<span style="color:#fda4af">2</span>]-a[<span style="color:#fda4af">3</span>];                        <span style="color:#374151;font-style:italic">// d starts at 3</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">4</span>;i&lt;n;i++) d4[i]=max(d4[i-<span style="color:#fda4af">1</span>],d3[i-<span style="color:#fda4af">1</span>]-a[i]);
+  <span style="color:#c084fc">return</span> d4[n-<span style="color:#fda4af">1</span>];                          <span style="color:#374151;font-style:italic">// answer = last cell of dp4</span>
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>);             <span style="color:#374151;font-style:italic">// decouple C/C++ I/O</span>
+  cin.tie(<span style="color:#c084fc">nullptr</span>);                     <span style="color:#374151;font-style:italic">// stop cin flushing cout</span>
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  vector&lt;<span style="color:#c084fc">int</span>&gt; a(n);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:a) cin&gt;&gt;x;
+  cout&lt;&lt;<span style="color:#67e8f9">solve</span>(a)&lt;&lt;<span style="color:#fda4af">'\n'</span>;               <span style="color:#374151;font-style:italic">// '\n' faster than endl</span>
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">#pragma O3+AVX2</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">4 passes O(n)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">vs O(n⁴) brute</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">answer=d4&#91;n-1&#93;</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcPass"><div class="var-name">pass</div><div class="var-value" id="vPass" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcIdx"> <div class="var-name">index i</div><div class="var-value" id="vIdx"  style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcVal"> <div class="var-name">a[i]</div>  <div class="var-value" id="vVal"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcPrev"><div class="var-name">prev best</div><div class="var-value" id="vPrev" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcCur" style="grid-column:1/3"><div class="var-name">current dp[i]</div><div class="var-value" id="vCur" style="font-size:1.1rem;color:var(--accent4)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Maximum Expression Value</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ EXPRESSION MAXIMIZED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {n,i,val,prev,cur,dp1,dp2,dp3} = args||{};
+  const INF='−∞';
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-a">Brute force tries all (a,b,c,d) combos → O(n⁴). Key insight: decompose the expression into 4 sub-problems, each solved in one left-to-right pass. Each array stores the best partial result achievable up to index i.</div>`,
+    inv:[
+      {icon:'🔑',cls:'',text:`<strong>Decomposition:</strong> a[a]−a[b]+a[c]−a[d] = (((a[a]) − a[b]) + a[c]) − a[d]. Build from inside out.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>4 arrays:</strong> dp1=best a[a], dp2=best a[a]−a[b], dp3=best a[a]−a[b]+a[c], dp4=best full expression. Answer = dp4[n−1].`},
+      {icon:'🔒',cls:'inv-pur',text:`<strong>Index constraints:</strong> a&lt;b&lt;c&lt;d forces each array to start one index later: dp1 starts at 0, dp2 at 1, dp3 at 2, dp4 at 3.`},
+    ]
+  };
+  if(type==='dp1') return {
+    why:`<div class="ep-why-block why-a">dp1[${i}] = max(dp1[${i-1}], a[${i}]) = max(${prev??INF}, ${val}) = <strong>${cur}</strong>. We want the best value of a[a] we've seen so far. This is just a running maximum.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp1[${i}]=${cur}</strong> — the maximum of a[0..${i}]. Any future b,c,d can use this as their a.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why running max?</strong> We want the largest a[a] seen before index b. dp1[i-1] carries that forward.`},
+    ]
+  };
+  if(type==='dp2') return {
+    why:`<div class="ep-why-block why-b">dp2[${i}] = max(dp2[${i-1}], dp1[${i-1}]−a[${i}]) = max(${prev??INF}, ${dp1[i-1]}−${val}=${dp1[i-1]-val}) = <strong>${cur}</strong>. Best (a[a]−a[b]) where b=i, using the best a[a] before i.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp2[${i}]=${cur}</strong> — best a[a]−a[b] for all valid a&lt;b≤${i}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why dp1[i-1]?</strong> Index constraint a&lt;b means a must come strictly before b=${i}. dp1[i-1] is the best a[a] for all a&lt;${i}.`},
+    ]
+  };
+  if(type==='dp3') return {
+    why:`<div class="ep-why-block why-c">dp3[${i}] = max(dp3[${i-1}], dp2[${i-1}]+a[${i}]) = max(${prev??INF}, ${dp2[i-1]}+${val}=${dp2[i-1]+val}) = <strong>${cur}</strong>. Best (a[a]−a[b]+a[c]) where c=i.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp3[${i}]=${cur}</strong> — best a[a]−a[b]+a[c] for all valid a&lt;b&lt;c≤${i}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Building on dp2:</strong> dp2[i-1] is the best a[a]−a[b] before index ${i}, so adding a[${i}] gives best partial expression with c=${i}.`},
+    ]
+  };
+  if(type==='dp4') return {
+    why:`<div class="ep-why-block why-d">dp4[${i}] = max(dp4[${i-1}], dp3[${i-1}]−a[${i}]) = max(${prev??INF}, ${dp3[i-1]}−${val}=${dp3[i-1]-val}) = <strong>${cur}</strong>. Best full expression with d=i.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp4[${i}]=${cur}</strong> — best a[a]−a[b]+a[c]−a[d] for all valid a&lt;b&lt;c&lt;d≤${i}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Final layer:</strong> dp4[n−1] = the answer. All four constraints a&lt;b&lt;c&lt;d are satisfied by construction.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">dp4[n−1] = <strong>${cur}</strong>. Four O(n) passes = O(n) total, O(n) space. Brute force would be O(n⁴). The DP trick: each layer uses the previous layer's best value, propagating optimal substructure forward.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${cur}</strong>. Final cell dp4[n−1] holds the global maximum.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n) time, O(n) space.</strong> Can be reduced to O(1) space using 4 scalar variables instead of arrays.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Pattern generalises:</strong> any expression of the form +a[i]−a[j]+a[k]−... with strict index ordering can be solved with this chained-DP approach.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-chk','cl-d1h','cl-d1l','cl-d1f','cl-d1b'],cls:'hl-a'},
+  dp1:  {ids:['cl-d1f','cl-d1b'], cls:'hl-a'},
+  dp2:  {ids:['cl-d2f','cl-d2b'], cls:'hl-b'},
+  dp3:  {ids:['cl-d3f','cl-d3b'], cls:'hl-c'},
+  dp4:  {ids:['cl-d4f','cl-d4b'], cls:'hl-d'},
+  done: {ids:['cl-ret'],          cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const n=arr.length;
+  const steps=[];
+  const dp1=new Array(n).fill(null);
+  const dp2=new Array(n).fill(null);
+  const dp3=new Array(n).fill(null);
+  const dp4=new Array(n).fill(null);
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,arr:[...arr],
+    dp1:[...dp1],dp2:[...dp2],dp3:[...dp3],dp4:[...dp4],
+    n, explain:makeExplain(type,{n,...extra}),
+    result:null,...extra
+  });
+
+  if(n<4){
+    snap('done','⚠️ Array has fewer than 4 elements — return 0.',{cur:0,i:0});
+    return steps;
+  }
+
+  snap('init',
+    `🚀 <strong>Start.</strong> n=${n}. Build 4 DP arrays left-to-right. Brute force O(n⁴)=<strong>${n**4}</strong> ops → DP O(n)=<strong>${n}</strong> ops.`,
+    {i:0,val:arr[0],cur:null}
+  );
+
+  // Pass 1: dp1[i] = max(arr[a]) for a in [0..i]
+  dp1[0]=arr[0];
+  snap('dp1',
+    `<span style="color:#2196f3;font-weight:700">Pass 1</span> dp1[0] = a[0] = <strong>${arr[0]}</strong>  (base case, only one choice)`,
+    {i:0,val:arr[0],prev:null,cur:dp1[0],dp1:[...dp1]}
+  );
+  for(let i=1;i<n;i++){
+    const prev=dp1[i-1];
+    dp1[i]=Math.max(prev, arr[i]);
+    snap('dp1',
+      `<span style="color:#2196f3;font-weight:700">Pass 1</span> dp1[${i}] = max(dp1[${i-1}]=${prev}, a[${i}]=${arr[i]}) = <strong>${dp1[i]}</strong>`,
+      {i,val:arr[i],prev,cur:dp1[i],dp1:[...dp1]}
+    );
+  }
+
+  // Pass 2: dp2[i] = max(dp1[a]-arr[b]) for b=i, a<i
+  dp2[1]=dp1[0]-arr[1];
+  snap('dp2',
+    `<span style="color:#e63946;font-weight:700">Pass 2</span> dp2[1] = dp1[0]−a[1] = ${dp1[0]}−${arr[1]} = <strong>${dp2[1]}</strong>  (base case, b=1)`,
+    {i:1,val:arr[1],prev:null,cur:dp2[1],dp1:[...dp1],dp2:[...dp2]}
+  );
+  for(let i=2;i<n;i++){
+    const prev=dp2[i-1];
+    dp2[i]=Math.max(prev, dp1[i-1]-arr[i]);
+    snap('dp2',
+      `<span style="color:#e63946;font-weight:700">Pass 2</span> dp2[${i}] = max(dp2[${i-1}]=${prev}, dp1[${i-1}]−a[${i}]=${dp1[i-1]}−${arr[i]}=${dp1[i-1]-arr[i]}) = <strong>${dp2[i]}</strong>`,
+      {i,val:arr[i],prev,cur:dp2[i],dp1:[...dp1],dp2:[...dp2]}
+    );
+  }
+
+  // Pass 3: dp3[i] = max(dp2[b]+arr[c]) for c=i, b<i
+  dp3[2]=dp2[1]+arr[2];
+  snap('dp3',
+    `<span style="color:#06d6a0;font-weight:700">Pass 3</span> dp3[2] = dp2[1]+a[2] = ${dp2[1]}+${arr[2]} = <strong>${dp3[2]}</strong>  (base case, c=2)`,
+    {i:2,val:arr[2],prev:null,cur:dp3[2],dp1:[...dp1],dp2:[...dp2],dp3:[...dp3]}
+  );
+  for(let i=3;i<n;i++){
+    const prev=dp3[i-1];
+    dp3[i]=Math.max(prev, dp2[i-1]+arr[i]);
+    snap('dp3',
+      `<span style="color:#06d6a0;font-weight:700">Pass 3</span> dp3[${i}] = max(dp3[${i-1}]=${prev}, dp2[${i-1}]+a[${i}]=${dp2[i-1]}+${arr[i]}=${dp2[i-1]+arr[i]}) = <strong>${dp3[i]}</strong>`,
+      {i,val:arr[i],prev,cur:dp3[i],dp1:[...dp1],dp2:[...dp2],dp3:[...dp3]}
+    );
+  }
+
+  // Pass 4: dp4[i] = max(dp3[c]-arr[d]) for d=i, c<i
+  dp4[3]=dp3[2]-arr[3];
+  snap('dp4',
+    `<span style="color:#c084fc;font-weight:700">Pass 4</span> dp4[3] = dp3[2]−a[3] = ${dp3[2]}−${arr[3]} = <strong>${dp4[3]}</strong>  (base case, d=3)`,
+    {i:3,val:arr[3],prev:null,cur:dp4[3],dp1:[...dp1],dp2:[...dp2],dp3:[...dp3],dp4:[...dp4]}
+  );
+  for(let i=4;i<n;i++){
+    const prev=dp4[i-1];
+    dp4[i]=Math.max(prev, dp3[i-1]-arr[i]);
+    snap('dp4',
+      `<span style="color:#c084fc;font-weight:700">Pass 4</span> dp4[${i}] = max(dp4[${i-1}]=${prev}, dp3[${i-1}]−a[${i}]=${dp3[i-1]}−${arr[i]}=${dp3[i-1]-arr[i]}) = <strong>${dp4[i]}</strong>`,
+      {i,val:arr[i],prev,cur:dp4[i],dp1:[...dp1],dp2:[...dp2],dp3:[...dp3],dp4:[...dp4]}
+    );
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Answer = dp4[${n-1}] = <strong>${dp4[n-1]}</strong>. Four O(n) passes. Time O(n), Space O(n).`,
+    {i:n-1,cur:dp4[n-1],dp1:[...dp1],dp2:[...dp2],dp3:[...dp3],dp4:[...dp4],
+     result:{value:dp4[n-1]}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let arr=[], n=0;
+const CW=52; // cell width+gap
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  arr=document.getElementById('inputArr').value.split(',').map(Number);
+  n=arr.length;
+  steps=computeSteps(arr);
+  currentStep=0;
+
+  document.getElementById('cxN').textContent=n;
+  document.getElementById('cxSub').textContent=`n=${n}, O(n⁴)=${n**4}`;
+
+  // Build all 5 cell rows
+  [
+    ['arrInput','ac-input',arr],
+    ['arr1','ac-empty',new Array(n).fill('—')],
+    ['arr2','ac-empty',new Array(n).fill('—')],
+    ['arr3','ac-empty',new Array(n).fill('—')],
+    ['arr4','ac-empty',new Array(n).fill('—')],
+  ].forEach(([id,cls,vals])=>{
+    const el=document.getElementById(id);
+    el.innerHTML='';
+    vals.forEach((v,i)=>{
+      el.innerHTML+=`<div class="acell ${cls}" id="${id}-${i}">
+        <span class="acell-idx">${i}</span>${v}
+      </div>`;
+    });
+  });
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── OVERLAY — translucent arrows + logic badge ───────────────────────────────
+function drawArrOverlay(ovId, srcIdx, destIdx, color, label){
+  const sv=document.getElementById(ovId);
+  if(!sv) return;
+  sv.innerHTML='';
+  sv.setAttribute('width', n*CW);
+  sv.setAttribute('height', 48);
+  if(srcIdx===null||destIdx===null||srcIdx<0||destIdx<0) return;
+
+  const defs=svgEl('defs',{}); sv.appendChild(defs);
+
+  // translucent color (rgba from hex shorthand)
+  const alpha='0.35';
+  const transColor=hexToRgba(color, alpha);
+  const transHead =hexToRgba(color, '0.5');
+
+  // arrowhead marker
+  const mid='mk'+color.replace(/[^a-zA-Z0-9]/g,'');
+  if(!defs.querySelector('#'+mid)){
+    const mk=svgEl('marker',{id:mid,markerWidth:'7',markerHeight:'7',refX:'6',refY:'3.5',orient:'auto'});
+    mk.appendChild(svgEl('path',{d:'M0,0 L7,3.5 L0,7 Z',fill:transHead}));
+    defs.appendChild(mk);
+  }
+
+  const cx = idx => idx*CW + 26; // cell centre x
+  const Y = 22;
+
+  const x1=cx(srcIdx)+14, x2=cx(destIdx)-16;
+  if(x2<=x1) return; // same cell or backwards — nothing to draw
+
+  // the translucent dashed line
+  sv.appendChild(svgEl('line',{
+    x1, y1:Y, x2, y2:Y,
+    stroke:transColor,
+    'stroke-width':'2',
+    'stroke-dasharray':'6 3',
+    'stroke-linecap':'round',
+    'marker-end':`url(#${mid})`
+  }));
+
+  // logic badge centred on the arrow — semi-transparent background
+  if(label){
+    const mx=(x1+x2)/2, my=Y-11;
+    const lw=label.length*5.2+10;
+    // pill bg at 70% opacity
+    sv.appendChild(svgEl('rect',{
+      x:mx-lw/2, y:my-7, width:lw, height:13, rx:4,
+      fill:hexToRgba(color,'0.72')
+    }));
+    const t=svgEl('text',{
+      x:mx, y:my+0,
+      'text-anchor':'middle','dominant-baseline':'middle',
+      fill:'white','font-family':'Space Mono,monospace',
+      'font-size':'7.5','font-weight':'700'
+    });
+    t.textContent=label;
+    sv.appendChild(t);
+  }
+}
+
+function hexToRgba(hex, alpha){
+  // handles #rrggbb
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+const PASS_COLOR={'dp1':'#2196f3','dp2':'#e63946','dp3':'#06d6a0','dp4':'#c084fc'};
+const PASS_CLS={'dp1':'ac-filled-a','dp2':'ac-filled-b','dp3':'ac-filled-c','dp4':'ac-filled-d'};
+const ARR_ID={'dp1':'arr1','dp2':'arr2','dp3':'arr3','dp4':'arr4'};
+const OV_ID={'dp1':'ov1','dp2':'ov2','dp3':'ov3','dp4':'ov4'};
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Update all dp array cells
+  ['dp1','dp2','dp3','dp4'].forEach(dpKey=>{
+    const arrId=ARR_ID[dpKey];
+    const cls=PASS_CLS[dpKey];
+    const dpArr=st[dpKey];
+    for(let j=0;j<n;j++){
+      const el=document.getElementById(`${arrId}-${j}`);
+      if(!el)continue;
+      const val=dpArr[j];
+      const isCur=st.type===dpKey&&st.i===j;
+      const isBest=isFinal&&j===n-1&&dpKey==='dp4';
+      el.innerHTML=`<span class="acell-idx">${j}</span>${val!==null?val:'—'}`;
+      if(isBest)       el.className='acell ac-best';
+      else if(isCur)   el.className='acell ac-cur';
+      else if(val!==null) el.className=`acell ${cls}`;
+      else             el.className='acell ac-empty';
+    }
+  });
+
+  // Input row stays static
+  for(let j=0;j<n;j++){
+    const el=document.getElementById(`arrInput-${j}`);
+    if(el) el.innerHTML=`<span class="acell-idx">${j}</span>${arr[j]}`;
+  }
+
+  // Clear overlays then draw translucent arrow for active pass
+  ['ov1','ov2','ov3','ov4'].forEach(id=>{const s=document.getElementById(id);if(s)s.innerHTML='';});
+  if(st.type==='dp1' && st.i>0)
+    drawArrOverlay('ov1', st.i-1, st.i, '#2196f3',
+      `max(${st.dp1[st.i-1]??'∅'}, ${st.val})`);
+  if(st.type==='dp2' && st.i>=2)
+    drawArrOverlay('ov2', st.i-1, st.i, '#e63946',
+      `max(${st.prev??'∅'}, ${st.dp1[st.i-1]}-${st.val})`);
+  if(st.type==='dp3' && st.i>=3)
+    drawArrOverlay('ov3', st.i-1, st.i, '#06d6a0',
+      `max(${st.prev??'∅'}, ${st.dp2[st.i-1]}+${st.val})`);
+  if(st.type==='dp4' && st.i>=4)
+    drawArrOverlay('ov4', st.i-1, st.i, '#c084fc',
+      `max(${st.prev??'∅'}, ${st.dp3[st.i-1]}-${st.val})`);
+
+  // Expression banner highlight
+
+  ['xpA','xpB','xpC','xpD'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  const activeMap={'dp1':'xpA','dp2':'xpB','dp3':'xpC','dp4':'xpD'};
+  if(activeMap[st.type]) document.getElementById(activeMap[st.type]).classList.add('active');
+  document.getElementById('exprLive').textContent=
+    isFinal?`= ${st.result.value}`:st.cur!=null?`→ ${st.cur}`:'';
+
+  // Decision panel
+  const dp=document.getElementById('decPanel');
+  const dc={'dp1':'dp-a','dp2':'dp-b','dp3':'dp-c','dp4':'dp-d','done':'dp-done'};
+  dp.className='dec-panel '+(dc[st.type]||'');
+  document.getElementById('decTitle').textContent=
+    st.type==='dp1'?`Pass 1 — building dp1[i] = max(dp1[i−1], a[i])`:
+    st.type==='dp2'?`Pass 2 — building dp2[i] = max(dp2[i−1], dp1[i−1] − a[i])`:
+    st.type==='dp3'?`Pass 3 — building dp3[i] = max(dp3[i−1], dp2[i−1] + a[i])`:
+    st.type==='dp4'?`Pass 4 — building dp4[i] = max(dp4[i−1], dp3[i−1] − a[i])`:
+    st.type==='done'?'Complete — dp4[n−1] is the answer':'';
+
+  const db=document.getElementById('decBody');
+  db.innerHTML='';
+  const makeBox=(label,val,sub,cls,win)=>
+    `<div class="dec-box ${cls} ${win?'db-win':''}">
+      <div class="db-lbl">${label}</div>
+      <div class="db-val">${val}</div>
+      <div class="db-sub">${sub}</div>
+    </div>`;
+
+  if(st.type==='dp1'&&st.i!=null){
+    const prev=st.prev??'∅';
+    const cur=st.cur;
+    db.innerHTML=
+      makeBox('prev dp1[i-1]',prev,'carry forward','db-a',cur===prev)
+      +'<span class="dec-op">vs</span>'
+      +makeBox(`a[${st.i}]`,st.val,'current value','db-a',cur===st.val)
+      +'<span class="dec-op">=</span>'
+      +`<div class="dec-result"><div class="db-lbl">dp1[${st.i}]</div><div class="db-val">${cur}</div></div>`;
+  } else if(st.type==='dp2'&&st.i!=null){
+    const prev=st.prev??'∅';
+    const newOpt=st.dp1[st.i-1]-st.val;
+    db.innerHTML=
+      makeBox('prev dp2[i-1]',prev,'carry forward','db-b',st.cur===prev)
+      +'<span class="dec-op">vs</span>'
+      +makeBox(`dp1[${st.i-1}]−a[${st.i}]`,`${st.dp1[st.i-1]}−${st.val}=${newOpt}`,'take new b','db-b',st.cur===newOpt)
+      +'<span class="dec-op">=</span>'
+      +`<div class="dec-result"><div class="db-lbl">dp2[${st.i}]</div><div class="db-val">${st.cur}</div></div>`;
+  } else if(st.type==='dp3'&&st.i!=null){
+    const prev=st.prev??'∅';
+    const newOpt=st.dp2[st.i-1]+st.val;
+    db.innerHTML=
+      makeBox('prev dp3[i-1]',prev,'carry forward','db-c',st.cur===prev)
+      +'<span class="dec-op">vs</span>'
+      +makeBox(`dp2[${st.i-1}]+a[${st.i}]`,`${st.dp2[st.i-1]}+${st.val}=${newOpt}`,'take new c','db-c',st.cur===newOpt)
+      +'<span class="dec-op">=</span>'
+      +`<div class="dec-result"><div class="db-lbl">dp3[${st.i}]</div><div class="db-val">${st.cur}</div></div>`;
+  } else if(st.type==='dp4'&&st.i!=null){
+    const prev=st.prev??'∅';
+    const newOpt=st.dp3[st.i-1]-st.val;
+    db.innerHTML=
+      makeBox('prev dp4[i-1]',prev,'carry forward','db-d',st.cur===prev)
+      +'<span class="dec-op">vs</span>'
+      +makeBox(`dp3[${st.i-1}]−a[${st.i}]`,`${st.dp3[st.i-1]}−${st.val}=${newOpt}`,'take new d','db-d',st.cur===newOpt)
+      +'<span class="dec-op">=</span>'
+      +`<div class="dec-result"><div class="db-lbl">dp4[${st.i}]</div><div class="db-val">${st.cur}</div></div>`;
+  }
+
+  // Vars
+  const passNames={'dp1':'Pass 1 (dp1)','dp2':'Pass 2 (dp2)','dp3':'Pass 3 (dp3)','dp4':'Pass 4 (dp4)','init':'init','done':'done'};
+  setVar('vPass','vcPass',passNames[st.type]||st.type);
+  setVar('vIdx','vcIdx',st.i!=null?st.i:'—');
+  setVar('vVal','vcVal',st.val!=null?st.val:'—');
+  setVar('vPrev','vcPrev',st.prev!=null?st.prev:'—');
+  setVar('vCur','vcCur',st.cur!=null?st.cur:'—');
+  document.getElementById('vCur').style.color=
+    PASS_COLOR[st.type]||'#e2e8f0';
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MAXIMUM = ${st.result.value}`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.value;
+    document.getElementById('bestMeta').textContent=`dp4[${n-1}] · O(n) time · O(n) space`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={dp1:'ep-a',dp2:'ep-b',dp3:'ep-c',dp4:'ep-d',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-a');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

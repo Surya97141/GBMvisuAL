@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Topological Ordering · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(192,84,252,0.2);border:1px solid var(--pur);color:var(--pur);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:260px;} .field input.small{width:80px;}
+  .field input:focus{border-color:var(--pur);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: DIRECTED SVG GRAPH
+     Arrowhead edges, WHITE/GRAY/BLACK nodes.
+     Finished nodes highlighted in purple.
+  ══════════════════════════════════════ */
+  .graph-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden;}
+  #graphSvg{width:100%;display:block;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: TOPO ORDER RESULT STRIP
+     Nodes slide in from the right as they finish.
+     Final strip = the topological order.
+  ══════════════════════════════════════ */
+  .result-section{margin-bottom:14px;}
+  .result-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;}
+  .result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .result-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .result-status{font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;}
+  .rs-building{color:var(--pur);}
+  .rs-done    {color:var(--accent3);}
+  .rs-cycle   {color:var(--accent);animation:flashRed 0.6s ease infinite alternate;}
+  @keyframes flashRed{from{opacity:1}to{opacity:0.4}}
+  .result-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:48px;}
+  .rs-node{
+    width:42px;height:42px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.88rem;font-weight:700;
+    border:2px solid var(--pur);background:rgba(192,84,252,0.12);color:var(--pur-dark);
+    transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .rs-node.rs-new{animation:slideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+  @keyframes slideIn{from{transform:scale(0.5) translateY(8px);opacity:0}to{transform:scale(1);opacity:1}}
+  .rs-node.rs-final{background:rgba(6,214,160,0.15);border-color:var(--accent3);color:#014d3a;}
+  .rs-arrow{font-family:'Space Mono',monospace;font-size:1rem;color:var(--muted);flex-shrink:0;}
+  .rs-pos{font-family:'Space Mono',monospace;font-size:0.5rem;color:var(--muted);text-align:center;margin-top:2px;}
+  .rs-node-wrap{display:flex;flex-direction:column;align-items:center;}
+  .rs-label{font-family:'Space Mono',monospace;font-size:0.5rem;color:var(--muted);margin-bottom:2px;text-align:center;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: DFS STATE + CALL STACK
+  ══════════════════════════════════════ */
+  .stack-section{margin-bottom:14px;}
+  .stack-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .stack-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .stack-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .stack-depth{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;color:var(--pur);}
+  .stack-frames{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;min-height:44px;}
+  .stack-frame{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:40px;height:40px;border-radius:50%;
+    font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;
+    border:2px solid;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);flex-shrink:0;
+  }
+  .sf-label{font-size:0.42rem;opacity:0.7;margin-bottom:1px;}
+  .stack-frame.sf-top{transform:translateY(-4px);box-shadow:0 6px 14px rgba(192,84,252,0.3);}
+  .stack-frame.sf-gray{background:rgba(255,209,102,0.18);border-color:#ffd166;color:#7a5a00;}
+  .stack-arrow{font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);margin-bottom:4px;}
+
+  /* Node state 3-color grid */
+  .state-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px;}
+  .sg-cell{
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    min-width:40px;padding:5px 7px;border-radius:7px;border:1.5px solid var(--border);
+    background:var(--surface);transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .sg-cell .sgc-node{font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;}
+  .sg-cell .sgc-state{font-family:'Space Mono',monospace;font-size:0.46rem;text-transform:uppercase;letter-spacing:0.3px;}
+  .sgc-white .sgc-node{color:#bbb;}.sgc-white .sgc-state{color:#ccc;}
+  .sgc-gray{background:rgba(255,209,102,0.14);border-color:#ffd166;transform:translateY(-2px);}
+  .sgc-gray  .sgc-node{color:#7a5a00;}.sgc-gray  .sgc-state{color:#a07030;}
+  .sgc-black{background:rgba(192,84,252,0.1);border-color:var(--pur);}
+  .sgc-black .sgc-node{color:var(--pur-dark);}.sgc-black .sgc-state{color:var(--pur);}
+  .sgc-cycle{background:rgba(230,57,70,0.14);border-color:#e63946;box-shadow:0 0 8px rgba(230,57,70,0.25);}
+  .sgc-cycle .sgc-node{color:#b71c1c;}.sgc-cycle .sgc-state{color:var(--accent);}
+
+  /* DEPENDENCY PANEL */
+  .dep-section{margin-bottom:14px;}
+  .dep-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .dep-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .dep-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .dep-ok{font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--accent3);}
+  .dep-rows{display:flex;flex-direction:column;gap:5px;}
+  .dep-row{
+    display:flex;align-items:center;gap:8px;
+    background:#f8f5ee;border:1.5px solid var(--border);
+    border-radius:6px;padding:6px 10px;transition:all 0.3s;
+  }
+  .dep-row.dep-satisfied{border-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .dep-row.dep-pending  {border-color:var(--border);}
+  .dep-row.dep-active   {border-color:var(--pur);background:rgba(192,84,252,0.05);}
+  .dep-u{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;min-width:24px;}
+  .dep-arrow{font-size:0.85rem;color:var(--muted);}
+  .dep-v{font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;min-width:24px;}
+  .dep-meaning{flex:1;font-size:0.72rem;color:var(--muted);}
+  .dep-status{font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;min-width:50px;text-align:right;}
+  .dep-status.ds-sat{color:var(--accent3);}
+  .dep-status.ds-pend{color:var(--muted);}
+  .dep-status.ds-active{color:var(--pur);}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--pur);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--pur-dark);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(192,84,252,0.04);border:1px solid rgba(192,84,252,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init {border-color:var(--accent3);}
+  .explain-panel.ep-visit{border-color:var(--accent4);}
+  .explain-panel.ep-skip {border-color:var(--accent2);}
+  .explain-panel.ep-fin  {border-color:var(--pur);}
+  .explain-panel.ep-done {border-color:var(--accent3);}
+  .explain-panel.ep-cycle{border-color:var(--accent);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--pur);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}.ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}.ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-visit{border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-skip{border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-fin  {border-left-color:var(--pur);background:rgba(192,84,252,0.07);}
+  .ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-why-block.why-cycle{border-left-color:var(--accent);background:rgba(230,57,70,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  .done-banner.success{background:var(--accent3);color:var(--ink);}
+  .done-banner.fail   {background:var(--accent);color:white;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init {background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-visit{background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-skip {background:rgba(33,150,243,0.14);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-fin  {background:rgba(192,84,252,0.16);border-left-color:var(--pur);    color:#e2e8f0;}
+  .code-line.hl-cycle{background:rgba(230,57,70,0.16); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-done {background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* FINISH ORDER MINI (right panel) */
+  .finish-order-wrap{margin-bottom:12px;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .finish-chips{display:flex;flex-wrap:wrap;gap:4px;}
+  .fin-chip{font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:10px;border:1px solid var(--pur);background:rgba(192,84,252,0.12);color:var(--pur);transition:all 0.25s;}
+  .fin-chip.fc-new{animation:chipPop 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+  @keyframes chipPop{from{transform:scale(0.6);opacity:0}to{transform:scale(1);opacity:1}}
+
+  /* ADJACENCY LIST */
+  .adj-list-wrap{margin-bottom:12px;}
+  .adj-row{display:flex;align-items:center;gap:6px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:4px;padding:5px 8px;margin-bottom:4px;transition:all 0.25s;}
+  .adj-row.adj-current{border-color:#ffd166;background:rgba(255,209,102,0.07);}
+  .adj-node-lbl{font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;width:20px;flex-shrink:0;color:#e2e8f0;}
+  .adj-neighbors{font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b7280;flex:1;}
+  .an-chip{display:inline-block;padding:1px 6px;border-radius:8px;margin:1px;font-size:0.62rem;font-weight:700;}
+  .an-white{color:#4a5568;} .an-gray{color:#ffd166;background:rgba(255,209,102,0.1);}
+  .an-black{color:var(--pur);background:rgba(192,84,252,0.1);}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-box.success{background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);}
+  .best-box.fail   {background:rgba(230,57,70,0.06); border:1px solid rgba(230,57,70,0.2);}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+  .best-box.success .best-label{color:var(--accent3);}
+  .best-box.fail    .best-label{color:var(--accent);}
+  .best-val{font-family:'Space Mono',monospace;font-size:0.82rem;font-weight:700;color:var(--bg);letter-spacing:2px;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show.success{display:block;background:var(--accent3);color:#000;animation:fadeUp 0.4s ease;}
+  .done-bar.show.fail   {display:block;background:var(--accent);color:white;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Topological Ordering</h1>
+    <div class="sub">Depth-First Search · Post-Order Reversal · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·07 · DAG</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Directed Edges (u→v, comma-separated)</label>
+      <input type="text" id="inputEdges" value="5-0,5-2,4-0,4-1,2-3,3-1" class="wide">
+    </div>
+    <div class="field">
+      <label>Nodes</label>
+      <input type="text" id="inputNodes" value="6" class="small">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="370">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:var(--surface);border-color:#ccc"></div>WHITE — unvisited</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.2);border-color:#ffd166"></div>GRAY — on stack</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(192,84,252,0.15);border-color:#c084fc"></div>BLACK — finished → prepend</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(230,57,70,0.2);border-color:#e63946"></div>CYCLE! (invalid DAG)</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: DIRECTED SVG GRAPH -->
+  <div class="section-label">Directed Graph (DAG)</div>
+  <div class="graph-wrap">
+    <svg id="graphSvg" viewBox="0 0 580 260"></svg>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: TOPOLOGICAL ORDER RESULT STRIP -->
+  <div class="result-section">
+    <div class="section-label">Topological Order  (finished nodes prepended left)</div>
+    <div class="result-wrap">
+      <div class="result-header">
+        <div class="result-title">post-order finish → reverse = topo order</div>
+        <div class="result-status rs-building" id="resultStatus">building…</div>
+      </div>
+      <div class="result-strip" id="resultStrip">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Nodes appear here as they finish DFS…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: DFS CALL STACK + NODE STATES -->
+  <div class="stack-section">
+    <div class="section-label">DFS Call Stack  (GRAY = active path)</div>
+    <div class="stack-wrap">
+      <div class="stack-header">
+        <div class="stack-title">← bottom &nbsp;&nbsp; top →</div>
+        <div class="stack-depth">depth: <span id="stackDepth">0</span></div>
+      </div>
+      <div class="stack-frames" id="stackFrames">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>
+      </div>
+      <!-- Node state grid -->
+      <div class="state-grid" id="stateGrid"></div>
+    </div>
+  </div>
+
+  <!-- DEPENDENCY SATISFACTION PANEL -->
+  <div class="dep-section">
+    <div class="section-label">Edge Constraints  (u must come before v)</div>
+    <div class="dep-wrap">
+      <div class="dep-header">
+        <div class="dep-title">satisfied when u appears left of v</div>
+        <div class="dep-ok" id="depOk">0 / 0 satisfied</div>
+      </div>
+      <div class="dep-rows" id="depRows"></div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given a <strong>Directed Acyclic Graph (DAG)</strong>, produce a <span class="prob-hi">topological ordering</span>
+      of its nodes — a linear sequence where for every directed edge <strong>u → v</strong>,
+      node <strong>u</strong> appears <em>before</em> node <em>v</em>.
+      <br><br>
+      <strong>DFS approach:</strong> Run DFS. When a node finishes (all descendants explored),
+      <em>prepend</em> it to the result. The final list is a valid topological order.
+      If a cycle is detected (GRAY neighbor seen), no valid order exists.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig">vector&lt;<span class="ck">int</span>&gt; <span class="cf">topoSort</span>(<span class="ck">int</span> n, adj) {</span>
+<span class="code-line" id="cl-init">  vector&lt;<span class="ck">int</span>&gt; color(n,<span class="cn">0</span>); <span class="cc">// 0=W 1=G 2=B</span></span>
+<span class="code-line" id="cl-res">  vector&lt;<span class="ck">int</span>&gt; result;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span>(<span class="ck">int</span> i=0; i&lt;n; i++)</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span>(color[i]==WHITE)</span>
+<span class="code-line" id="cl-call">      <span class="cf">dfs</span>(i, color, result);</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> result; <span class="cc">// already in topo order</span></span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-dfn"><span class="ck">void</span> <span class="cf">dfs</span>(<span class="ck">int</span> u, color, result) {</span>
+<span class="code-line" id="cl-gray">  color[u] = GRAY;  <span class="cc">// on active path</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span>(<span class="ck">int</span> v : adj[u]) {</span>
+<span class="code-line" id="cl-ifwhite">    <span class="ck">if</span>(color[v]==WHITE)</span>
+<span class="code-line" id="cl-rec">      <span class="cf">dfs</span>(v, color, result);</span>
+<span class="code-line" id="cl-ifgray">    <span class="ck">else if</span>(color[v]==GRAY)</span>
+<span class="code-line" id="cl-cycle">      <span class="ck">throw</span> <span class="cn">"cycle!"</span>; <span class="cc">// not a DAG</span></span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-black">  color[u] = BLACK;</span>
+<span class="code-line" id="cl-prepend">  result.insert(result.begin(), u); <span class="cc">// prepend</span></span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcU">    <div class="var-name">u (current)</div>   <div class="var-value yel" id="vU">—</div></div>
+      <div class="var-card" id="vcV">    <div class="var-name">v (neighbor)</div>  <div class="var-value"     id="vV" style="color:#e2e8f0;">—</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">stack depth</div>   <div class="var-value pur" id="vDepth">0</div></div>
+      <div class="var-card" id="vcDone"> <div class="var-name">finished</div>      <div class="var-value grn" id="vDone">0</div></div>
+      <div class="var-card" id="vcScanI"style="grid-column:1/3"><div class="var-name">outer loop i</div><div class="var-value" id="vScanI" style="color:#e2e8f0;">—</div></div>
+    </div>
+
+    <!-- FINISH ORDER -->
+    <div class="finish-order-wrap">
+      <div class="arr-state-title">Post-order finish sequence</div>
+      <div class="finish-chips" id="finishChips"></div>
+    </div>
+
+    <!-- ADJACENCY LIST -->
+    <div class="adj-list-wrap">
+      <div class="arr-state-title">Adjacency List (directed)</div>
+      <div id="adjList"></div>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Topological Order</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// EXPLAIN LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(n,e)=>({
+    why:`<div class="ep-why-block why-init">The post-order DFS topo sort works because: when a node u finishes (all its descendants are done), it goes to the FRONT of the result. Any node v that u depends on (u→v) finishes BEFORE u returns — so v will be prepended before u, meaning v ends up to the LEFT of u in the final list. That's exactly what we want for u→v: u before v.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> ${n} nodes, ${e} directed edges. All WHITE. result=[]. Scan nodes 0..${n-1} for unvisited roots.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The post-order invariant:</strong> When node u is prepended to result, ALL nodes reachable from u via directed edges are already in result (to the right of u's future position). This guarantees u comes before all its dependencies.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why PREPEND (not append)?</strong> DFS explores deepest nodes first. The deepest node (a sink — no outgoing edges) finishes first. Sinks come LAST in topo order. Prepending puts each new finisher before all previous finishers, correctly building the order in reverse post-order.`},
+    ]
+  }),
+  visit:(u,par,path)=>({
+    why:`<div class="ep-why-block why-visit">Node ${u} enters DFS: color[${u}]=GRAY. It's now on the active path. Until ${u} finishes, any GRAY neighbor found means a cycle (since it would be an ancestor of ${u}). After exploring all neighbors, ${u} will turn BLACK and be prepended.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>GRAY invariant:</strong> color[${u}]=GRAY. Node ${u} is an ancestor of any node currently being explored from ${u}. Stack depth = ${path.length}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Record parent ${par!==-1?par:'(none — root)'}:</strong> Unlike undirected graphs, directed graphs don't have the parent-edge false-positive issue. Any GRAY neighbor is a true ancestor → true cycle.`},
+    ]
+  }),
+  skip_black:(u,v)=>({
+    why:`<div class="ep-why-block why-skip">Neighbor ${v} of ${u} is BLACK (already finished). Its entire subtree is already in result. No need to recurse — ${v} is correctly positioned to the right of wherever ${u} will end up.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Safe skip:</strong> color[${v}]=BLACK. Node ${v} already contributed its post-order slot. Recurring would waste time and duplicate work.`}]
+  }),
+  cycle_found:(u,v)=>({
+    why:`<div class="ep-why-block why-cycle">🚨 Edge ${u}→${v} where color[${v}]=GRAY. Node ${v} is an ancestor of ${u} in the DFS tree. The path ${v}→…→${u}→${v} forms a directed cycle. A DAG cannot have cycles — no valid topological order exists.</div>`,
+    inv:[
+      {icon:'🚨',cls:'inv-key',text:`<strong>CYCLE DETECTED:</strong> ${u}→${v} is a back-edge in a directed graph. ${v} is GRAY (on active path). This is a directed cycle.`},
+      {icon:'🔑',cls:'inv-warn',text:`<strong>Directed vs undirected:</strong> In directed graphs, ALL GRAY neighbors (not just non-parents) indicate cycles. There's no parent edge to exclude.`},
+    ]
+  }),
+  finish:(u,pos,result)=>({
+    why:`<div class="ep-why-block why-fin">Node ${u} finishes — all its outgoing neighbors explored. color[${u}]=BLACK. <strong>Prepend to result.</strong> ${u} now sits at position 0. Every node that ${u} has an edge to is already in result[1..] — so ${u} correctly comes before all of them.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Post-order invariant holds:</strong> result = [${result.join(', ')}]. Node ${u} was just prepended. For every edge ${u}→v, v is somewhere to the right of ${u}.`},
+      {icon:'✨',cls:'inv-pur',text:`<strong>This is the key step:</strong> Prepending the finished node builds the topological order automatically. No explicit reversal needed — prepend IS the reversal.`},
+    ]
+  }),
+  done:(result,n,e)=>({
+    why:`<div class="ep-why-block why-done">All ${n} nodes BLACK. result = [${result.join(' → ')}]. For every edge u→v in the graph, u appears before v in this sequence — verified by construction.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness proof:</strong> For any edge u→v: v finishes before u (since DFS explores v completely before returning to u). v is prepended before u. So u ends up LEFT of v. ✓`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E)</strong> — each node colored exactly once, each edge traversed exactly once. O(V) space for color[] and result[].`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Multiple valid orderings exist</strong> — topological sort is not unique. Different DFS starting orders produce different valid orderings. Any ordering where all u→v edges have u before v is correct.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:        {ids:['cl-sig','cl-init','cl-res','cl-for','cl-check','cl-call'],cls:'hl-init'},
+  visit:       {ids:['cl-dfn','cl-gray'],                                       cls:'hl-visit'},
+  check_white: {ids:['cl-loop','cl-ifwhite','cl-rec'],                          cls:'hl-visit'},
+  skip_black:  {ids:['cl-loop','cl-ifgray'],                                    cls:'hl-skip'},
+  cycle_found: {ids:['cl-ifgray','cl-cycle'],                                   cls:'hl-cycle'},
+  finish:      {ids:['cl-black','cl-prepend'],                                  cls:'hl-fin'},
+  scan:        {ids:['cl-for','cl-check'],                                      cls:'hl-init'},
+  done:        {ids:['cl-ret'],                                                 cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps — DFS post-order topo sort
+// ─────────────────────────────────────────────
+// color: 0=WHITE, 1=GRAY, 2=BLACK
+function computeSteps(n, adj){
+  const steps=[];
+  const color=new Array(n).fill(0);
+  const result=[];   // topo order built by prepending
+  let hasCycle=false;
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0);
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    color:[...color], result:[...result], n, adj,
+    curU:null, curV:null, dfsPath:[], scanI:null,
+    hasCycle, desc, type, explain, resultItem:null, ...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${n} nodes, ${numEdges} directed edges. `
+    +`All WHITE. Scan 0..${n-1}: for each WHITE node, DFS. `
+    +`When a node finishes → prepend to result. Final result = topo order.`,
+    'init', EXPLAIN.init(n,numEdges)
+  );
+
+  for(let start=0;start<n&&!hasCycle;start++){
+    snap(
+      `🔎 Scan node <strong>${start}</strong>: ${color[start]===0?'WHITE → start DFS.':'already visited → skip.'}`,
+      'scan', EXPLAIN.init(n,numEdges), {scanI:start}
+    );
+    if(color[start]!==0) continue;
+
+    // Iterative DFS with explicit stack tracking
+    // Each entry: {node, nIdx} — nIdx tracks which neighbor we're processing
+    const dfsStack=[{node:start,nIdx:0}];
+    const pathArr=[start];
+    color[start]=1;
+
+    snap(
+      `📍 Enter node <strong>${start}</strong>. color[${start}] = <span style="color:#ffd166;font-weight:700">GRAY</span>. Start exploring outgoing edges.`,
+      'visit', EXPLAIN.visit(start,-1,[start]),
+      {curU:start, dfsPath:[...pathArr]}
+    );
+
+    while(dfsStack.length>0&&!hasCycle){
+      const top=dfsStack[dfsStack.length-1];
+      const u=top.node;
+      const neighbors=adj[u]||[];
+
+      if(top.nIdx>=neighbors.length){
+        // Finished — prepend
+        color[u]=2;
+        result.unshift(u);
+        dfsStack.pop(); pathArr.pop();
+        snap(
+          `✅ Node <strong>${u}</strong> finished. color[${u}] = <span style="color:#c084fc;font-weight:700">BLACK</span>. `
+          +`<strong>Prepend ${u} to result</strong>. Result: [${result.join(', ')}]`,
+          'finish', EXPLAIN.finish(u,0,[...result]),
+          {curU:u, dfsPath:[...pathArr], resultItem:u}
+        );
+        continue;
+      }
+
+      const v=neighbors[top.nIdx];
+      top.nIdx++;
+
+      if(color[v]===0){
+        // WHITE — recurse
+        snap(
+          `➡️ ${u}→<strong>${v}</strong>: color[${v}]=<span style="color:#e2e8f0;font-weight:700">WHITE</span>. Recurse into ${v}. color[${v}]=GRAY.`,
+          'check_white', EXPLAIN.visit(v,u,[...pathArr,v]),
+          {curU:u, curV:v, dfsPath:[...pathArr]}
+        );
+        color[v]=1;
+        dfsStack.push({node:v,nIdx:0});
+        pathArr.push(v);
+        snap(
+          `📍 Enter node <strong>${v}</strong>. color[${v}] = GRAY. Path: ${pathArr.join(' → ')}.`,
+          'visit', EXPLAIN.visit(v,u,[...pathArr]),
+          {curU:v, dfsPath:[...pathArr]}
+        );
+      } else if(color[v]===1){
+        // GRAY — cycle!
+        hasCycle=true;
+        snap(
+          `🚨 <span style="color:var(--accent);font-weight:700">CYCLE!</span> ${u}→<strong>${v}</strong>: color[${v}]=<span style="color:var(--accent);font-weight:700">GRAY</span>. `
+          +`${v} is an ancestor of ${u}. Directed cycle detected — no valid topo order!`,
+          'cycle_found', EXPLAIN.cycle_found(u,v),
+          {curU:u, curV:v, dfsPath:[...pathArr], hasCycle:true}
+        );
+      } else {
+        // BLACK — skip
+        snap(
+          `⏭️ ${u}→<strong>${v}</strong>: color[${v}]=<span style="color:#c084fc;font-weight:700">BLACK</span> (finished). Skip.`,
+          'skip_black', EXPLAIN.skip_black(u,v),
+          {curU:u, curV:v, dfsPath:[...pathArr]}
+        );
+      }
+    }
+  }
+
+  if(!hasCycle){
+    snap(
+      `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> All nodes BLACK. `
+      +`Topological order: <strong>${result.join(' → ')}</strong>. `
+      +`All edges u→v satisfied: u appears before v. O(V+E).`,
+      'done', EXPLAIN.done([...result],n,numEdges),
+      {result:[...result], scanI:n-1, result_final:true}
+    );
+    steps[steps.length-1].resultFinal=result;
+  }
+
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GRAPH LAYOUT — layered for DAG
+// ─────────────────────────────────────────────
+function layoutNodes(n, adj){
+  const W=560, H=240, cx=W/2, cy=H/2;
+  // Compute in-degree to do rough layered layout
+  const indeg=new Array(n).fill(0);
+  for(const[u,vs] of Object.entries(adj)) for(const v of vs) indeg[v]++;
+  // Topological order via Kahn's for layout
+  const queue=[]; const dist=new Array(n).fill(0);
+  for(let i=0;i<n;i++) if(indeg[i]===0) queue.push(i);
+  let maxDist=0;
+  while(queue.length){
+    const u=queue.shift();
+    for(const v of (adj[u]||[])){
+      dist[v]=Math.max(dist[v],dist[u]+1);
+      maxDist=Math.max(maxDist,dist[v]);
+      if(--indeg[v]===0) queue.push(v);
+    }
+  }
+  // Group by layer
+  const layers=[];
+  for(let i=0;i<=maxDist;i++) layers.push([]);
+  for(let i=0;i<n;i++) layers[dist[i]].push(i);
+  const pos=new Array(n);
+  const layerW=maxDist>0?W/(maxDist+1):W/2;
+  layers.forEach((layer,li)=>{
+    layer.forEach((node,ni)=>{
+      pos[node]={
+        x:layerW*(li+0.5),
+        y:H/(layer.length+1)*(ni+1)
+      };
+    });
+  });
+  // Jitter to avoid overlap, then force relax
+  for(let iter=0;iter<60;iter++){
+    const f=pos.map(()=>({x:0,y:0}));
+    for(let a=0;a<n;a++) for(let b=a+1;b<n;b++){
+      const dx=pos[a].x-pos[b].x, dy=pos[a].y-pos[b].y;
+      const d=Math.max(Math.sqrt(dx*dx+dy*dy),1);
+      const k=900/(d*d);
+      f[a].x+=k*dx/d; f[a].y+=k*dy/d;
+      f[b].x-=k*dx/d; f[b].y-=k*dy/d;
+    }
+    for(const[u,vs] of Object.entries(adj)){
+      for(const v of vs){
+        const dx=pos[v].x-pos[+u].x, dy=pos[v].y-pos[+u].y;
+        const d=Math.sqrt(dx*dx+dy*dy)||1, k=(d-100)*0.04;
+        f[+u].x+=k*dx/d; f[+u].y+=k*dy/d;
+        f[v].x-=k*dx/d;  f[v].y-=k*dy/d;
+      }
+    }
+    for(let i=0;i<n;i++){
+      pos[i].x=Math.max(28,Math.min(W-28,pos[i].x+f[i].x*0.25));
+      pos[i].y=Math.max(28,Math.min(H-28,pos[i].y+f[i].y*0.25));
+    }
+  }
+  return pos;
+}
+
+// ─────────────────────────────────────────────
+// BUILD SVG  (directed — arrowhead markers)
+// ─────────────────────────────────────────────
+let nodePos=[], nGlobal=0, adjGlobal={};
+
+function buildSvgGraph(n, adj, pos){
+  const svg=document.getElementById('graphSvg');
+  svg.innerHTML='';
+  // Arrowhead marker
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const mkr=(id,color)=>{
+    const m=document.createElementNS('http://www.w3.org/2000/svg','marker');
+    m.setAttribute('id',id);m.setAttribute('viewBox','0 0 10 10');
+    m.setAttribute('refX','22');m.setAttribute('refY','5');
+    m.setAttribute('markerWidth','7');m.setAttribute('markerHeight','7');
+    m.setAttribute('orient','auto-start-reverse');
+    const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d','M2 2L8 5L2 8');p.setAttribute('fill','none');
+    p.setAttribute('stroke',color);p.setAttribute('stroke-width','1.5');
+    p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');
+    m.appendChild(p);defs.appendChild(m);
+  };
+  mkr('arr-default','#d4ccb8');mkr('arr-gray','#ffd166');
+  mkr('arr-black','#c084fc');mkr('arr-cycle','#e63946');
+  mkr('arr-done','#06d6a0');
+  svg.appendChild(defs);
+  // Edges
+  const eg=document.createElementNS('http://www.w3.org/2000/svg','g');
+  eg.id='edgeGroup';
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.id=`edge-${u}-${v}`;
+      line.setAttribute('x1',pos[+u].x);line.setAttribute('y1',pos[+u].y);
+      line.setAttribute('x2',pos[v].x);line.setAttribute('y2',pos[v].y);
+      line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+      line.setAttribute('marker-end','url(#arr-default)');
+      eg.appendChild(line);
+    }
+  }
+  svg.appendChild(eg);
+  // Nodes
+  const ng=document.createElementNS('http://www.w3.org/2000/svg','g');
+  ng.id='nodeGroup';
+  for(let i=0;i<n;i++){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.id=`gnode-${i}`;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',pos[i].x);c.setAttribute('cy',pos[i].y);c.setAttribute('r',22);
+    c.setAttribute('fill','var(--surface)');c.setAttribute('stroke','#ccc');c.setAttribute('stroke-width','2');
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pos[i].x);t.setAttribute('y',pos[i].y);
+    t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+    t.setAttribute('font-family','Space Mono,monospace');t.setAttribute('font-size','13');
+    t.setAttribute('font-weight','700');t.setAttribute('fill','#bbb');t.textContent=i;
+    g.appendChild(c);g.appendChild(t);ng.appendChild(g);
+  }
+  svg.appendChild(ng);
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+
+function parseInput(){
+  const n=parseInt(document.getElementById('inputNodes').value.trim());
+  if(isNaN(n)||n<1)return null;
+  const adj={};
+  for(let i=0;i<n;i++)adj[i]=[];
+  const edgeStr=document.getElementById('inputEdges').value.trim();
+  if(edgeStr){
+    edgeStr.split(',').forEach(tok=>{
+      tok=tok.trim();
+      if(tok.includes('-')){
+        const[a,b]=tok.split('-').map(Number);
+        if(!isNaN(a)&&!isNaN(b)&&a<n&&b<n&&a!==b) adj[a].push(b);
+      }
+    });
+  }
+  for(let i=0;i<n;i++) adj[i]=[...new Set(adj[i])];
+  return{n,adj};
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const parsed=parseInput();
+  if(!parsed)return;
+  const{n,adj}=parsed;
+  nGlobal=n;adjGlobal=adj;
+  nodePos=layoutNodes(n,adj);
+  buildSvgGraph(n,adj,nodePos);
+  steps=computeSteps(n,adj);
+  currentStep=0;
+
+  // State grid
+  const sg=document.getElementById('stateGrid');
+  sg.innerHTML='';
+  for(let i=0;i<n;i++){
+    const cell=document.createElement('div');
+    cell.className='sg-cell sgc-white';cell.id=`sgc-${i}`;
+    cell.innerHTML=`<div class="sgc-node">${i}</div><div class="sgc-state">W</div>`;
+    sg.appendChild(cell);
+  }
+
+  // Dep rows
+  const dr=document.getElementById('depRows');
+  dr.innerHTML='';
+  const allEdges=[];
+  for(const[u,vs] of Object.entries(adj)) for(const v of vs) allEdges.push([+u,v]);
+  allEdges.forEach(([u,v])=>{
+    const row=document.createElement('div');
+    row.className='dep-row dep-pending';row.id=`dep-${u}-${v}`;
+    row.innerHTML=`<div class="dep-u">${u}</div><div class="dep-arrow">→</div>`
+      +`<div class="dep-v">${v}</div>`
+      +`<div class="dep-meaning">${u} must come before ${v}</div>`
+      +`<div class="dep-status ds-pend" id="deps-${u}-${v}">pending</div>`;
+    dr.appendChild(row);
+  });
+  document.getElementById('depOk').textContent=`0 / ${allEdges.length} satisfied`;
+
+  // Adj list
+  const al=document.getElementById('adjList');al.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');
+    row.className='adj-row';row.id=`ar-${i}`;
+    row.innerHTML=`<div class="adj-node-lbl">${i}</div>`
+      +`<div class="adj-neighbors" id="an-${i}">${(adj[i]||[]).map(v=>`<span class="an-chip an-white">${v}</span>`).join(' ')||'<span style="color:#333">—</span>'}</div>`;
+    al.appendChild(row);
+  }
+
+  // Problem example
+  const finalStep=steps[steps.length-1];
+  const hasCycle=finalStep.hasCycle;
+  const numEdges=Object.values(adj).reduce((s,a)=>s+a.length,0);
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">${n} nodes, ${numEdges} directed edges</span>`
+    +(hasCycle?`Contains a cycle → no valid topological order`
+      :`One valid order: <strong>${finalStep.result.join(' → ')}</strong>`);
+
+  document.getElementById('resultStrip').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Nodes appear here as they finish DFS…</div>`;
+  document.getElementById('resultStatus').className='result-status rs-building';
+  document.getElementById('resultStatus').textContent='building…';
+  document.getElementById('stackFrames').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>`;
+  document.getElementById('stackDepth').textContent='0';
+  document.getElementById('finishChips').innerHTML='';
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+const COLOR_NAME=['W','G','B'];
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const n=st.n,adj=st.adj;
+  const isFinal=!!(st.resultFinal||st.hasCycle&&st.type==='cycle_found'&&idx===steps.length-1);
+
+  // ── SVG nodes ──
+  for(let i=0;i<n;i++){
+    const g=document.getElementById(`gnode-${i}`);
+    if(!g)continue;
+    const c=g.querySelector('circle'),t=g.querySelector('text');
+    const isCur=st.curU===i&&!isFinal;
+    const inCycle=st.hasCycle&&(st.curU===i||st.curV===i);
+    if(inCycle&&st.type==='cycle_found'){
+      c.setAttribute('fill','rgba(230,57,70,0.18)');c.setAttribute('stroke','#e63946');c.setAttribute('stroke-width','3');
+      c.setAttribute('filter','drop-shadow(0 0 8px #e63946)');t.setAttribute('fill','#b71c1c');
+    } else if(st.color[i]===2){
+      c.setAttribute('fill','rgba(192,84,252,0.12)');c.setAttribute('stroke','#c084fc');c.setAttribute('stroke-width','2.5');
+      c.removeAttribute('filter');t.setAttribute('fill',isCur?'#6a1b9a':st.resultFinal?'#014d3a':var_pur_dark());
+    } else if(st.color[i]===1){
+      c.setAttribute('fill','rgba(255,209,102,0.2)');c.setAttribute('stroke','#ffd166');
+      c.setAttribute('stroke-width',isCur?'3':'2.5');
+      c.setAttribute('filter',isCur?'drop-shadow(0 0 8px #ffd166)':'none');
+      t.setAttribute('fill','#7a5a00');
+    } else {
+      c.setAttribute('fill','var(--surface)');c.setAttribute('stroke','#ccc');c.setAttribute('stroke-width','1.5');
+      c.removeAttribute('filter');t.setAttribute('fill','#bbb');
+    }
+    // Final topo: nodes that are in result turn green
+    if(st.resultFinal){
+      c.setAttribute('fill','rgba(6,214,160,0.15)');c.setAttribute('stroke','#06d6a0');
+      c.setAttribute('stroke-width','2.5');t.setAttribute('fill','#014d3a');
+    }
+  }
+
+  // ── SVG edges ──
+  for(const[u,vs] of Object.entries(adj)){
+    for(const v of vs){
+      const line=document.getElementById(`edge-${u}-${v}`);
+      if(!line)continue;
+      const cu=st.color[+u],cv=st.color[v];
+      const isCycleEdge=st.hasCycle&&st.curU===+u&&st.curV===v&&st.type==='cycle_found';
+      const isActiveEdge=st.curU===+u&&st.curV===v&&!isCycleEdge;
+      if(st.resultFinal){
+        line.setAttribute('stroke','#06d6a0');line.setAttribute('stroke-width','2');
+        line.setAttribute('marker-end','url(#arr-done)');
+      } else if(isCycleEdge){
+        line.setAttribute('stroke','#e63946');line.setAttribute('stroke-width','3');
+        line.setAttribute('marker-end','url(#arr-cycle)');
+      } else if(cu===1&&cv===1){
+        line.setAttribute('stroke','#ffd166');line.setAttribute('stroke-width','2.5');
+        line.setAttribute('marker-end','url(#arr-gray)');
+      } else if(cu===2&&cv===2){
+        line.setAttribute('stroke','#c084fc');line.setAttribute('stroke-width','2');
+        line.setAttribute('marker-end','url(#arr-black)');
+      } else {
+        line.setAttribute('stroke','#d4ccb8');line.setAttribute('stroke-width','1.5');
+        line.setAttribute('marker-end','url(#arr-default)');
+      }
+    }
+  }
+
+  // ── Result strip ──
+  const rs=document.getElementById('resultStrip');
+  const rstatus=document.getElementById('resultStatus');
+  if(st.hasCycle&&st.type==='cycle_found'){
+    rstatus.className='result-status rs-cycle';
+    rstatus.textContent='⚠ CYCLE — invalid DAG';
+    rs.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--accent);font-weight:700;">No valid topological order</div>`;
+  } else if(st.result.length===0&&!st.resultFinal){
+    rs.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Nodes appear here as they finish DFS…</div>`;
+    rstatus.className='result-status rs-building';rstatus.textContent='building…';
+  } else {
+    if(st.resultFinal){rstatus.className='result-status rs-done';rstatus.textContent='✓ complete';}
+    else{rstatus.className='result-status rs-building';rstatus.textContent=`${st.result.length}/${n} done`;}
+    rs.innerHTML='';
+    st.result.forEach((node,i)=>{
+      const wrap=document.createElement('div');wrap.className='rs-node-wrap';
+      const lbl=document.createElement('div');lbl.className='rs-label';lbl.textContent=`pos ${i+1}`;
+      const nd=document.createElement('div');
+      nd.className=`rs-node${st.resultFinal?' rs-final':''}${st.resultItem===node&&st.type==='finish'?' rs-new':''}`;
+      nd.textContent=node;
+      wrap.appendChild(lbl);wrap.appendChild(nd);
+      rs.appendChild(wrap);
+      if(i<st.result.length-1){const arr=document.createElement('div');arr.className='rs-arrow';arr.textContent='→';rs.appendChild(arr);}
+    });
+  }
+
+  // ── DFS Stack ──
+  const sf=document.getElementById('stackFrames');
+  document.getElementById('stackDepth').textContent=st.dfsPath?st.dfsPath.length:0;
+  if(!st.dfsPath||st.dfsPath.length===0){
+    sf.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Stack empty</div>`;
+  } else {
+    sf.innerHTML='';
+    st.dfsPath.forEach((node,i)=>{
+      const isTop=i===st.dfsPath.length-1;
+      const fr=document.createElement('div');
+      fr.className=`stack-frame sf-gray${isTop?' sf-top':''}`;
+      fr.innerHTML=`<div class="sf-label">${isTop?'TOP':''}</div>${node}`;
+      sf.appendChild(fr);
+      if(!isTop){const a=document.createElement('div');a.className='stack-arrow';a.textContent='→';sf.appendChild(a);}
+    });
+  }
+
+  // ── State grid ──
+  for(let i=0;i<n;i++){
+    const cell=document.getElementById(`sgc-${i}`);if(!cell)continue;
+    const inCycleNode=st.hasCycle&&(st.curU===i||st.curV===i)&&st.type==='cycle_found';
+    const cls=inCycleNode?'sgc-cycle':['sgc-white','sgc-gray','sgc-black'][st.color[i]];
+    cell.className=`sg-cell ${cls}`;
+    cell.querySelector('.sgc-state').textContent=inCycleNode?'CYC':COLOR_NAME[st.color[i]];
+  }
+
+  // ── Dependency rows ──
+  const allEdges=[];
+  for(const[u,vs] of Object.entries(adj)) for(const v of vs) allEdges.push([+u,v]);
+  let satisfied=0;
+  allEdges.forEach(([u,v])=>{
+    const row=document.getElementById(`dep-${u}-${v}`);
+    const status=document.getElementById(`deps-${u}-${v}`);
+    if(!row||!status)return;
+    const uPos=st.result.indexOf(u), vPos=st.result.indexOf(v);
+    const isSat=uPos>=0&&vPos>=0&&uPos<vPos;
+    const isActive=st.curU===u&&st.curV===v;
+    row.className='dep-row '+(isSat?'dep-satisfied':isActive?'dep-active':'dep-pending');
+    status.className='dep-status '+(isSat?'ds-sat':isActive?'ds-active':'ds-pend');
+    status.textContent=isSat?'✓ ok':isActive?'checking':'pending';
+    if(isSat)satisfied++;
+  });
+  document.getElementById('depOk').textContent=`${satisfied} / ${allEdges.length} satisfied`;
+
+  // ── Finish chips ──
+  const fc=document.getElementById('finishChips');
+  fc.innerHTML='';
+  st.result.forEach((node,i)=>{
+    const chip=document.createElement('div');
+    chip.className=`fin-chip${st.resultItem===node&&st.type==='finish'?' fc-new':''}`;
+    chip.textContent=`${node}`;
+    fc.appendChild(chip);
+  });
+
+  // ── Adj list colors ──
+  for(let i=0;i<n;i++){
+    const row=document.getElementById(`ar-${i}`);
+    const nn=document.getElementById(`an-${i}`);
+    if(!row||!nn)continue;
+    row.className='adj-row'+(st.curU===i&&!isFinal?' adj-current':'');
+    nn.innerHTML=(adj[i]||[]).map(v=>{
+      const cls=st.color[v]===2?'an-black':st.color[v]===1?'an-gray':'an-white';
+      return `<span class="an-chip ${cls}">${v}</span>`;
+    }).join(' ')||'<span style="color:#333">—</span>';
+  }
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Variables ──
+  setVar('vU',    'vcU',    st.curU!=null?st.curU:'—');
+  setVar('vV',    'vcV',    st.curV!=null?st.curV:'—');
+  setVar('vDepth','vcDepth',st.dfsPath?st.dfsPath.length:0);
+  setVar('vDone', 'vcDone', st.result.length);
+  setVar('vScanI','vcScanI',st.scanI!=null?st.scanI:'—');
+
+  // ── Done ──
+  if(st.resultFinal||st.hasCycle){
+    const hasCycle=st.hasCycle;
+    document.getElementById('doneBanner').className=`done-banner show ${hasCycle?'fail':'success'}`;
+    document.getElementById('doneBanner').textContent=hasCycle?'⚠ CYCLE DETECTED — INVALID DAG':`✓ TOPOLOGICAL ORDER FOUND`;
+    document.getElementById('doneBar').className=`done-bar show ${hasCycle?'fail':'success'}`;
+    document.getElementById('doneBar').textContent=hasCycle?'⚠ CYCLE — O(V+E)':`✓ TOPO SORT — O(V+E)`;
+    const bb=document.getElementById('bestBox');
+    bb.className=`best-box show ${hasCycle?'fail':'success'}`;
+    document.getElementById('bestVal').textContent=hasCycle?'NO ORDER':st.result.join(' → ');
+    document.getElementById('bestMeta').textContent=hasCycle?`Cycle found · ${steps.length} steps`:`${n} nodes · ${steps.length} steps · O(V+E)`;
+  }
+
+  // ── Progress ──
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+function var_pur_dark(){return '#7a3fc0';}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',scan:'ep-init',visit:'ep-visit',
+    check_white:'ep-visit',skip_black:'ep-skip',
+    cycle_found:'ep-cycle',finish:'ep-fin',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

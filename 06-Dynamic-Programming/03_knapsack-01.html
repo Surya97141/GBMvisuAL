@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0/1 Knapsack — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(255,209,102,0.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:260px;} .field input.small{width:80px;}
+  .field input:focus{border-color:var(--accent4);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ITEMS ROW */
+  .items-row{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;}
+  .item-card{
+    background:var(--surface);border:1.5px solid var(--border);border-radius:8px;
+    padding:8px 12px;text-align:center;transition:all 0.3s;min-width:58px;
+  }
+  .item-card.ic-active{border-color:var(--accent4);background:rgba(255,209,102,0.12);transform:translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,0.3);}
+  .item-card.ic-taken {border-color:var(--accent3);background:rgba(6,214,160,0.12);}
+  .item-card.ic-skip  {border-color:var(--accent); background:rgba(230,57,70,0.07);opacity:0.6;}
+  .ic-idx {font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:4px;}
+  .ic-val {font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+  .ic-wgt {font-family:'Space Mono',monospace;font-size:0.68rem;color:var(--muted);margin-top:2px;}
+  .ic-badge{font-size:0.6rem;font-family:'Space Mono',monospace;font-weight:700;margin-top:4px;padding:1px 5px;border-radius:3px;}
+  .ic-badge.take{background:var(--accent3);color:#0a2e22;}
+  .ic-badge.skip{background:var(--accent);color:white;}
+  .ic-badge.back{background:var(--accent4);color:#3a2800;}
+  .cap-display{background:var(--surface);border:1.5px solid var(--accent2);border-radius:8px;padding:8px 14px;text-align:center;margin-left:auto;}
+  .cap-label{font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);margin-bottom:3px;}
+  .cap-val  {font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--accent2);}
+
+  /* DP TABLE */
+  .dp-section{margin-bottom:14px;}
+  .dp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow:auto;}
+  .dp-wrap{position:relative;display:inline-block;}
+  .dp-grid{display:inline-grid;gap:2px;}
+  .dp-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+
+  /* header cells */
+  .dp-hcell{
+    width:46px;height:34px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;
+    background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.2);
+    color:var(--accent2);
+  }
+  .dp-hcell.hc-item{background:rgba(255,209,102,0.1);border-color:rgba(255,209,102,0.3);color:#7a5a00;}
+  /* value cells */
+  .dp-cell{
+    width:46px;height:34px;border-radius:4px;border:1px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;
+    background:var(--surface);color:var(--muted);
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .dp-cell.dc-zero   {color:var(--muted);background:var(--surface);}
+  .dp-cell.dc-filled {background:rgba(33,150,243,0.08);border-color:rgba(33,150,243,0.3);color:var(--accent2);}
+  .dp-cell.dc-current{background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;color:#7a4800!important;transform:scale(1.15) translateY(-2px);box-shadow:0 6px 16px rgba(245,166,35,0.45);z-index:4;animation:dpPulse 0.8s ease infinite alternate;}
+  @keyframes dpPulse{from{box-shadow:0 4px 10px rgba(245,166,35,0.35);}to{box-shadow:0 8px 22px rgba(245,166,35,0.6);}}
+  .dp-cell.dc-take   {background:rgba(6,214,160,0.15);border-color:var(--accent3);color:#028a5b;}
+  .dp-cell.dc-skip   {background:rgba(230,57,70,0.08);border-color:rgba(230,57,70,0.35);color:var(--accent);}
+  .dp-cell.dc-backtrack{background:rgba(255,209,102,0.22);border-color:#f5a623;border-width:2.5px;color:#7a4800;}
+  .dp-cell.dc-best   {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;box-shadow:0 4px 12px rgba(6,214,160,0.3);}
+
+  /* DECISION DISPLAY */
+  .decision-row{display:flex;gap:10px;margin-bottom:14px;}
+  .dec-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 13px;transition:all 0.3s;}
+  .dec-card.dc-a-take{border-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .dec-card.dc-a-skip{border-color:var(--accent);background:rgba(230,57,70,0.05);}
+  .dec-card.dc-a-back{border-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .dec-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .dec-val  {font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;color:var(--ink);}
+  .dec-sub  {font-size:0.7rem;color:var(--muted);margin-top:3px;}
+
+  /* 3-TAB */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-fill{border-color:var(--accent2);}
+  .explain-panel.ep-take{border-color:var(--accent3);}
+  .explain-panel.ep-skip{border-color:var(--accent);}
+  .explain-panel.ep-back{border-color:var(--accent4);}
+  .explain-panel.ep-done{border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);       border-bottom-color:var(--accent4);}
+  .ep-tab.active.t-why{color:var(--pur-dark);  border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;          border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;} .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;} .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-take{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-skip{border-left-color:var(--accent); background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-back{border-left-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur {background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur  .inv-text strong{color:var(--pur-dark);}
+
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*8+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init{background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-fill{background:rgba(33,150,243,0.16);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-take{background:rgba(6,214,160,0.16); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-skip{background:rgba(230,57,70,0.14); border-left-color:var(--accent); color:#e2e8f0;}
+  .code-line.hl-back{background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(6,214,160,0.18); border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);}
+  .var-value.blu{color:#4fc3f7;} .var-value.red{color:#ff6b6b;}
+
+  /* DP mini right */
+  .dp-mini-section{margin-bottom:12px;}
+  .dp-mini-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .dp-mini-grid{display:inline-grid;gap:2px;}
+  .dp-mini-cell{width:32px;height:26px;border-radius:3px;border:1px solid #2a2a3e;background:#0d0d18;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;color:#6b7280;transition:all 0.25s;}
+  .dp-mini-cell.dmc-filled{border-color:rgba(33,150,243,0.4);background:rgba(33,150,243,0.1);color:#4fc3f7;}
+  .dp-mini-cell.dmc-cur   {border-color:#ffd166;background:rgba(255,209,102,0.1);color:var(--accent4);}
+  .dp-mini-cell.dmc-back  {border-color:var(--accent3);background:rgba(6,214,160,0.1);color:var(--accent3);}
+  .dp-mini-cell.dmc-best  {border-color:var(--accent3);background:rgba(6,214,160,0.15);color:var(--accent3);}
+
+  /* result items */
+  .result-section{margin-bottom:12px;}
+  .ri-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .ri-chips{display:flex;gap:4px;flex-wrap:wrap;}
+  .ri-chip{min-width:28px;height:28px;border-radius:4px;border:1px solid rgba(6,214,160,0.4);background:rgba(6,214,160,0.1);padding:0 6px;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:700;color:var(--accent3);display:flex;align-items:center;justify-content:center;}
+  .ri-arrow{color:#028a5b;font-family:'Space Mono',monospace;font-size:0.75rem;align-self:center;}
+
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>0/1 Knapsack Problem</h1>
+    <div class="sub">Dynamic Programming · Take or Skip · Item Selection</div>
+  </div>
+  <div class="family-badge">DP · Classic</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Items  [value, weight] per pair</label>
+      <input type="text" id="inputItems" class="wide" value="1,2|4,3|5,6|6,7">
+    </div>
+    <div class="field">
+      <label>Capacity</label>
+      <input type="number" id="inputCap" value="10" class="small" min="1">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="330">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- ITEMS -->
+  <div class="section-label">Items  <span id="itemCount" style="color:var(--accent2)"></span></div>
+  <div class="items-row" id="itemsRow"></div>
+
+  <!-- DP TABLE -->
+  <div class="dp-section">
+    <div class="section-label">DP Table  <span style="color:var(--muted);font-size:0.55rem">dp[i][w] = max value using first i items with capacity w</span></div>
+    <div class="dp-outer">
+      <div class="dp-wrap">
+        <div class="dp-grid" id="dpGrid"></div>
+        <svg class="dp-overlay" id="dpOverlay" width="1" height="1"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLEXITY STRIP -->
+  <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <div style="flex:1;background:var(--surface);border:1.5px solid rgba(33,150,243,0.3);border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:4px;">Time Complexity</div>
+      <div style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);">O(n · W)</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">n items × W capacity</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1.5px solid rgba(192,84,252,0.3);border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur-dark);margin-bottom:4px;">Space Complexity</div>
+      <div style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);">O(n · W)</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">DP table · O(W) possible</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1.5px solid rgba(6,214,160,0.3);border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#028a5b;margin-bottom:4px;">Backtrack</div>
+      <div style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);">O(n)</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;">read table top→bottom</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1.5px solid rgba(255,209,102,0.4);border-radius:8px;padding:8px 14px;text-align:center;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#7a5a00;margin-bottom:4px;">This run</div>
+      <div style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);" id="cxThisRun">—</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:2px;" id="cxThisSub">n=? W=?</div>
+    </div>
+  </div>
+
+  <!-- DECISION PANEL — shows the logic for current cell -->
+  <div id="decisionPanel" style="margin-bottom:14px;">
+    <!-- FILL MODE: shows skip vs take comparison -->
+    <div id="fillPanel" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;display:none;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">
+        Computing <span id="fpCell" style="color:var(--accent4)">dp[i][w]</span>
+        — item <span id="fpItem" style="color:var(--accent4)"></span>
+        (val=<span id="fpVal" style="color:var(--accent3)"></span>,
+         wgt=<span id="fpWgt" style="color:var(--accent2)"></span>)
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <!-- SKIP OPTION -->
+        <div id="fpSkipBox" style="flex:1;min-width:120px;border:2px solid var(--accent);border-radius:8px;padding:9px 12px;background:rgba(230,57,70,0.06);text-align:center;transition:all 0.3s;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:1px;color:var(--accent);text-transform:uppercase;margin-bottom:5px;">⬇ Skip  →  dp[i−1][w]</div>
+          <div id="fpSkipSrc" style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:4px;"></div>
+          <div id="fpSkipVal" style="font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--accent);">—</div>
+        </div>
+        <!-- VS -->
+        <div style="font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);flex-shrink:0;">vs</div>
+        <!-- TAKE OPTION -->
+        <div id="fpTakeBox" style="flex:1;min-width:120px;border:2px solid var(--accent3);border-radius:8px;padding:9px 12px;background:rgba(6,214,160,0.06);text-align:center;transition:all 0.3s;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:1px;color:var(--accent3);text-transform:uppercase;margin-bottom:5px;">↙ Take  →  v + dp[i−1][w−wt]</div>
+          <div id="fpTakeSrc" style="font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:4px;"></div>
+          <div id="fpTakeVal" style="font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--accent3);">—</div>
+        </div>
+        <!-- EQUALS RESULT -->
+        <div style="font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);flex-shrink:0;">=</div>
+        <div id="fpResultBox" style="min-width:90px;border:3px solid var(--accent4);border-radius:8px;padding:9px 12px;background:rgba(255,209,102,0.1);text-align:center;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:1px;color:#7a5a00;text-transform:uppercase;margin-bottom:5px;">dp[i][w]</div>
+          <div id="fpResult" style="font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:#7a5a00;">—</div>
+          <div id="fpWinner" style="font-size:0.65rem;color:var(--muted);margin-top:3px;font-family:'Space Mono',monospace;"></div>
+        </div>
+      </div>
+    </div>
+    <!-- BACKTRACK MODE -->
+    <div id="backPanel" style="background:var(--surface);border:1.5px solid var(--accent4);border-radius:10px;padding:12px 14px;display:none;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">
+        Backtracking — reading the table backwards
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;background:rgba(255,209,102,0.08);border:1.5px solid var(--accent4);border-radius:7px;padding:8px 12px;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.55rem;color:#7a5a00;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Current  dp[i][c]</div>
+          <div id="bpCur" style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--ink);">—</div>
+          <div id="bpCurLbl" style="font-size:0.68rem;color:var(--muted);margin-top:2px;font-family:'Space Mono',monospace;"></div>
+        </div>
+        <div id="bpEqSign" style="font-family:'Space Mono',monospace;font-size:1.2rem;color:var(--muted);">?</div>
+        <div style="flex:1;min-width:130px;background:rgba(33,150,243,0.06);border:1.5px solid var(--accent2);border-radius:7px;padding:8px 12px;">
+          <div style="font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Above  dp[i−1][c]</div>
+          <div id="bpAbove" style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--ink);">—</div>
+          <div id="bpAboveLbl" style="font-size:0.68rem;color:var(--muted);margin-top:2px;font-family:'Space Mono',monospace;"></div>
+        </div>
+        <div style="flex:1.5;min-width:160px;border-radius:7px;padding:8px 12px;transition:all 0.3s;" id="bpDecision">
+          <div style="font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;" id="bpDecTxt">—</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;line-height:1.5;" id="bpDecSub">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy" >Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv" ><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig" ><span class="ck">pair</span>&lt;<span class="ck">int</span>,vector&lt;<span class="ck">int</span>&gt;&gt; <span class="cf">knapsack</span>(</span>
+<span class="code-line" id="cl-sig2">  vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; items, <span class="ck">int</span> cap){</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> n=items.size();</span>
+<span class="code-line" id="cl-dp0">  <span class="cc">// (n+1)×(cap+1) table, all zeros</span></span>
+<span class="code-line" id="cl-dp1">  vvi dp(n+<span class="cn">1</span>,vector&lt;<span class="ck">int</span>&gt;(cap+<span class="cn">1</span>,<span class="cn">0</span>));</span>
+<span class="code-line" id="cl-loop1">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">1</span>;i&lt;=n;i++){</span>
+<span class="code-line" id="cl-loop2">   <span class="ck">int</span> v=items[i-<span class="cn">1</span>][<span class="cn">0</span>], w=items[i-<span class="cn">1</span>][<span class="cn">1</span>];</span>
+<span class="code-line" id="cl-loop3">   <span class="ck">for</span>(<span class="ck">int</span> c=<span class="cn">0</span>;c&lt;=cap;c++){</span>
+<span class="code-line" id="cl-skip">    dp[i][c]=dp[i-<span class="cn">1</span>][c];           <span class="cc">// skip</span></span>
+<span class="code-line" id="cl-take">    <span class="ck">if</span>(c&gt;=w)                        <span class="cc">// can take?</span></span>
+<span class="code-line" id="cl-take2">     dp[i][c]=max(dp[i][c],          <span class="cc">// take</span></span>
+<span class="code-line" id="cl-take3">       v+dp[i-<span class="cn">1</span>][c-w]);}</span>
+<span class="code-line" id="cl-end" >  }</span>
+<span class="code-line" id="cl-back1">  <span class="cc">// Backtrack to find chosen items</span></span>
+<span class="code-line" id="cl-back2">  vector&lt;<span class="ck">int</span>&gt; chosen; <span class="ck">int</span> c=cap;</span>
+<span class="code-line" id="cl-back3">  <span class="ck">for</span>(<span class="ck">int</span> i=n;i&gt;<span class="cn">0</span>;i--)</span>
+<span class="code-line" id="cl-back4">   <span class="ck">if</span>(dp[i][c]!=dp[i-<span class="cn">1</span>][c]){</span>
+<span class="code-line" id="cl-back5">    chosen.push_back(i-<span class="cn">1</span>);</span>
+<span class="code-line" id="cl-back6">    c-=items[i-<span class="cn">1</span>][<span class="cn">1</span>]; }</span>
+<span class="code-line" id="cl-ret" >  <span class="ck">return</span> make_pair(dp[n][cap],chosen);}</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(230,57,70,0.15);border:1px solid rgba(230,57,70,0.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;letter-spacing:1px;">O(n·cap) · DP</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:0.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:280px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span> <span style="color:#374151;font-style:italic">// compiler: max speed</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>              <span style="color:#374151;font-style:italic">// SIMD 256-bit vectors</span>
+<span style="color:#67e8f9">#include</span> <span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>               <span style="color:#374151;font-style:italic">// all headers in one</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; vvi;
+
+<span style="color:#c084fc">pair</span>&lt;<span style="color:#c084fc">int</span>,vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; <span style="color:#67e8f9">knapsack</span>(vvi&amp; it,<span style="color:#c084fc">int</span> cap){
+  <span style="color:#c084fc">int</span> n=it.size();
+  vvi dp(n+<span style="color:#fda4af">1</span>,vector&lt;<span style="color:#c084fc">int</span>&gt;(cap+<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>));   <span style="color:#374151;font-style:italic">// (n+1)×(cap+1) table</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;=n;i++){
+    <span style="color:#c084fc">int</span> v=it[i-<span style="color:#fda4af">1</span>][<span style="color:#fda4af">0</span>],w=it[i-<span style="color:#fda4af">1</span>][<span style="color:#fda4af">1</span>];
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c=<span style="color:#fda4af">0</span>;c&lt;=cap;c++){
+      dp[i][c]=dp[i-<span style="color:#fda4af">1</span>][c];               <span style="color:#374151;font-style:italic">// always try skip</span>
+      <span style="color:#c084fc">if</span>(c&gt;=w) dp[i][c]=max(dp[i][c],v+dp[i-<span style="color:#fda4af">1</span>][c-w]);
+    }}                                   <span style="color:#374151;font-style:italic">// take if fits → max</span>
+  vector&lt;<span style="color:#c084fc">int</span>&gt; chosen; <span style="color:#c084fc">int</span> c=cap;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=n;i&gt;<span style="color:#fda4af">0</span>;i--)               <span style="color:#374151;font-style:italic">// backtrack top→bottom</span>
+    <span style="color:#c084fc">if</span>(dp[i][c]!=dp[i-<span style="color:#fda4af">1</span>][c])           <span style="color:#374151;font-style:italic">// value changed → item taken</span>
+      {chosen.push_back(i-<span style="color:#fda4af">1</span>);c-=it[i-<span style="color:#fda4af">1</span>][<span style="color:#fda4af">1</span>];}
+  <span style="color:#c084fc">return</span> make_pair(dp[n][cap],chosen);
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>);          <span style="color:#374151;font-style:italic">// decouple C/C++ I/O</span>
+  cin.tie(<span style="color:#c084fc">nullptr</span>);                    <span style="color:#374151;font-style:italic">// stop cin flushing cout</span>
+  <span style="color:#c084fc">int</span> n,cap; cin&gt;&gt;n&gt;&gt;cap;
+  vvi it(n,vector&lt;<span style="color:#c084fc">int</span>&gt;(<span style="color:#fda4af">2</span>));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:it) cin&gt;&gt;x[<span style="color:#fda4af">0</span>]&gt;&gt;x[<span style="color:#fda4af">1</span>];
+  <span style="color:#c084fc">auto</span> &#91;val,idx&#93;=<span style="color:#67e8f9">knapsack</span>(it,cap);    <span style="color:#374151;font-style:italic">// C++17 structured binding</span>
+  cout&lt;&lt;val&lt;&lt;<span style="color:#fda4af">'\n'</span>;                    <span style="color:#374151;font-style:italic">// '\n' faster than endl</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i:idx) cout&lt;&lt;i&lt;&lt;<span style="color:#fda4af">' '</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(192,84,252,0.12);border:1px solid rgba(192,84,252,0.3);color:#c084fc;padding:2px 8px;border-radius:3px;">#pragma O3+AVX2</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(33,150,243,0.12);border:1px solid rgba(33,150,243,0.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">structured binding</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(6,214,160,0.10);border:1px solid rgba(6,214,160,0.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">backtrack O(n)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(255,209,102,0.10);border:1px solid rgba(255,209,102,0.3);color:#ffd166;padding:2px 8px;border-radius:3px;">O(n·cap) time</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(230,57,70,0.10);border:1px solid rgba(230,57,70,0.3);color:#ff6b6b;padding:2px 8px;border-radius:3px;">O(n·cap) space</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">  <div class="var-name">item i</div>    <div class="var-value yel" id="vI">—</div></div>
+      <div class="var-card" id="vcW">  <div class="var-name">capacity c</div><div class="var-value blu" id="vW">—</div></div>
+      <div class="var-card" id="vcV">  <div class="var-name">val (vᵢ)</div>  <div class="var-value grn" id="vV">—</div></div>
+      <div class="var-card" id="vcWt"> <div class="var-name">wgt (wᵢ)</div>  <div class="var-value"    id="vWt" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcSkp"><div class="var-name">skip val</div>  <div class="var-value red" id="vSkp">—</div></div>
+      <div class="var-card" id="vcTk"> <div class="var-name">take val</div>  <div class="var-value grn" id="vTk">—</div></div>
+      <div class="var-card" id="vcDp" style="grid-column:1/3"><div class="var-name">dp[i][c]</div><div class="var-value" style="font-size:1.2rem;" id="vDp">—</div></div>
+    </div>
+
+    <!-- DP MINI TABLE -->
+    <div class="dp-mini-section">
+      <div class="dp-mini-title">DP Table (mini)</div>
+      <div class="dp-mini-grid" id="dpMiniGrid"></div>
+    </div>
+
+    <!-- RESULT ITEMS -->
+    <div class="result-section">
+      <div class="ri-title">Items selected (backtrack)</div>
+      <div class="ri-chips" id="riChips">
+        <span style="font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b6b8a;">not yet</span>
+      </div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Maximum Value</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ KNAPSACK SOLVED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN LIBRARY ──────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {n, cap, i, w, v, wt, skipVal, takeVal, dpVal, chosen, phase} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Why DP? The knapsack has <strong>overlapping subproblems</strong> — "best value with capacity c using first i items" depends on smaller sub-problems. Brute force tries all 2ⁿ subsets. DP solves each sub-problem once and reuses it → O(n·cap).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[i][c]</strong> = maximum value achievable using the first i items with capacity exactly ≤ c. Base case: dp[0][c] = 0 for all c (no items → no value).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Recurrence:</strong> dp[i][c] = max(skip: dp[i−1][c], take: vᵢ + dp[i−1][c−wᵢ]). Take is only valid when c ≥ wᵢ.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Key insight:</strong> Each cell only looks at the row above — dp[i] depends only on dp[i−1]. This is why we can reconstruct the chosen items by backtracking from dp[n][cap].`},
+    ]
+  };
+  if(type==='fill'||type==='take'||type==='skip') return {
+    why: type==='take'
+      ? `<div class="ep-why-block why-take">Taking item ${i} (val=${v}, wgt=${wt}): ${takeVal} = ${v} + dp[${i-1}][${w-wt}] = ${v} + ${takeVal-v}. This beats skip (${skipVal}). <strong>Take wins → dp[${i}][${w}] = ${dpVal}</strong>.</div>`
+      : `<div class="ep-why-block why-skip">${wt>w?`Item ${i} weighs ${wt} but capacity is only ${w} — can't fit. Forced skip.`:`Skipping item ${i} gives ${skipVal}. Taking would give ${takeVal < 0 ? 'N/A (too heavy)' : takeVal}. Skip wins → dp[${i}][${w}] = ${dpVal}.`}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> dp[${i}][${w}] is now the maximum value using items 1..${i} with capacity ≤ ${w}. All cells dp[${i}][0..${w-1}] are already correctly filled.`},
+      {icon:'⚖️',cls:'inv-warn',text:`<strong>Why max(skip, take)?</strong> We're guaranteed the best of both worlds — if taking is worse, skip is already stored. We never lose information.`},
+    ]
+  };
+  if(type==='backtrack') return {
+    why:`<div class="ep-why-block why-back">Backtracking from dp[${n}][${cap}]. If dp[${i}][${w}] ≠ dp[${i-1}][${w}], the value changed — item ${i} was taken. Subtract its weight and move up. Otherwise skip it.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Backtrack insight:</strong> dp[i][c] = dp[i−1][c] means item i was NOT taken (skip case). dp[i][c] ≠ dp[i−1][c] means it WAS taken (take case). Read the decision backwards.`},
+      {icon:'🏃',cls:'inv-warn',text:`<strong>O(n) backtrack</strong> — just walk up one row at a time. No recomputation needed.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">dp[${n}][${cap}] = <strong>${dpVal}</strong> is the answer. Chosen items: [${(chosen||[]).join(', ')}]. Two phases: O(n·cap) fill + O(n) backtrack = <strong>O(n·cap)</strong> total.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>dp[${n}][${cap}] = ${dpVal}</strong> — maximum value with all ${n} items and capacity ${cap}.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n·cap) time and space.</strong> For space-optimised version: use a 1D array and iterate capacity backwards — O(cap) space, same time.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>This is 0/1 knapsack</strong> — each item used at most once. For unbounded knapsack (unlimited copies), iterate capacity forwards instead of backwards.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:     {ids:['cl-sig','cl-sig2','cl-init','cl-dp0','cl-dp1','cl-loop1','cl-loop2','cl-loop3'], cls:'hl-init'},
+  fill:     {ids:['cl-loop3','cl-skip','cl-take','cl-take2','cl-take3'],                            cls:'hl-fill'},
+  take:     {ids:['cl-take','cl-take2','cl-take3'],                                                 cls:'hl-take'},
+  skip:     {ids:['cl-skip'],                                                                       cls:'hl-skip'},
+  backtrack:{ids:['cl-back1','cl-back2','cl-back3','cl-back4','cl-back5','cl-back6'],               cls:'hl-back'},
+  done:     {ids:['cl-ret'],                                                                        cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(items, cap){
+  const n=items.length;
+  const steps=[];
+  // dp[i][c]: (n+1) × (cap+1)
+  const dp=Array.from({length:n+1},()=>new Array(cap+1).fill(0));
+
+  const snap=(type,desc,explain,extra={})=>steps.push({
+    dp:dp.map(r=>[...r]), n, cap, items,
+    curI:null,curW:null,phase:'fill',
+    chosen:[], backtrackC:cap,
+    desc, type, explain, result:null, ...extra
+  });
+
+  snap('init',
+    `🚀 <strong>Start.</strong> ${n} items, capacity=${cap}. Build dp[${n+1}][${cap+1}] table. Row i = item i, Col c = capacity c. dp[i][c] = max value with first i items and capacity ≤ c.`,
+    makeExplain('init',{n,cap})
+  );
+
+  // FILL TABLE
+  for(let i=1;i<=n;i++){
+    const v=items[i-1][0], wt=items[i-1][1];
+    for(let w=0;w<=cap;w++){
+      const skipVal=dp[i-1][w];
+      const takeVal=w>=wt ? v+dp[i-1][w-wt] : -1;
+      dp[i][w]=skipVal;
+      let chosen_type='skip';
+      if(takeVal>skipVal){ dp[i][w]=takeVal; chosen_type='take'; }
+
+      snap(chosen_type,
+        chosen_type==='take'
+          ? `✅ Item ${i} (v=${v},w=${wt}), cap=${w}: <span class="grn">TAKE</span> → ${v}+dp[${i-1}][${w-wt}]=${v}+${dp[i-1][w-wt]}=<strong>${dp[i][w]}</strong> > skip(${skipVal})`
+          : wt>w
+            ? `⏭ Item ${i} (v=${v},w=${wt}), cap=${w}: too heavy (${wt}>${w}). <span class="red">SKIP</span> → dp[${i}][${w}]=dp[${i-1}][${w}]=<strong>${dp[i][w]}</strong>`
+            : `⬇️ Item ${i} (v=${v},w=${wt}), cap=${w}: <span class="red">SKIP</span> wins. ${skipVal}≥${takeVal}. dp[${i}][${w}]=<strong>${dp[i][w]}</strong>`,
+        makeExplain(chosen_type,{n,cap,i,w,v,wt,skipVal,takeVal,dpVal:dp[i][w]}),
+        {curI:i,curW:w,phase:'fill',
+         skipVal,takeVal,dpVal:dp[i][w],
+         curV:v,curWt:wt}
+      );
+    }
+  }
+
+  // BACKTRACK
+  const chosen=[];
+  let c=cap;
+  for(let i=n;i>0;i--){
+    const taken=dp[i][c]!==dp[i-1][c];
+    const wt=items[i-1][1];
+    snap('backtrack',
+      taken
+        ? `🎒 Item ${i}: dp[${i}][${c}]=${dp[i][c]} ≠ dp[${i-1}][${c}]=${dp[i-1][c]} → <span class="grn">TAKEN!</span> Add to bag. c: ${c}→${c-wt}`
+        : `⬆️ Item ${i}: dp[${i}][${c}]=${dp[i][c]} = dp[${i-1}][${c}] → not taken, skip.`,
+      makeExplain('backtrack',{n,cap,i,w:c,wt,chosen:[...chosen]}),
+      {curI:i,curW:c,phase:'backtrack',
+       backtrackC:c,backtrackTaken:taken,
+       chosen:[...chosen]}
+    );
+    if(taken){ chosen.push(i-1); c-=wt; }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Maximum value = <strong>${dp[n][cap]}</strong>. Items chosen: [${chosen.join(', ')}] (0-indexed). Total weight = ${chosen.reduce((s,idx)=>s+items[idx][1],0)} ≤ ${cap}.`,
+    makeExplain('done',{n,cap,dpVal:dp[n][cap],chosen}),
+    {phase:'done',chosen:[...chosen],result:{value:dp[n][cap],chosen:[...chosen]}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let items=[], cap=10, n=0;
+
+function parseItems(){
+  return document.getElementById('inputItems').value.trim().split('|')
+    .map(pair=>pair.split(',').map(Number));
+}
+
+const CW=48, CH=36; // dp cell stride
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── OVERLAY ──────────────────────────────────────────────────────────────────
+function cellCx(col){ return (col+1)*CW + CW/2; }
+function cellCy(row){ return (row+1)*CH + CH/2; }
+function cellL(col) { return (col+1)*CW; }
+function cellT(row) { return (row+1)*CH; }
+
+function mkMark(defs, id, color){
+  if(defs.querySelector('#'+id)) return;
+  const mk=svgEl('marker',{id,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+  mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:color}));
+  defs.appendChild(mk);
+}
+
+function svgLine(svg,defs, x1,y1,x2,y2, color,sw,dashed,markId){
+  mkMark(defs,markId,color);
+  const a={x1,y1,x2,y2,stroke:color,'stroke-width':sw,
+    'stroke-linecap':'round','marker-end':`url(#${markId})`};
+  if(dashed) a['stroke-dasharray']='5 3';
+  svg.appendChild(svgEl('line',a));
+}
+
+function svgRing(svg, cx,cy, color, dashed, r){
+  const a={cx,cy,r:r||16,fill:'none',stroke:color,'stroke-width':'2.5'};
+  if(dashed) a['stroke-dasharray']='4 3';
+  svg.appendChild(svgEl('circle',a));
+}
+
+function svgBadge(svg, x,y, txt, bg, fg){
+  const w=txt.length*5.6+10, h=15;
+  svg.appendChild(svgEl('rect',{x:x-w/2,y:y-h/2,width:w,height:h,rx:4,fill:bg}));
+  const t=svgEl('text',{x,y:y+1,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:fg||'white','font-family':'Space Mono,monospace','font-size':'8.5','font-weight':'700'});
+  t.textContent=txt; svg.appendChild(t);
+}
+
+function drawDpOverlay(st){
+  const svg=document.getElementById('dpOverlay');
+  svg.innerHTML='';
+  if(!st) return;
+  svg.setAttribute('width',(cap+2)*CW);
+  svg.setAttribute('height',(n+2)*CH);
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+
+  // ── FILL PHASE ────────────────────────────────────────────────────────────
+  if(st.phase==='fill' && st.curI && st.curW!=null){
+    const {curI:i, curW:w, curWt:wt, skipVal, takeVal, type} = st;
+    const isTake  = type==='take';
+    const canTake = wt<=w && takeVal>=0;
+
+    const destX=cellCx(w), destY=cellCy(i);
+    const skipX=cellCx(w), skipY=cellCy(i-1);
+
+    // ── SKIP: dp[i-1][w] → dp[i][w] straight down ──
+    const skipC = isTake ? 'rgba(230,57,70,0.3)' : '#e63946';
+    svgLine(svg,defs, skipX, skipY+CH/2-3, destX, destY-CH/2+5,
+      skipC, isTake?'1.2':'2.2', isTake, 'mk_s');
+    if(!isTake)
+      svgBadge(svg, skipX-CW, (skipY+destY)/2,
+        `dp[${i-1}][${w}]=${skipVal}`, '#e63946');
+
+    // ── TAKE: dp[i-1][w-wt] → dp[i][w] diagonal ──
+    if(canTake){
+      const takeX=cellCx(w-wt), takeY=cellCy(i-1);
+      const takeC = isTake ? '#06d6a0' : 'rgba(6,214,160,0.3)';
+      svgLine(svg,defs,
+        takeX+CW/2-3, takeY+CH/2-3,
+        destX-CW/2+3, destY-CH/2+5,
+        takeC, isTake?'2.2':'1.2', !isTake, 'mk_t');
+      if(isTake){
+        const mx=(takeX+CW/2+destX-CW/2)/2;
+        const my=(takeY+CH/2+destY-CH/2)/2-10;
+        svgBadge(svg, mx, my,
+          `${st.curV}+dp[${i-1}][${w-wt}]=${takeVal}`, '#06d6a0');
+      }
+    }
+  }
+
+  // ── BACKTRACK PHASE ───────────────────────────────────────────────────────
+  if(st.phase==='backtrack' && st.curI!=null && st.backtrackC!=null){
+    const {curI:i, backtrackC:c, backtrackTaken} = st;
+    const valCur  = st.dp[i][c];
+    const valAbove= st.dp[i-1][c];
+    const eq      = valCur===valAbove;
+    const col     = backtrackTaken ? '#06d6a0' : '#aaa';
+
+    // Dashed vertical line connecting them on right side
+    const lx=cellL(c)+CW-5;
+    svg.appendChild(svgEl('line',{x1:lx,y1:cellT(i)+3,x2:lx,y2:cellT(i-1)+CH-3,
+      stroke:col,'stroke-width':'1.8','stroke-dasharray':'4 3'}));
+
+    // Comparison badge at midpoint
+    const midY=(cellCy(i)+cellCy(i-1))/2;
+    svgBadge(svg, cellL(c)+CW+42, midY,
+      eq?`${valCur}=${valAbove} → skip`:`${valCur}≠${valAbove} → TAKEN!`,
+      backtrackTaken?'#06d6a0':'#888');
+
+    // If taken: gold horizontal arrow in row above (c → c-wt)
+    if(backtrackTaken){
+      const wt=items[i-1][1], newC=c-wt;
+      if(newC>=0){
+        const hy=cellCy(i-1);
+        svgLine(svg,defs,
+          cellCx(c)-CW/2+2, hy,
+          cellCx(newC)+CW/2-2, hy,
+          '#ffd166','2',false,'mk_h');
+        svgBadge(svg,(cellCx(c)+cellCx(newC))/2, hy-13,
+          `c−${wt}=${newC}`, '#ffd166','#3a2800');
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  items=parseItems();
+  cap=parseInt(document.getElementById('inputCap').value)||10;
+  n=items.length;
+  steps=computeSteps(items,cap);
+  currentStep=0;
+  document.getElementById('itemCount').textContent=`${n} items, cap=${cap}`;
+  document.getElementById('cxThisRun').textContent=`${n*cap}`;
+  document.getElementById('cxThisSub').textContent=`n=${n} × W=${cap}`;
+
+  // Items row
+  const ir=document.getElementById('itemsRow');
+  ir.innerHTML='';
+  items.forEach(([v,w],i)=>{
+    ir.innerHTML+=`<div class="item-card" id="ic-${i}">
+      <div class="ic-idx">item ${i}</div>
+      <div class="ic-val">${v}</div>
+      <div class="ic-wgt">wgt: ${w}</div>
+      <div class="ic-badge" id="icb-${i}" style="display:none"></div>
+    </div>`;
+  });
+  ir.innerHTML+=`<div class="cap-display"><div class="cap-label">Capacity</div><div class="cap-val">${cap}</div></div>`;
+
+  // DP grid (includes header row + col)
+  const dg=document.getElementById('dpGrid');
+  dg.style.gridTemplateColumns=`repeat(${cap+2},${CW}px)`;
+  dg.innerHTML='';
+  // corner
+  dg.innerHTML+=`<div class="dp-hcell" style="background:transparent;border:none"></div>`;
+  // col headers (capacities)
+  for(let c=0;c<=cap;c++)
+    dg.innerHTML+=`<div class="dp-hcell">w=${c}</div>`;
+  // rows
+  for(let i=0;i<=n;i++){
+    dg.innerHTML+=`<div class="dp-hcell hc-item">${i===0?'∅':`i${i}`}</div>`;
+    for(let c=0;c<=cap;c++)
+      dg.innerHTML+=`<div class="dp-cell dc-zero" id="dp-${i}-${c}">0</div>`;
+  }
+
+  // DP mini grid (right panel)
+  const dmg=document.getElementById('dpMiniGrid');
+  dmg.style.gridTemplateColumns=`repeat(${Math.min(cap+1,8)},32px)`;
+  dmg.innerHTML='';
+  for(let i=0;i<=Math.min(n,6);i++)
+    for(let c=0;c<=Math.min(cap,7);c++)
+      dmg.innerHTML+=`<div class="dp-mini-cell" id="dpm-${i}-${c}">0</div>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('riChips').innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:0.65rem;color:#6b6b8a;">not yet</span>`;
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // DP cells
+  for(let i=0;i<=n;i++)
+    for(let c=0;c<=cap;c++){
+      const el=document.getElementById(`dp-${i}-${c}`);
+      if(!el)continue;
+      const val=st.dp[i][c];
+      el.textContent=val;
+      const isCur=st.curI===i&&st.curW===c&&st.phase==='fill';
+      const isBackCur=st.phase==='backtrack'&&st.curI===i&&st.backtrackC===c;
+      const isChosen=(st.phase==='done'||st.phase==='backtrack')
+        ? (st.chosen.includes(i-1) && (st.dp[i-1]?st.dp[i][c]!==st.dp[i-1][c]:false))
+        : false;
+      const isBestCell=isFinal&&i===n&&c===cap;
+      if(isBestCell)     el.className='dp-cell dc-best';
+      else if(isCur)     el.className='dp-cell dc-current';
+      else if(isBackCur) el.className='dp-cell dc-backtrack';
+      else if(val>0)     el.className='dp-cell dc-filled';
+      else               el.className='dp-cell dc-zero';
+    }
+
+  // DP mini cells (right)
+  for(let i=0;i<=Math.min(n,6);i++)
+    for(let c=0;c<=Math.min(cap,7);c++){
+      const el=document.getElementById(`dpm-${i}-${c}`);
+      if(!el)continue;
+      const val=st.dp[i][c];
+      el.textContent=val;
+      const isCur=st.curI===i&&st.curW===c&&st.phase==='fill';
+      const isBack=st.phase==='backtrack'&&st.curI===i&&c===Math.min(st.backtrackC,7);
+      if(isFinal&&i===n&&c===Math.min(cap,7))el.className='dp-mini-cell dmc-best';
+      else if(isCur)  el.className='dp-mini-cell dmc-cur';
+      else if(isBack) el.className='dp-mini-cell dmc-back';
+      else if(val>0)  el.className='dp-mini-cell dmc-filled';
+      else            el.className='dp-mini-cell';
+    }
+
+  // Item cards
+  items.forEach(([v,w],i)=>{
+    const card=document.getElementById(`ic-${i}`);
+    const badge=document.getElementById(`icb-${i}`);
+    if(!card||!badge)return;
+    const isActive=st.phase==='fill'&&st.curI===i+1;
+    const isTaken=st.chosen.includes(i);
+    const isBack=st.phase==='backtrack'&&st.curI===i+1;
+    card.className='item-card'+(isActive?' ic-active':isTaken?' ic-taken':'');
+    badge.style.display=isActive||isTaken||isBack?'block':'none';
+    if(isActive){badge.textContent=st.type==='take'?'TAKE':'SKIP';badge.className='ic-badge '+(st.type==='take'?'take':'skip');}
+    else if(isTaken){badge.textContent='✓ taken';badge.className='ic-badge take';}
+    else if(isBack){badge.textContent='← back';badge.className='ic-badge back';}
+  });
+
+  // ── Decision panel ───────────────────────────────────────────────────────
+  const fillPanel=document.getElementById('fillPanel');
+  const backPanel=document.getElementById('backPanel');
+
+  if(st.phase==='fill' && st.curI){
+    fillPanel.style.display='block';
+    backPanel.style.display='none';
+    const v=st.curV, wt=st.curWt, w=st.curW, i=st.curI;
+    const sv=st.skipVal, tv=st.takeVal;
+    const isTake=st.type==='take';
+    const canTake=wt<=w && tv>=0;
+
+    document.getElementById('fpCell').textContent=`dp[${i}][${w}]`;
+    document.getElementById('fpItem').textContent=i;
+    document.getElementById('fpVal').textContent=v;
+    document.getElementById('fpWgt').textContent=wt;
+
+    // Skip box
+    const skipBox=document.getElementById('fpSkipBox');
+    skipBox.style.opacity=isTake?'0.55':'1';
+    skipBox.style.borderColor=isTake?'rgba(230,57,70,0.4)':'var(--accent)';
+    document.getElementById('fpSkipSrc').textContent=`dp[${i-1}][${w}]`;
+    document.getElementById('fpSkipVal').textContent=sv;
+
+    // Take box
+    const takeBox=document.getElementById('fpTakeBox');
+    if(!canTake){
+      takeBox.style.opacity='0.4';
+      takeBox.style.borderColor='rgba(6,214,160,0.3)';
+      document.getElementById('fpTakeSrc').textContent=`weight ${wt} > capacity ${w} — cannot take`;
+      document.getElementById('fpTakeVal').textContent='✗';
+      document.getElementById('fpTakeVal').style.fontSize='1rem';
+    } else {
+      takeBox.style.opacity=isTake?'1':'0.55';
+      takeBox.style.borderColor=isTake?'var(--accent3)':'rgba(6,214,160,0.4)';
+      document.getElementById('fpTakeSrc').textContent=`${v} + dp[${i-1}][${w-wt}] = ${v} + ${tv-v}`;
+      document.getElementById('fpTakeVal').textContent=tv;
+      document.getElementById('fpTakeVal').style.fontSize='1.6rem';
+    }
+
+    // Result box
+    document.getElementById('fpResult').textContent=st.dpVal;
+    document.getElementById('fpWinner').textContent=
+      !canTake ? '⏭ skip (item too heavy)' :
+      isTake   ? `✅ take wins  (${tv} > ${sv})` :
+                 `⏭ skip wins  (${sv} ≥ ${tv})`;
+    const resBox=document.getElementById('fpResultBox');
+    resBox.style.borderColor=isTake?'var(--accent3)':'var(--accent)';
+    resBox.style.background=isTake?'rgba(6,214,160,0.08)':'rgba(230,57,70,0.06)';
+
+  } else if(st.phase==='backtrack' && st.curI!=null){
+    fillPanel.style.display='none';
+    backPanel.style.display='block';
+    const i=st.curI, c=st.backtrackC;
+    const valCur  = st.dp[i]  [c];
+    const valAbove= st.dp[i-1][c];
+    const eq=valCur===valAbove;
+
+    document.getElementById('bpCur').textContent=valCur;
+    document.getElementById('bpCurLbl').textContent=`dp[${i}][${c}]`;
+    document.getElementById('bpAbove').textContent=valAbove;
+    document.getElementById('bpAboveLbl').textContent=`dp[${i-1}][${c}]`;
+    document.getElementById('bpEqSign').textContent=eq?'=':'≠';
+    document.getElementById('bpEqSign').style.color=eq?'var(--muted)':'var(--accent3)';
+
+    const decBox=document.getElementById('bpDecision');
+    const decTxt=document.getElementById('bpDecTxt');
+    const decSub=document.getElementById('bpDecSub');
+    if(eq){
+      decBox.style.background='rgba(130,130,130,0.08)';
+      decBox.style.border='1.5px solid #ccc';
+      decTxt.textContent='⏭ Item not taken';
+      decTxt.style.color='var(--muted)';
+      decSub.textContent='Values equal → item was skipped.\nMove up one row: i = '+(i-1);
+    } else {
+      decBox.style.background='rgba(6,214,160,0.08)';
+      decBox.style.border='1.5px solid var(--accent3)';
+      decTxt.textContent='✅ Item '+(i-1)+' was taken!';
+      decTxt.style.color='var(--accent3)';
+      const wt=items[i-1][1];
+      decSub.textContent=`Subtract weight ${wt}. Next: dp[${i-1}][${c-wt}]`;
+    }
+  } else {
+    fillPanel.style.display='none';
+    backPanel.style.display='none';
+  }
+
+  // Result chips
+  if(st.chosen.length){
+    const rc=document.getElementById('riChips');
+    rc.innerHTML='';
+    [...st.chosen].reverse().forEach((idx,i)=>{
+      if(i>0)rc.innerHTML+=`<span class="ri-arrow">→</span>`;
+      rc.innerHTML+=`<div class="ri-chip">item ${idx}<br><span style="font-size:0.52rem;color:#6b6b8a">v=${items[idx][0]},w=${items[idx][1]}</span></div>`;
+    });
+  }
+
+  // Vars
+  setVar('vI','vcI',st.curI!=null?st.curI:'—');
+  setVar('vW','vcW',st.curW!=null?st.curW:'—');
+  setVar('vV','vcV',st.curV!=null?st.curV:'—');
+  setVar('vWt','vcWt',st.curWt!=null?st.curWt:'—');
+  setVar('vSkp','vcSkp',st.skipVal!=null?st.skipVal:'—');
+  const tkEl=document.getElementById('vTk'),tkCard=document.getElementById('vcTk');
+  tkEl.textContent=st.takeVal!=null&&st.takeVal>=0?st.takeVal:'N/A';
+  tkEl.style.color=st.takeVal>st.skipVal?'var(--accent3)':'#e2e8f0';
+  setVar('vDp','vcDp',st.dpVal!=null?st.dpVal:'—');
+  document.getElementById('vDp').style.color=st.type==='take'?'var(--accent3)':st.type==='skip'?'#ff6b6b':'#e2e8f0';
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MAX VALUE = ${st.result.value}  |  ITEMS: [${st.result.chosen.join(', ')}]`;
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.value;
+    const tw=st.result.chosen.reduce((s,i)=>s+items[i][1],0);
+    const tv=st.result.chosen.reduce((s,i)=>s+items[i][0],0);
+    document.getElementById('bestMeta').textContent=
+      `items [${st.result.chosen.join(',')}] · total weight ${tw}/${cap} · O(n·cap)`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  // SVG overlay
+  drawDpOverlay(st);
+}
+
+// ─── TAB SWITCHER ──────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap2=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap2).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap2).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',fill:'ep-fill',take:'ep-take',skip:'ep-skip',backtrack:'ep-back',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ──────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

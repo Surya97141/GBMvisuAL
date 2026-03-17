@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFS — Island Counting · Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  /* HEADER */
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(6,214,160,0.2);border:1px solid var(--accent3);color:var(--accent3);font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;}
+
+  /* LAYOUT */
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input,.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field textarea{width:300px;height:80px;resize:vertical;line-height:1.6;}
+  .field input:focus,.field textarea:focus{border-color:var(--accent3);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#006d4e;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  /* LEGEND */
+  .zone-legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .zone-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;}
+  .zone-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: 2D GRID
+     The main visualization — a map of 1s and 0s.
+     Each cell shows its value and state:
+     water (blue), unvisited land (green),
+     current DFS cell (gold), sunk land (island color).
+     Outer scan cursor sweeps across cells.
+  ══════════════════════════════════════ */
+  .grid-section{margin-bottom:14px;}
+  .grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:16px;overflow:auto;}
+  .grid-table{border-collapse:separate;border-spacing:4px;margin:0 auto;}
+  .grid-cell{
+    width:46px;height:46px;border-radius:7px;
+    border:2px solid var(--border);
+    font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;
+    text-align:center;vertical-align:middle;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position:relative;cursor:default;user-select:none;
+  }
+  /* cell state classes */
+  .gc-water   {background:rgba(33,150,243,0.12);border-color:rgba(33,150,243,0.4);color:rgba(33,150,243,0.6);}
+  .gc-land    {background:rgba(6,214,160,0.12);  border-color:rgba(6,214,160,0.4); color:rgba(6,214,160,0.8);}
+  .gc-scan    {background:rgba(255,209,102,0.1);  border-color:rgba(255,209,102,0.5);color:var(--muted);outline:2.5px solid var(--accent4);outline-offset:2px;}
+  .gc-current {background:rgba(255,209,102,0.28);border-color:#ffd166;color:#7a5a00;transform:scale(1.12);box-shadow:0 6px 18px rgba(255,209,102,0.35);z-index:2;}
+  /* island color classes — filled once visited */
+  .gc-i0{background:rgba(33,150,243,0.2);  border-color:#2196f3;color:#1565c0;}
+  .gc-i1{background:rgba(6,214,160,0.22);  border-color:#06d6a0;color:#014d3a;}
+  .gc-i2{background:rgba(230,57,70,0.18);  border-color:#e63946;color:#b71c1c;}
+  .gc-i3{background:rgba(192,84,252,0.18); border-color:#c084fc;color:#6a1b9a;}
+  .gc-i4{background:rgba(255,159,67,0.2);  border-color:#ff9f43;color:#7a3900;}
+  .gc-i5{background:rgba(255,209,102,0.22);border-color:#ffd166;color:#7a5a00;}
+  .gc-i6{background:rgba(255,107,129,0.18);border-color:#ff6b81;color:#880e4f;}
+  .gc-i7{background:rgba(72,219,251,0.2);  border-color:#48dbfb;color:#006064;}
+  /* row/col axis headers */
+  .gc-header{font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--muted);text-align:center;vertical-align:middle;width:20px;padding:0 4px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: DFS STACK with [r,c] frames
+  ══════════════════════════════════════ */
+  .stack-section{margin-bottom:14px;}
+  .stack-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .stack-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .stack-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .stack-info{font-family:'Space Mono',monospace;font-size:0.75rem;font-weight:700;color:var(--accent3);}
+  .stack-frames{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;min-height:44px;}
+  .stack-frame{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-width:48px;height:44px;border-radius:7px;
+    font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;
+    border:2px solid;padding:0 8px;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .sf-coord{font-size:0.72rem;font-weight:700;}
+  .sf-label{font-size:0.44rem;opacity:0.7;margin-bottom:2px;letter-spacing:0.3px;}
+  .stack-frame.sf-top{transform:translateY(-4px);box-shadow:0 6px 14px rgba(0,0,0,0.12);}
+  .stack-frame.sf-i0{background:rgba(33,150,243,0.15);border-color:#2196f3;color:#1565c0;}
+  .stack-frame.sf-i1{background:rgba(6,214,160,0.18); border-color:#06d6a0;color:#014d3a;}
+  .stack-frame.sf-i2{background:rgba(230,57,70,0.15); border-color:#e63946;color:#b71c1c;}
+  .stack-frame.sf-i3{background:rgba(192,84,252,0.15);border-color:#c084fc;color:#6a1b9a;}
+  .stack-frame.sf-i4{background:rgba(255,159,67,0.18);border-color:#ff9f43;color:#7a3900;}
+  .stack-frame.sf-i5{background:rgba(255,209,102,0.22);border-color:#ffd166;color:#7a5a00;}
+  .stack-arrow{font-family:'Space Mono',monospace;font-size:0.7rem;color:var(--muted);margin-bottom:6px;}
+
+  /* Direction probing indicator */
+  .dir-probe{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .dir-chip{
+    font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700;
+    padding:3px 10px;border-radius:12px;border:1.5px solid var(--border);
+    background:var(--surface);color:var(--muted);transition:all 0.25s;
+  }
+  .dir-chip.dir-active {border-color:var(--accent4);background:rgba(255,209,102,0.15);color:#7a5a00;}
+  .dir-chip.dir-land   {border-color:var(--accent3);background:rgba(6,214,160,0.12);color:#028a5b;}
+  .dir-chip.dir-visited{border-color:var(--border);  background:rgba(0,0,0,0.04);   color:#ccc;}
+  .dir-chip.dir-oob    {border-color:var(--accent);  background:rgba(230,57,70,0.06);color:var(--accent);}
+  .dir-chip.dir-water  {border-color:var(--accent2); background:rgba(33,150,243,0.08);color:var(--accent2);}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 3: ISLAND TRACKER
+     Each island as a growing group of [r,c] chips.
+  ══════════════════════════════════════ */
+  .island-section{margin-bottom:14px;}
+  .island-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .island-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .island-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+  .island-count{font-family:'Space Mono',monospace;font-size:0.9rem;font-weight:700;color:var(--accent3);}
+  .island-groups{display:flex;flex-direction:column;gap:8px;}
+  .island-group{display:flex;align-items:flex-start;gap:7px;flex-wrap:wrap;}
+  .ig-label{font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;min-width:32px;margin-top:3px;flex-shrink:0;}
+  .ig-cells{display:flex;flex-wrap:wrap;gap:4px;}
+  .ig-chip{
+    font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;
+    padding:2px 7px;border-radius:10px;border:1.5px solid;
+    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .ig-chip.ic-cur{transform:scale(1.1) translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,0.12);}
+  .ig-sep{width:100%;height:1px;background:var(--border);}
+  .ig-size{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);margin-top:2px;flex-shrink:0;}
+
+  /* Island color palettes for chips */
+  .ic-i0{background:rgba(33,150,243,0.12);border-color:#2196f3;color:#1565c0;}
+  .ic-i1{background:rgba(6,214,160,0.14); border-color:#06d6a0;color:#014d3a;}
+  .ic-i2{background:rgba(230,57,70,0.12); border-color:#e63946;color:#b71c1c;}
+  .ic-i3{background:rgba(192,84,252,0.12);border-color:#c084fc;color:#6a1b9a;}
+  .ic-i4{background:rgba(255,159,67,0.14);border-color:#ff9f43;color:#7a3900;}
+  .ic-i5{background:rgba(255,209,102,0.16);border-color:#ffd166;color:#7a5a00;}
+  .ic-i6{background:rgba(255,107,129,0.12);border-color:#ff6b81;color:#880e4f;}
+  .ic-i7{background:rgba(72,219,251,0.14);border-color:#48dbfb;color:#006064;}
+
+  /* PROBLEM CARD */
+  .problem-card{background:var(--surface);border:1.5px solid var(--border);border-left:4px solid var(--accent3);border-radius:8px;padding:12px 16px;margin-bottom:14px;}
+  .prob-title{font-family:'Space Mono',monospace;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent3);margin-bottom:7px;}
+  .prob-body{font-size:0.82rem;line-height:1.7;color:var(--ink);}
+  .prob-hi{color:#028a5b;font-weight:700;}
+  .prob-example{display:block;margin-top:9px;background:rgba(6,214,160,0.04);border:1px solid rgba(6,214,160,0.2);border-radius:6px;padding:8px 12px;font-family:'Space Mono',monospace;font-size:0.68rem;line-height:1.7;color:var(--ink);}
+  .ex-label{font-size:0.57rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:3px;}
+
+  /* 3-TAB PANEL */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init  {border-color:var(--accent3);}
+  .explain-panel.ep-scan  {border-color:var(--accent4);}
+  .explain-panel.ep-dfs   {border-color:var(--accent3);}
+  .explain-panel.ep-sink  {border-color:var(--accent4);}
+  .explain-panel.ep-skip  {border-color:var(--accent2);}
+  .explain-panel.ep-done  {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);border-bottom-color:var(--accent3);}
+  .ep-tab.active.t-why{color:#7a3fc0;   border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;   border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}.ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}.ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-scan{border-left-color:var(--accent4);background:rgba(255,209,102,0.06);}
+  .ep-why-block.why-dfs {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-skip{border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,0.07);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key{background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur{background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width 0.3s;}
+
+  .done-banner{display:none;background:var(--accent3);color:var(--ink);text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;font-size:0.58rem;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s,border-left-color 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init{background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-scan{background:rgba(255,209,102,0.16);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-sink{background:rgba(6,214,160,0.14); border-left-color:var(--accent3);color:#e2e8f0;}
+  .code-line.hl-skip{background:rgba(33,150,243,0.14);border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(6,214,160,0.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;}.var-value.yel{color:var(--accent4);}.var-value.grn{color:var(--accent3);}.var-value.pur{color:var(--pur);}
+
+  /* MINI GRID (right panel) */
+  .mini-grid-wrap{margin-bottom:12px;overflow-x:auto;}
+  .arr-state-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .mini-grid-table{border-collapse:separate;border-spacing:2px;}
+  .mini-cell{width:20px;height:20px;border-radius:3px;border:1px solid #2a2a3e;background:#0d0d18;font-family:'Space Mono',monospace;font-size:0.56rem;font-weight:700;text-align:center;vertical-align:middle;color:#333;transition:all 0.22s;}
+  .mc-water {background:rgba(33,150,243,0.15);border-color:#2196f3;color:#4fc3f7;}
+  .mc-land  {background:#0d0d18;color:#4a5568;}
+  .mc-cur   {background:rgba(255,209,102,0.3);border-color:#ffd166;color:#ffd166;}
+  .mc-i0{background:rgba(33,150,243,0.25);border-color:#2196f3;color:#4fc3f7;}
+  .mc-i1{background:rgba(6,214,160,0.25);  border-color:#06d6a0;color:#06d6a0;}
+  .mc-i2{background:rgba(230,57,70,0.25);  border-color:#e63946;color:#ff6b6b;}
+  .mc-i3{background:rgba(192,84,252,0.25); border-color:#c084fc;color:#c084fc;}
+  .mc-i4{background:rgba(255,159,67,0.25); border-color:#ff9f43;color:#ff9f43;}
+  .mc-i5{background:rgba(255,209,102,0.3); border-color:#ffd166;color:#ffd166;}
+  .mc-i6{background:rgba(255,107,129,0.25);border-color:#ff6b81;color:#ff6b81;}
+  .mc-i7{background:rgba(72,219,251,0.25); border-color:#48dbfb;color:#48dbfb;}
+
+  /* STATS CARDS */
+  .stats-row{display:flex;gap:7px;margin-bottom:12px;}
+  .stat-card{flex:1;background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;text-align:center;}
+  .stat-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--accent3);}
+  .stat-label{font-family:'Space Mono',monospace;font-size:0.52rem;color:#6b6b8a;text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+
+  /* RESULT */
+  .best-box{margin:0 0 12px;padding:11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);letter-spacing:3px;}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#000;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>DFS — Island Counting</h1>
+    <div class="sub">Depth-First Search · Implicit Grid Graph · Live Visualizer</div>
+  </div>
+  <div class="family-badge">04·06 · Grid</div>
+</div>
+
+<div class="main">
+
+<!-- ════════════ LEFT ════════════ -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Grid (rows of 0s and 1s, one row per line)</label>
+      <textarea id="inputGrid">11110
+11010
+11000
+00000</textarea>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="350">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="zone-legend">
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.12);border-color:rgba(33,150,243,0.4);border-radius:3px"></div>Water (0)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.12);border-color:rgba(6,214,160,0.4);border-radius:3px"></div>Unvisited Land (1)</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(255,209,102,0.28);border-color:#ffd166;border-radius:3px"></div>Current DFS Cell</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(33,150,243,0.2);border-color:#2196f3;border-radius:3px"></div>Island #1</div>
+    <div class="zone-item"><div class="zone-dot" style="background:rgba(6,214,160,0.22);border-color:#06d6a0;border-radius:3px"></div>Island #2 etc.</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: 2D GRID -->
+  <div class="grid-section">
+    <div class="section-label">Grid  (1 = land, 0 = water)</div>
+    <div class="grid-outer">
+      <table class="grid-table" id="gridTable"></table>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DFS STACK with [r,c] frames -->
+  <div class="stack-section">
+    <div class="section-label">DFS Stack  (exploring island)</div>
+    <div class="stack-wrap">
+      <div class="stack-header">
+        <div class="stack-title">← bottom &nbsp;&nbsp; top →</div>
+        <div class="stack-info">depth: <span id="stackDepth">0</span></div>
+      </div>
+      <div class="stack-frames" id="stackFrames">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>
+      </div>
+      <div class="dir-probe" id="dirProbe">
+        <span class="dir-chip">↑ up</span>
+        <span class="dir-chip">↓ down</span>
+        <span class="dir-chip">← left</span>
+        <span class="dir-chip">→ right</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: ISLAND TRACKER -->
+  <div class="island-section">
+    <div class="section-label">Islands Discovered</div>
+    <div class="island-wrap">
+      <div class="island-header">
+        <div class="island-title">Each island = one DFS launch</div>
+        <div class="island-count"><span id="islandCount">0</span> islands</div>
+      </div>
+      <div class="island-groups" id="islandGroups">
+        <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN to discover…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM CARD -->
+  <div class="problem-card">
+    <div class="prob-title">📋 Problem Statement</div>
+    <div class="prob-body">
+      Given a 2D grid of <strong>'1's</strong> (land) and <strong>'0's</strong> (water),
+      count the number of <span class="prob-hi">islands</span>.
+      An island is a group of <strong>horizontally or vertically</strong> adjacent land cells
+      surrounded by water or the grid boundary.
+      <br><br>
+      <strong>Approach:</strong> Scan every cell. When we find an unvisited <code>'1'</code>,
+      increment island count and DFS in all 4 directions to <em>sink</em> the entire island
+      (mark visited), so it won't be counted again.
+      <span class="prob-example" id="probExample"></span>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLANATION -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <div class="done-banner" id="doneBanner"></div>
+
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+
+</div><!-- /viz-panel -->
+
+<!-- ════════════ RIGHT ════════════ -->
+<div class="state-panel">
+
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Executing Line</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">numIslands</span>(</span>
+<span class="code-line" id="cl-sig2">    vector&lt;vector&lt;<span class="ck">char</span>&gt;&gt;&amp; grid) {</span>
+<span class="code-line" id="cl-rows">  <span class="ck">int</span> R=grid.size(),C=grid[0].size();</span>
+<span class="code-line" id="cl-cnt">  <span class="ck">int</span> islands = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-for1">  <span class="ck">for</span>(<span class="ck">int</span> i=0; i&lt;R; i++)</span>
+<span class="code-line" id="cl-for2">   <span class="ck">for</span>(<span class="ck">int</span> j=0; j&lt;C; j++)</span>
+<span class="code-line" id="cl-if">    <span class="ck">if</span>(grid[i][j]==<span class="cn">'1'</span>) {</span>
+<span class="code-line" id="cl-inc">      islands++;            <span class="cc">// new island!</span></span>
+<span class="code-line" id="cl-dfs">      <span class="cf">dfs</span>(grid,i,j,R,C);</span>
+<span class="code-line" id="cl-ifend">    }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> islands;</span>
+<span class="code-line" id="cl-sep">}</span>
+<span class="code-line" id="cl-dfn"><span class="ck">void</span> <span class="cf">dfs</span>(grid,r,c,R,C) {</span>
+<span class="code-line" id="cl-oob">  <span class="ck">if</span>(r&lt;0||r&gt;=R||c&lt;0||c&gt;=C</span>
+<span class="code-line" id="cl-oob2">     ||grid[r][c]!='<span class="cn">1</span>') <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-sink">  grid[r][c] = <span class="cn">'0'</span>; <span class="cc">// sink / mark visited</span></span>
+<span class="code-line" id="cl-d4">  <span class="cf">dfs</span>(r-1,c); <span class="cf">dfs</span>(r+1,c);</span>
+<span class="code-line" id="cl-d42"><span class="cf">  dfs</span>(r,c-1); <span class="cf">dfs</span>(r,c+1);</span>
+<span class="code-line" id="cl-dfend">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">      <div class="var-name">scan row i</div>   <div class="var-value yel" id="vI">—</div></div>
+      <div class="var-card" id="vcJ">      <div class="var-name">scan col j</div>   <div class="var-value yel" id="vJ">—</div></div>
+      <div class="var-card" id="vcR">      <div class="var-name">dfs row r</div>    <div class="var-value grn" id="vR">—</div></div>
+      <div class="var-card" id="vcC">      <div class="var-name">dfs col c</div>    <div class="var-value grn" id="vC">—</div></div>
+      <div class="var-card" id="vcIslands"><div class="var-name">islands</div>       <div class="var-value grn" id="vIslands">0</div></div>
+      <div class="var-card" id="vcDepth">  <div class="var-name">stack depth</div>  <div class="var-value pur" id="vDepth">0</div></div>
+      <div class="var-card" id="vcSize" style="grid-column:1/3"><div class="var-name">current island size</div><div class="var-value" id="vSize" style="color:#e2e8f0;">0</div></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val" id="statLand">—</div><div class="stat-label">land cells</div></div>
+      <div class="stat-card"><div class="stat-val" id="statWater">—</div><div class="stat-label">water cells</div></div>
+      <div class="stat-card"><div class="stat-val" id="statVisited">0</div><div class="stat-label">sunk</div></div>
+    </div>
+
+    <!-- MINI GRID -->
+    <div class="mini-grid-wrap">
+      <div class="arr-state-title">Grid State</div>
+      <table class="mini-grid-table" id="miniGrid"></table>
+    </div>
+
+    <!-- RESULT -->
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Number of Islands</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+
+  <div class="done-bar" id="doneBar"></div>
+
+</div><!-- /state-panel -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────
+// ISLAND COLOR PALETTE
+// ─────────────────────────────────────────────
+const IPAL=[
+  {gc:'gc-i0',mc:'mc-i0',sf:'sf-i0',ic:'ic-i0',stroke:'#2196f3',label:'#1565c0'},
+  {gc:'gc-i1',mc:'mc-i1',sf:'sf-i1',ic:'ic-i1',stroke:'#06d6a0',label:'#014d3a'},
+  {gc:'gc-i2',mc:'mc-i2',sf:'sf-i2',ic:'ic-i2',stroke:'#e63946',label:'#b71c1c'},
+  {gc:'gc-i3',mc:'mc-i3',sf:'sf-i3',ic:'ic-i3',stroke:'#c084fc',label:'#6a1b9a'},
+  {gc:'gc-i4',mc:'mc-i4',sf:'sf-i4',ic:'ic-i4',stroke:'#ff9f43',label:'#7a3900'},
+  {gc:'gc-i5',mc:'mc-i5',sf:'sf-i5',ic:'ic-i5',stroke:'#ffd166',label:'#7a5a00'},
+  {gc:'gc-i6',mc:'mc-i6',sf:'sf-i6',ic:'ic-i6',stroke:'#ff6b81',label:'#880e4f'},
+  {gc:'gc-i7',mc:'mc-i7',sf:'sf-i7',ic:'ic-i7',stroke:'#48dbfb',label:'#006064'},
+];
+function ipal(i){return IPAL[i%IPAL.length];}
+
+// ─────────────────────────────────────────────
+// EXPLAIN LIBRARY
+// ─────────────────────────────────────────────
+const EXPLAIN={
+  init:(R,C,land,water)=>({
+    why:`<div class="ep-why-block why-init">The grid is an <strong>implicit graph</strong>: nodes are land cells, edges connect horizontally/vertically adjacent land cells. We never build an adjacency list — the grid itself IS the adjacency structure. DFS explores each island by moving in 4 directions and marking cells as water ('0') to avoid re-visiting. O(R×C) time, O(R×C) space (recursion stack in worst case).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Starting state:</strong> ${R}×${C} grid. ${land} land cells, ${water} water cells. Outer scan visits every cell exactly once.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>The key invariant:</strong> After DFS completes for any cell (r,c), every land cell reachable from (r,c) is marked '0'. It will never be counted as a new island again.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why mark '0' instead of a separate visited[]?</strong> It's simpler and uses no extra space. The original grid is modified in-place. If you need the original grid preserved, use a separate boolean visited array.`},
+    ]
+  }),
+  scan_water:(i,j)=>({
+    why:`<div class="ep-why-block why-skip">grid[${i}][${j}] = '0' (water). Skip — water cells are never islands. The outer loop just moves on.</div>`,
+    inv:[{icon:'💧',cls:'inv-warn',text:`<strong>Skip water:</strong> '0' cells are either ocean or already-sunk land. Neither can start a new island.`}]
+  }),
+  scan_visited:(i,j)=>({
+    why:`<div class="ep-why-block why-skip">grid[${i}][${j}] = '0' — was land but already visited (sunk by a previous DFS). Skip — we already counted this island.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Already sunk:</strong> This cell was reachable from a previously counted island. It's now '0' so the outer loop correctly skips it.`}]
+  }),
+  new_island:(i,j,n)=>({
+    why:`<div class="ep-why-block why-dfs">grid[${i}][${j}] = '1' and unvisited. This is the start of a new, undiscovered island! Increment islands to ${n}. Now DFS in all 4 directions to explore and sink the entire island.</div>`,
+    inv:[
+      {icon:'🏝️',cls:'',text:`<strong>New island #${n}:</strong> Cell (${i},${j}) is unvisited land. By definition, it's a new connected component of land cells.`},
+      {icon:'🎯',cls:'inv-warn',text:`<strong>Why increment BEFORE DFS?</strong> We count the island at discovery time. The DFS just sinks all cells in it so they're never double-counted.`},
+    ]
+  }),
+  sink:(r,c,island)=>({
+    why:`<div class="ep-why-block why-dfs">grid[${r}][${c}] = '1' → mark as '0' (sink it). This cell now belongs to island #${island+1}. Explore all 4 neighbors: up (${r-1},${c}), down (${r+1},${c}), left (${r},${c-1}), right (${r},${c+1}).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Sink invariant:</strong> grid[${r}][${c}] is now '0'. Any future scan or DFS call will skip it. The island grows by one cell.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>4-directional adjacency only:</strong> Diagonal cells are NOT neighbors. Two land cells that touch only diagonally are separate islands.`},
+    ]
+  }),
+  oob:(r,c,reason)=>({
+    why:`<div class="ep-why-block why-skip">DFS reached (${r},${c}): ${reason}. Base case — return immediately. No cell to sink or explore.</div>`,
+    inv:[{icon:'🚧',cls:'inv-key',text:`<strong>Base case:</strong> ${reason}. The DFS boundary check prevents array out-of-bounds and stops propagation at water.`}]
+  }),
+  done:(islands,R,C)=>({
+    why:`<div class="ep-why-block why-done">All ${R}×${C} cells scanned. Every land cell was either found as a new island root (counted once) or sunk by DFS from its island root (skipped). Total islands = ${islands}.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> Every '1' cell was eventually sunk. Every connected component of '1' cells was counted exactly once (when its first cell was encountered in the outer scan).`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(R×C) time</strong> — each cell is visited at most twice: once by the outer scan, once by DFS. <strong>O(R×C) space</strong> — recursion stack depth ≤ number of land cells (worst case: entire grid is one island).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The implicit graph pattern:</strong> No adjacency list needed. The grid IS the graph. This pattern applies to flood fill, maze solving, number of provinces — any 2D connectivity problem.`},
+    ]
+  }),
+};
+
+// ─────────────────────────────────────────────
+// CODE HIGHLIGHT MAP
+// ─────────────────────────────────────────────
+const TYPE_LINES={
+  init:        {ids:['cl-sig','cl-sig2','cl-rows','cl-cnt','cl-for1','cl-for2'],cls:'hl-init'},
+  scan_water:  {ids:['cl-for1','cl-for2','cl-if'],                              cls:'hl-skip'},
+  scan_visited:{ids:['cl-for1','cl-for2','cl-if'],                              cls:'hl-skip'},
+  new_island:  {ids:['cl-if','cl-inc','cl-dfs'],                                cls:'hl-init'},
+  sink:        {ids:['cl-dfn','cl-sink','cl-d4','cl-d42'],                      cls:'hl-sink'},
+  oob:         {ids:['cl-oob','cl-oob2'],                                       cls:'hl-skip'},
+  done:        {ids:['cl-ret'],                                                 cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─────────────────────────────────────────────
+// computeSteps
+// ─────────────────────────────────────────────
+function computeSteps(origGrid){
+  const steps=[];
+  const R=origGrid.length, C=origGrid[0].length;
+  // Deep copy: island assignment grid (-1=unvisited, -2=water, >=0=island id)
+  const iGrid=origGrid.map(row=>row.map(c=>c==='1'?-1:-2));
+  let islands=0;
+  const islandCells=[]; // islandCells[i] = array of {r,c} for island i
+  const totalLand=origGrid.flat().filter(c=>c==='1').length;
+  const totalWater=R*C-totalLand;
+
+  const snap=(desc,type,explain,extra={})=>steps.push({
+    iGrid:iGrid.map(r=>[...r]),islands,R,C,
+    scanI:null,scanJ:null,dfsR:null,dfsC:null,
+    dfsStack:[],islandCells:islandCells.map(a=>[...a]),
+    dirs:{up:null,down:null,left:null,right:null},
+    desc,type,explain,result:null,...extra
+  });
+
+  snap(
+    `🚀 <strong>Init.</strong> ${R}×${C} grid. ${totalLand} land cells, ${totalWater} water. `
+    +`Scan every cell (i,j): if '1' and unvisited → new island, DFS to sink it.`,
+    'init',EXPLAIN.init(R,C,totalLand,totalWater)
+  );
+
+  const DIRS=[[-1,0,'up'],[1,0,'down'],[0,-1,'left'],[0,1,'right']];
+
+  for(let i=0;i<R;i++){
+    for(let j=0;j<C;j++){
+      if(iGrid[i][j]===-2){
+        snap(
+          `🌊 Scan (${i},${j}) = <span style="color:#4fc3f7;font-weight:700">'0'</span> — water. Skip.`,
+          'scan_water',EXPLAIN.scan_water(i,j),
+          {scanI:i,scanJ:j}
+        );
+        continue;
+      }
+      if(iGrid[i][j]>=0){
+        snap(
+          `✓ Scan (${i},${j}) = '1' but already sunk (island #${iGrid[i][j]+1}). Skip.`,
+          'scan_visited',EXPLAIN.scan_visited(i,j),
+          {scanI:i,scanJ:j}
+        );
+        continue;
+      }
+      // New island found
+      const islandId=islands;
+      islands++;
+      islandCells.push([]);
+      snap(
+        `🏝️ Scan (${i},${j}) = <span style="color:#028a5b;font-weight:700">'1'</span> — unvisited land! `
+        +`<span style="color:#028a5b;font-weight:700">Island #${islands}</span> starts here. DFS to sink it…`,
+        'new_island',EXPLAIN.new_island(i,j,islands),
+        {scanI:i,scanJ:j,dfsStack:[[i,j]]}
+      );
+
+      // Iterative DFS to sink island
+      const dfsStack=[[i,j]];
+      while(dfsStack.length>0){
+        const [r,c]=dfsStack[dfsStack.length-1];
+        dfsStack.pop();
+
+        if(r<0||r>=R||c<0||c>=C||iGrid[r][c]!=-1){
+          // OOB or not unvisited land — handled inline
+          continue;
+        }
+
+        // Sink this cell
+        iGrid[r][c]=islandId;
+        islandCells[islandId].push({r,c});
+
+        // Compute direction states for visualization
+        const dirState={};
+        for(const[dr,dc,name] of DIRS){
+          const nr=r+dr,nc=c+dc;
+          if(nr<0||nr>=R||nc<0||nc>=C)dirState[name]='oob';
+          else if(iGrid[nr][nc]===-2)dirState[name]='water';
+          else if(iGrid[nr][nc]>=0)dirState[name]='visited';
+          else dirState[name]='land';
+        }
+
+        snap(
+          `🔥 Sink [${r},${c}]: grid[${r}][${c}]='0'. Island #${islandId+1} now has ${islandCells[islandId].length} cell${islandCells[islandId].length>1?'s':''}. `
+          +`Exploring 4 neighbors…`,
+          'sink',EXPLAIN.sink(r,c,islandId),
+          {scanI:i,scanJ:j,dfsR:r,dfsC:c,
+           dfsStack:[...dfsStack,[r,c]].slice(-8), // show last 8 in stack
+           dirs:dirState}
+        );
+
+        // Push valid neighbors
+        for(const[dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+          const nr=r+dr,nc=c+dc;
+          if(nr>=0&&nr<R&&nc>=0&&nc<C&&iGrid[nr][nc]===-1){
+            dfsStack.push([nr,nc]);
+          }
+        }
+      }
+    }
+  }
+
+  snap(
+    `🎉 <span style="color:#028a5b;font-weight:700">Done!</span> Found <span style="color:#028a5b;font-weight:700">${islands}</span> island${islands!==1?'s':''}. `
+    +`All ${totalLand} land cells sunk. O(R×C) = O(${R*C}).`,
+    'done',EXPLAIN.done(islands,R,C),
+    {result:{islands,islandCells:islandCells.map(a=>[...a])}}
+  );
+  return steps;
+}
+
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let rowsG=0, colsG=0, origGridG=[];
+
+// ─────────────────────────────────────────────
+// PARSE
+// ─────────────────────────────────────────────
+function parseGrid(){
+  const raw=document.getElementById('inputGrid').value.trim();
+  const rows=raw.split('\n').map(r=>r.trim().replace(/[^01]/g,'').split(''));
+  if(!rows.length||!rows[0].length)return null;
+  const C=rows[0].length;
+  if(!rows.every(r=>r.length===C))return null;
+  return rows;
+}
+
+// ─────────────────────────────────────────────
+// BUILD GRID TABLE
+// ─────────────────────────────────────────────
+function buildGridTable(R,C){
+  const tbl=document.getElementById('gridTable');
+  tbl.innerHTML='';
+  // Header row
+  const hrow=document.createElement('tr');
+  hrow.appendChild(Object.assign(document.createElement('th'),{className:'gc-header'}));
+  for(let j=0;j<C;j++){
+    const th=document.createElement('th');
+    th.className='gc-header';th.textContent=j;
+    hrow.appendChild(th);
+  }
+  tbl.appendChild(hrow);
+  // Data rows
+  for(let i=0;i<R;i++){
+    const tr=document.createElement('tr');
+    const rh=document.createElement('th');
+    rh.className='gc-header';rh.textContent=i;
+    tr.appendChild(rh);
+    for(let j=0;j<C;j++){
+      const td=document.createElement('td');
+      td.className='grid-cell';td.id=`gc-${i}-${j}`;
+      td.textContent=origGridG[i][j]==='1'?'1':'0';
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+}
+
+function buildMiniGrid(R,C){
+  const tbl=document.getElementById('miniGrid');
+  tbl.innerHTML='';
+  for(let i=0;i<R;i++){
+    const tr=document.createElement('tr');
+    for(let j=0;j<C;j++){
+      const td=document.createElement('td');
+      td.className='mini-cell';td.id=`mc-${i}-${j}`;
+      td.textContent=origGridG[i][j];
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+}
+
+// ─────────────────────────────────────────────
+// BUILD UI
+// ─────────────────────────────────────────────
+function buildUI(){
+  const grid=parseGrid();
+  if(!grid)return;
+  origGridG=grid;
+  rowsG=grid.length;colsG=grid[0].length;
+  const totalLand=grid.flat().filter(c=>c==='1').length;
+  const totalWater=rowsG*colsG-totalLand;
+
+  steps=computeSteps(grid.map(r=>[...r]));
+  currentStep=0;
+
+  buildGridTable(rowsG,colsG);
+  buildMiniGrid(rowsG,colsG);
+
+  // Stats
+  document.getElementById('statLand').textContent=totalLand;
+  document.getElementById('statWater').textContent=totalWater;
+  document.getElementById('statVisited').textContent='0';
+
+  // Island group
+  document.getElementById('islandGroups').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Press RUN to discover…</div>`;
+  document.getElementById('islandCount').textContent='0';
+
+  // Stack
+  document.getElementById('stackFrames').innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">Stack empty</div>`;
+  document.getElementById('stackDepth').textContent='0';
+
+  // Problem example
+  const ans=steps[steps.length-1].result.islands;
+  document.getElementById('probExample').innerHTML=
+    `<span class="ex-label">${rowsG}×${colsG} grid — ${totalLand} land cells, ${totalWater} water</span>`
+    +`Answer: <strong>${ans} island${ans!==1?'s':''}</strong>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─────────────────────────────────────────────
+// RENDER STEP
+// ─────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // ── Grid cells ──
+  for(let i=0;i<rowsG;i++){
+    for(let j=0;j<colsG;j++){
+      const cell=document.getElementById(`gc-${i}-${j}`);
+      const mini=document.getElementById(`mc-${i}-${j}`);
+      if(!cell||!mini)continue;
+      const v=st.iGrid[i][j];
+      const isCur=st.dfsR===i&&st.dfsC===j&&!isFinal;
+      const isScan=st.scanI===i&&st.scanJ===j&&!isFinal&&!isCur;
+
+      cell.className='grid-cell';
+      mini.className='mini-cell';
+
+      if(isCur){cell.classList.add('gc-current');mini.classList.add('mc-cur');}
+      else if(v===-2){cell.classList.add('gc-water');mini.classList.add('mc-water');cell.textContent='0';}
+      else if(v===-1){
+        cell.classList.add(isScan?'gc-scan':'gc-land');
+        mini.classList.add('mc-land');
+        cell.textContent='1';
+      } else {
+        const p=ipal(v);
+        cell.classList.add(p.gc);mini.classList.add(p.mc);
+        cell.textContent='0';
+      }
+    }
+  }
+
+  // ── DFS Stack ──
+  const sf=document.getElementById('stackFrames');
+  document.getElementById('stackDepth').textContent=st.dfsStack?st.dfsStack.length:0;
+  const curIsland=st.islands>0?st.islands-1:0;
+  const pal=ipal(curIsland);
+  if(!st.dfsStack||st.dfsStack.length===0||st.type==='scan_water'||st.type==='scan_visited'||st.type==='init'||st.type==='done'){
+    sf.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);padding:4px 0;">Stack empty</div>`;
+  } else {
+    sf.innerHTML='';
+    st.dfsStack.forEach(([r,c],i)=>{
+      const isTop=i===st.dfsStack.length-1;
+      const fr=document.createElement('div');
+      fr.className=`stack-frame ${pal.sf}${isTop?' sf-top':''}`;
+      fr.innerHTML=`<div class="sf-label">${isTop?'TOP':''}</div><div class="sf-coord">[${r},${c}]</div>`;
+      sf.appendChild(fr);
+      if(!isTop){const a=document.createElement('div');a.className='stack-arrow';a.textContent='→';sf.appendChild(a);}
+    });
+  }
+
+  // Direction probes
+  const dp=document.getElementById('dirProbe');
+  const dirs=['↑ up','↓ down','← left','→ right'];
+  const dirKeys=['up','down','left','right'];
+  dp.innerHTML='';
+  dirKeys.forEach((k,idx)=>{
+    const chip=document.createElement('span');
+    chip.className='dir-chip';
+    const state=st.dirs?st.dirs[k]:null;
+    if(state==='land')chip.classList.add('dir-land');
+    else if(state==='visited')chip.classList.add('dir-visited');
+    else if(state==='oob')chip.classList.add('dir-oob');
+    else if(state==='water')chip.classList.add('dir-water');
+    chip.textContent=dirs[idx]+(state?` (${state})`:'');
+    dp.appendChild(chip);
+  });
+
+  // ── Island tracker ──
+  document.getElementById('islandCount').textContent=st.islands;
+  const ig=document.getElementById('islandGroups');
+  if(st.islands===0){
+    ig.innerHTML=`<div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);">No islands yet…</div>`;
+  } else {
+    ig.innerHTML='';
+    st.islandCells.forEach((cells,idx)=>{
+      if(!cells.length)return;
+      const p=ipal(idx);
+      const row=document.createElement('div');
+      row.className='island-group';
+      const lbl=document.createElement('div');
+      lbl.className='ig-label';lbl.style.color=p.label;lbl.textContent=`#${idx+1}:`;
+      row.appendChild(lbl);
+      const cellWrap=document.createElement('div');cellWrap.className='ig-cells';
+      cells.forEach(({r,c})=>{
+        const chip=document.createElement('div');
+        const isCur=!isFinal&&st.dfsR===r&&st.dfsC===c;
+        chip.className=`ig-chip ${p.ic}${isCur?' ic-cur':''}`;
+        chip.textContent=`[${r},${c}]`;
+        cellWrap.appendChild(chip);
+      });
+      row.appendChild(cellWrap);
+      const sz=document.createElement('div');sz.className='ig-size';sz.textContent=`${cells.length} cell${cells.length>1?'s':''}`;
+      row.appendChild(sz);
+      ig.appendChild(row);
+      if(idx<st.islands-1){const sep=document.createElement('div');sep.className='ig-sep';ig.appendChild(sep);}
+    });
+  }
+
+  // ── Stats ──
+  const sunk=st.iGrid.flat().filter(v=>v>=0).length;
+  document.getElementById('statVisited').textContent=sunk;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Variables ──
+  const curIslandSize=st.islandCells[curIsland]?st.islandCells[curIsland].length:0;
+  setVar('vI',      'vcI',      st.scanI!=null?st.scanI:'—');
+  setVar('vJ',      'vcJ',      st.scanJ!=null?st.scanJ:'—');
+  setVar('vR',      'vcR',      st.dfsR!=null?st.dfsR:'—');
+  setVar('vC',      'vcC',      st.dfsC!=null?st.dfsC:'—');
+  setVar('vIslands','vcIslands',st.islands);
+  setVar('vDepth',  'vcDepth',  st.dfsStack?st.dfsStack.length:0);
+  setVar('vSize',   'vcSize',   st.type==='done'||st.type==='scan_water'||st.type==='scan_visited'||st.type==='init'?'—':curIslandSize);
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').className='done-banner show';
+    document.getElementById('doneBanner').textContent=`✓ ${st.result.islands} ISLAND${st.result.islands!==1?'S':''} FOUND`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`✓ ISLANDS = ${st.result.islands} — O(R×C)`;
+    const bb=document.getElementById('bestBox');bb.className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.islands);
+    document.getElementById('bestMeta').textContent=`${rowsG}×${colsG} grid · ${steps.length} steps · O(R×C)`;
+  }
+
+  // ── Progress ──
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─────────────────────────────────────────────
+// TAB SWITCHER
+// ─────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',scan_water:'ep-scan',scan_visited:'ep-scan',
+    new_island:'ep-dfs',sink:'ep-sink',oob:'ep-skip',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// PLAYBACK
+// ─────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+// ─────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

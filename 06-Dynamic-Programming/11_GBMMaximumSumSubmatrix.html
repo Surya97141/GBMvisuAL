@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maximum Sum Submatrix — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070; --pur:#c084fc; --pur-dark:#7a3fc0;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.35rem);font-weight:700;letter-spacing:-1px;}
+  .header .sub{font-size:0.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:rgba(255,209,102,0.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  /* CONTROLS */
+  .controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.82rem;color:var(--ink);outline:none;transition:border-color 0.2s;}
+  .field input.wide{width:260px;} .field input.small{width:64px;}
+  .field input:focus{border-color:var(--accent4);}
+  .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:4px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  .section-label{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 1: MATRIX GRID
+     Cells change shade based on their heat
+     (negative = red, positive = green).
+     Window highlight slides over them.
+     Best cells get gold glow.
+  ══════════════════════════════════════ */
+  .matrices-row{display:flex;gap:18px;margin-bottom:14px;flex-wrap:wrap;}
+  .matrix-box{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;flex-shrink:0;}
+  .matrix-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:9px;}
+  .matrix-grid{display:inline-grid;gap:3px;}
+  .mcell{
+    width:52px;height:44px;border-radius:5px;border:1.5px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.85rem;font-weight:700;
+    transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    position:relative;color:var(--ink);background:var(--surface);
+  }
+  /* ── PREFIX BUILD SOURCE HIGHLIGHTS ──
+     4 cells light up when computing p[i][j].
+     Each role gets its own distinct colour.
+  ── */
+  /* m[i-1][j-1] — the matrix value being added (orange) */
+  .mcell.px-src  {background:#fff3cd!important;border-color:#e6a817!important;border-width:2.5px!important;color:#7a4800!important;transform:scale(1.1) translateY(-3px);box-shadow:0 6px 14px rgba(230,168,23,0.4);z-index:4;}
+  /* p[i-1][j]   — above cell (blue, +) */
+  .pcell.px-above{background:#bbdefb!important;border-color:#1565c0!important;border-width:2px!important;color:#0d47a1!important;transform:scale(1.07) translateY(-2px);box-shadow:0 4px 10px rgba(21,101,192,0.3);z-index:3;}
+  /* p[i][j-1]   — left cell (green, +) */
+  .pcell.px-left {background:#c8f7e4!important;border-color:#028a5b!important;border-width:2px!important;color:#024d37!important;transform:scale(1.07) translateY(-2px);box-shadow:0 4px 10px rgba(2,138,91,0.3);z-index:3;}
+  /* p[i-1][j-1] — corner cell (red, −) */
+  .pcell.px-corner{background:#fde8e8!important;border-color:#c0002a!important;border-width:2px!important;color:#8b0000!important;transform:scale(1.07) translateY(-2px);box-shadow:0 4px 10px rgba(192,0,42,0.28);z-index:3;}
+  /* p[i][j]     — the cell being written (gold pulse) */
+  .pcell.px-dest {background:#fff8c5!important;border-color:#f5a623!important;border-width:3px!important;color:#7a4800!important;transform:scale(1.12) translateY(-4px);box-shadow:0 8px 20px rgba(245,166,35,0.5);z-index:5;animation:destPulse 0.8s ease infinite alternate;}
+  @keyframes destPulse{from{box-shadow:0 6px 14px rgba(245,166,35,0.4);}to{box-shadow:0 10px 24px rgba(245,166,35,0.7);}}
+
+  /* ── SVG OVERLAY ── */
+  .grid-overlay-wrap{position:relative;display:inline-block;}
+  .grid-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+  /* animated dash for bracket lines */
+  .ov-arrow{stroke-dasharray:6 3;animation:dashFlow 0.6s linear infinite;}
+  @keyframes dashFlow{to{stroke-dashoffset:-18;}}
+  /* window bracket rect pulse */
+  .ov-win-rect{stroke-dasharray:8 4;animation:winDash 0.5s linear infinite;}
+  @keyframes winDash{to{stroke-dashoffset:-24;}}
+     5 bands from ice-cold → hot.
+     Each band has its own background,
+     border, text colour — fully readable.
+  ── */
+  .mcell.h-ice  {background:#fde8e8;border-color:#e63946;color:#9b0a14;} /* very negative  */
+  .mcell.h-cold {background:#fdf0e8;border-color:#f4845f;color:#8c3000;} /* slightly neg    */
+  .mcell.h-zero {background:#f5f0e8;border-color:#d4ccb8;color:#6b5e4f;} /* near zero       */
+  .mcell.h-warm {background:#e8f8f0;border-color:#52c49a;color:#0d5c3a;} /* moderately pos  */
+  .mcell.h-hot  {background:#ccf5e5;border-color:#06d6a0;color:#024d37;font-size:0.9rem;} /* very positive */
+
+  /* window overlay — strong blue, lifts off the grid */
+  .mcell.in-window{
+    background:#bbdefb!important;
+    border-color:#1565c0!important;
+    border-width:2.5px!important;
+    color:#0d47a1!important;
+    transform:scale(1.08) translateY(-2px);
+    box-shadow:0 6px 16px rgba(21,101,192,0.35);
+    z-index:2;
+  }
+  /* best window — saturated gold, pops off screen */
+  .mcell.in-best{
+    background:#fff8c5!important;
+    border-color:#f5a623!important;
+    border-width:3px!important;
+    color:#7a4800!important;
+    transform:scale(1.1) translateY(-3px);
+    box-shadow:0 8px 20px rgba(245,166,35,0.45);
+    animation:bestPulse 1.4s ease-in-out infinite alternate;
+    z-index:3;
+  }
+  @keyframes bestPulse{
+    from{box-shadow:0 6px 14px rgba(245,166,35,0.35);}
+    to  {box-shadow:0 10px 26px rgba(245,166,35,0.65);}
+  }
+  /* prefix sum cell */
+  .pcell{
+    width:52px;height:44px;border-radius:5px;border:1.5px solid var(--border);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:0.78rem;font-weight:700;
+    transition:all 0.3s;background:rgba(192,84,252,0.05);color:var(--pur-dark);
+  }
+  .pcell.pc-used{background:rgba(192,84,252,0.18);border-color:var(--pur);color:var(--pur-dark);transform:scale(1.05);}
+  .pcell.pc-cur {background:rgba(255,209,102,0.2);border-color:#ffd166;color:#7a5a00;}
+
+  /* ══════════════════════════════════════
+     UNIQUE VISUAL 2: WINDOW SUM FORMULA
+     Shows the 4 prefix-sum cells that
+     combine to give the window sum.
+     p[r2][c2] - p[r1-1][c2] - p[r2][c1-1] + p[r1-1][c1-1]
+  ══════════════════════════════════════ */
+  .formula-section{margin-bottom:14px;}
+  .formula-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .formula-title{font-family:'Space Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:9px;}
+  .formula-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'Space Mono',monospace;font-size:0.78rem;}
+  .fval{
+    min-width:38px;height:32px;padding:0 8px;border-radius:5px;border:1.5px solid;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;transition:all 0.3s;
+  }
+  .fval.fv-pos{background:rgba(192,84,252,0.12);border-color:var(--pur);color:var(--pur-dark);}
+  .fval.fv-neg{background:rgba(230,57,70,0.10);border-color:var(--accent);color:var(--accent);}
+  .fval.fv-result{background:rgba(255,209,102,0.2);border-color:#ffd166;color:#7a5a00;font-size:0.9rem;}
+  .fval.fv-best{background:rgba(6,214,160,0.15);border-color:var(--accent3);color:#028a5b;}
+  .fop{color:var(--muted);font-size:0.8rem;}
+
+  /* BEST TRACKER */
+  .best-tracker{display:flex;gap:10px;margin-bottom:14px;}
+  .bt-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 13px;transition:all 0.3s;text-align:center;}
+  .bt-card.bt-active{border-color:var(--accent4);background:rgba(255,209,102,0.07);transform:translateY(-2px);}
+  .bt-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .bt-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--ink);}
+  .bt-sub{font-size:0.68rem;color:var(--muted);margin-top:3px;}
+
+  /* 3-TAB EXPLAIN */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-init   {border-color:var(--accent3);}
+  .explain-panel.ep-prefix {border-color:var(--pur);}
+  .explain-panel.ep-window {border-color:var(--accent2);}
+  .explain-panel.ep-best   {border-color:var(--accent4);}
+  .explain-panel.ep-done   {border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);       border-bottom-color:var(--accent4);}
+  .ep-tab.active.t-why{color:var(--pur-dark);  border-bottom-color:var(--pur);}
+  .ep-tab.active.t-inv{color:#028a5b;          border-bottom-color:var(--accent3);}
+  .ep-body{padding:12px 16px;min-height:80px;}
+  .ep-pane{display:none;font-size:0.82rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .red{color:var(--accent);font-weight:600;} .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;} .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .pur{color:var(--pur-dark);font-weight:600;}
+  .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:9px 13px;font-size:0.8rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-init  {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-prefix{border-left-color:var(--pur);    background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-window{border-left-color:var(--accent2);background:rgba(33,150,243,0.05);}
+  .ep-why-block.why-best  {border-left-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+  .inv-row{display:flex;align-items:flex-start;gap:9px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:7px 10px;}
+  .inv-icon{font-size:0.95rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.78rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+  .inv-row.inv-pur {background:rgba(192,84,252,0.05);border-color:rgba(192,84,252,0.2);}
+  .inv-row.inv-pur  .inv-text strong{color:var(--pur-dark);}
+
+  /* PROGRESS */
+  .progress-wrap{margin-bottom:12px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:12px;}
+  .done-banner.show{display:block;animation:fadeUp 0.4s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;margin-bottom:8px;}
+  .kbd-hint{font-family:'Space Mono',monospace;font-size:0.58rem;color:var(--muted);display:flex;gap:10px;}
+  .kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+  /* RIGHT PANEL */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+
+  .code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 5px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-prefix{background:rgba(192,84,252,0.16);border-left-color:var(--pur);   color:#e2e8f0;}
+  .code-line.hl-window{background:rgba(33,150,243,0.16); border-left-color:var(--accent2);color:#e2e8f0;}
+  .code-line.hl-best  {background:rgba(255,209,102,0.18);border-left-color:var(--accent4);color:#e2e8f0;}
+  .code-line.hl-done  {background:rgba(6,214,160,0.16);  border-left-color:var(--accent3);color:#e2e8f0;}
+  .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 13px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 10px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);}
+  .var-value.blu{color:#4fc3f7;} .var-value.pur{color:var(--pur);}
+
+  /* PREFIX SUM TABLE (right) */
+  .ps-section{margin-bottom:12px;}
+  .ps-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .ps-grid{display:inline-grid;gap:2px;}
+  .ps-cell{width:44px;height:34px;border-radius:4px;border:1px solid #2a2a3e;background:#0d0d18;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:0.68rem;font-weight:700;color:#6b7280;transition:all 0.3s;}
+  .ps-cell.psc-active {border-color:#f5a623;background:rgba(255,248,197,0.5);color:#7a4800;font-weight:700;}
+  .ps-cell.psc-used  {border-color:#ffd166;background:rgba(255,209,102,0.1);color:var(--accent4);}
+  .ps-cell.psc-above {border-color:#1565c0;background:rgba(187,222,251,0.25);color:#4fc3f7;}
+  .ps-cell.psc-left  {border-color:#028a5b;background:rgba(200,247,228,0.25);color:var(--accent3);}
+  .ps-cell.psc-corner{border-color:#c0002a;background:rgba(253,232,232,0.25);color:#ff6b6b;}
+
+  /* CANDIDATE LOG */
+  .clog-section{margin-bottom:12px;}
+  .clog-title{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .clog-rows{display:flex;flex-direction:column;gap:3px;max-height:160px;overflow-y:auto;}
+  .clog-rows::-webkit-scrollbar{width:3px;}
+  .clog-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .clog-row{display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.62rem;transition:all 0.3s;}
+  .clog-row.cl-current{border-color:#ffd166;background:rgba(255,209,102,0.07);}
+  .clog-row.cl-best   {border-color:var(--accent3);background:rgba(6,214,160,0.08);}
+  .cl-pos {color:#4fc3f7;width:72px;flex-shrink:0;}
+  .cl-sum {font-weight:700;width:36px;}
+  .cl-sum.pos{color:var(--accent3);}
+  .cl-sum.neg{color:#ff6b6b;}
+  .cl-flag{color:#6b6b8a;}
+
+  .best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:0.4;transition:opacity 0.4s;background:rgba(255,209,102,0.06);border:1px solid rgba(255,209,102,0.2);}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 13px 10px;background:var(--accent4);color:#3a2800;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.67rem;font-weight:800;letter-spacing:2px;}
+  .done-bar.show{display:block;animation:fadeUp 0.4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Maximum Sum Submatrix</h1>
+    <div class="sub">2D Sliding Window · Prefix Sums · O(rows × cols) · Live Visualizer</div>
+  </div>
+  <div class="family-badge">2D · DP / Prefix Sum</div>
+</div>
+
+<div class="main">
+
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>Matrix  (rows separated by |, values by comma)</label>
+      <input type="text" id="inputMatrix" class="wide"
+        value="5,3,-1,5|-7,3,7,4|12,8,0,0|1,-8,-8,2">
+    </div>
+    <div class="field">
+      <label>Size</label>
+      <input type="number" id="inputSize" value="2" class="small" min="1">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="350">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- COLOUR LEGEND -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+    <span style="font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)">Cell value:</span>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#fde8e8;border:1.5px solid #e63946;color:#9b0a14;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">very negative</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#fdf0e8;border:1.5px solid #f4845f;color:#8c3000;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">slightly neg</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#f5f0e8;border:1.5px solid #d4ccb8;color:#6b5e4f;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">near zero</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#e8f8f0;border:1.5px solid #52c49a;color:#0d5c3a;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">mod. positive</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#ccf5e5;border:1.5px solid #06d6a0;color:#024d37;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">very positive</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#bbdefb;border:2.5px solid #1565c0;color:#0d47a1;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">current window</div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:0.74rem;background:#fff8c5;border:3px solid #f5a623;color:#7a4800;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">★ best window</div>
+  </div>
+  <!-- PREFIX BUILD LEGEND -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:rgba(192,84,252,0.04);border:1px solid rgba(192,84,252,0.18);border-radius:7px;">
+    <span style="font-family:'Space Mono',monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--pur-dark)">Prefix build:</span>
+    <div style="font-size:0.74rem;background:#fff3cd;border:2px solid #e6a817;color:#7a4800;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">↙ matrix cell</div>
+    <div style="font-size:0.74rem;background:#bbdefb;border:2px solid #1565c0;color:#0d47a1;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">↑ above (+)</div>
+    <div style="font-size:0.74rem;background:#c8f7e4;border:2px solid #028a5b;color:#024d37;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">← left (+)</div>
+    <div style="font-size:0.74rem;background:#fde8e8;border:2px solid #c0002a;color:#8b0000;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">↖ corner (−)</div>
+    <div style="font-size:0.74rem;background:#fff8c5;border:3px solid #f5a623;color:#7a4800;border-radius:5px;padding:3px 10px;font-family:'Space Mono',monospace;font-weight:700">★ result</div>
+  </div>
+  <div class="matrices-row">
+    <div class="matrix-box">
+      <div class="matrix-title">Original Matrix  <span id="matDims" style="color:var(--accent2)"></span></div>
+      <div class="grid-overlay-wrap">
+        <div class="matrix-grid" id="matGrid"></div>
+        <svg class="grid-overlay" id="matOverlay" width="1" height="1"></svg>
+      </div>
+    </div>
+    <div class="matrix-box">
+      <div class="matrix-title">Prefix Sum Table  <span style="color:var(--pur);font-size:0.55rem">(p[i+1][j+1])</span></div>
+      <div class="grid-overlay-wrap">
+        <div class="matrix-grid" id="prefGrid"></div>
+        <svg class="grid-overlay" id="prefOverlay" width="1" height="1"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- BEST TRACKER -->
+  <div class="best-tracker">
+    <div class="bt-card" id="btCurrent">
+      <div class="bt-label">Current Sum</div>
+      <div class="bt-val" id="btCurrentVal">—</div>
+      <div class="bt-sub" id="btCurrentPos">—</div>
+    </div>
+    <div class="bt-card" id="btBest">
+      <div class="bt-label">Best Sum ★</div>
+      <div class="bt-val" id="btBestVal">—</div>
+      <div class="bt-sub" id="btBestPos">—</div>
+    </div>
+    <div class="bt-card">
+      <div class="bt-label">Windows Checked</div>
+      <div class="bt-val" id="btChecked" style="color:var(--accent2)">0</div>
+      <div class="bt-sub" id="btTotal">of — total</div>
+    </div>
+  </div>
+
+  <!-- FORMULA DISPLAY -->
+  <div class="formula-section">
+    <div class="section-label">Window Sum Formula  (prefix sum trick)</div>
+    <div class="formula-wrap">
+      <div class="formula-title">sum = p[r2+1][c2+1] − p[r1][c2+1] − p[r2+1][c1] + p[r1][c1]</div>
+      <div class="formula-row" id="formulaRow">
+        <span style="color:var(--muted);font-family:'Space Mono',monospace;font-size:0.8rem">Press RUN to start</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3-TAB EXPLAIN -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy" >Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneInv" ><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span id="stepCounter">Step 0</span>
+      <span id="stepTotal"></span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block" style="max-height:calc(1.9em*8+14px)">
+<span class="code-line" id="cl-sig" ><span class="ck">int</span> <span class="cf">maxSumSubmatrix</span>(vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; m,</span>
+<span class="code-line" id="cl-sig2">                    <span class="ck">int</span> s) {</span>
+<span class="code-line" id="cl-dim" >  <span class="ck">int</span> R=m.size(), C=m[<span class="cn">0</span>].size();</span>
+<span class="code-line" id="cl-pdecl">  <span class="cc">// (R+1)×(C+1) prefix table, zero-padded</span></span>
+<span class="code-line" id="cl-pre1">  vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt; p(R+<span class="cn">1</span>,vector&lt;<span class="ck">int</span>&gt;(C+<span class="cn">1</span>,<span class="cn">0</span>));</span>
+<span class="code-line" id="cl-pre2">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">1</span>;i&lt;=R;i++)</span>
+<span class="code-line" id="cl-pre3">   <span class="ck">for</span>(<span class="ck">int</span> j=<span class="cn">1</span>;j&lt;=C;j++)</span>
+<span class="code-line" id="cl-pre4">    p[i][j] = m[i-<span class="cn">1</span>][j-<span class="cn">1</span>]   <span class="cc">// ↙ cell</span></span>
+<span class="code-line" id="cl-pre5">            + p[i-<span class="cn">1</span>][j]      <span class="cc">// ↑ above</span></span>
+<span class="code-line" id="cl-pre6">            + p[i][j-<span class="cn">1</span>]      <span class="cc">// ← left</span></span>
+<span class="code-line" id="cl-pre7">            - p[i-<span class="cn">1</span>][j-<span class="cn">1</span>];  <span class="cc">// ↖ corner (−)</span></span>
+<span class="code-line" id="cl-bdecl">  <span class="ck">int</span> best = INT_MIN;</span>
+<span class="code-line" id="cl-win1">  <span class="ck">for</span>(<span class="ck">int</span> r1=<span class="cn">0</span>; r1&lt;=R-s; r1++) {</span>
+<span class="code-line" id="cl-win2">   <span class="ck">int</span> r2 = r1+s-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-win3">   <span class="ck">for</span>(<span class="ck">int</span> c1=<span class="cn">0</span>; c1&lt;=C-s; c1++) {</span>
+<span class="code-line" id="cl-win4">    <span class="ck">int</span> c2 = c1+s-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-win5">    <span class="ck">int</span> sum = p[r2+<span class="cn">1</span>][c2+<span class="cn">1</span>]  <span class="cc">// ↘ full rect</span></span>
+<span class="code-line" id="cl-win6">            - p[r1][c2+<span class="cn">1</span>]   <span class="cc">// − top strip</span></span>
+<span class="code-line" id="cl-win7">            - p[r2+<span class="cn">1</span>][c1]   <span class="cc">// − left strip</span></span>
+<span class="code-line" id="cl-win8">            + p[r1][c1];     <span class="cc">// + corner back</span></span>
+<span class="code-line" id="cl-best1">    <span class="ck">if</span>(sum &gt; best) best = sum;</span>
+<span class="code-line" id="cl-best2">   }}</span>
+<span class="code-line" id="cl-ret" >  <span class="ck">return</span> best;</span>
+<span class="code-line" id="cl-close">}</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(230,57,70,0.15);border:1px solid rgba(230,57,70,0.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;letter-spacing:1px;">O(R·C) · fast I/O</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:0.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:320px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span> <span style="color:#374151;font-style:italic">// compiler: max speed + unroll</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>              <span style="color:#374151;font-style:italic">// enable SIMD 256-bit instructions</span>
+<span style="color:#67e8f9">#include</span> <span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>               <span style="color:#374151;font-style:italic">// every std header in one line</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> <span style="color:#c084fc">long long</span> ll;                   <span style="color:#374151;font-style:italic">// ll saves typing, avoids overflow</span>
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; vvi;        <span style="color:#374151;font-style:italic">// shorthand for 2D vector</span>
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">solve</span>(vvi&amp; m, <span style="color:#c084fc">int</span> s){
+  <span style="color:#c084fc">int</span> R=m.size(),C=m[<span style="color:#fda4af">0</span>].size();
+  vvi p(R+<span style="color:#fda4af">1</span>,vector&lt;<span style="color:#c084fc">int</span>&gt;(C+<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>));        <span style="color:#374151;font-style:italic">// (R+1)×(C+1), zero border</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;=R;i++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> j=<span style="color:#fda4af">1</span>;j&lt;=C;j++)
+      p[i][j]=m[i-<span style="color:#fda4af">1</span>][j-<span style="color:#fda4af">1</span>]+p[i-<span style="color:#fda4af">1</span>][j]+p[i][j-<span style="color:#fda4af">1</span>]-p[i-<span style="color:#fda4af">1</span>][j-<span style="color:#fda4af">1</span>];
+  <span style="color:#c084fc">int</span> best=INT_MIN;                      <span style="color:#374151;font-style:italic">// -2^31, safe for any negative sum</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r1=<span style="color:#fda4af">0</span>;r1&lt;=R-s;r1++){
+    <span style="color:#c084fc">int</span> r2=r1+s-<span style="color:#fda4af">1</span>;
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c1=<span style="color:#fda4af">0</span>;c1&lt;=C-s;c1++){
+      <span style="color:#c084fc">int</span> c2=c1+s-<span style="color:#fda4af">1</span>;
+      best=max(best,p[r2+<span style="color:#fda4af">1</span>][c2+<span style="color:#fda4af">1</span>]    <span style="color:#374151;font-style:italic">// max() avoids if-branch = faster</span>
+        -p[r1][c2+<span style="color:#fda4af">1</span>]-p[r2+<span style="color:#fda4af">1</span>][c1]+p[r1][c1]);
+    }}
+  <span style="color:#c084fc">return</span> best;
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>);          <span style="color:#374151;font-style:italic">// decouple C and C++ I/O streams</span>
+  cin.tie(<span style="color:#c084fc">nullptr</span>);                    <span style="color:#374151;font-style:italic">// stop cin flushing cout before read</span>
+  <span style="color:#c084fc">int</span> R,C,s;
+  cin&gt;&gt;R&gt;&gt;C&gt;&gt;s;
+  vvi m(R,vector&lt;<span style="color:#c084fc">int</span>&gt;(C));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; row:m)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:row) cin&gt;&gt;x;
+  cout&lt;&lt;<span style="color:#67e8f9">solve</span>(m,s)&lt;&lt;<span style="color:#fda4af">'\n'</span>;              <span style="color:#374151;font-style:italic">// '\n' faster than endl (no flush)</span>
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(192,84,252,0.12);border:1px solid rgba(192,84,252,0.3);color:#c084fc;padding:2px 8px;border-radius:3px;">#pragma O3 + AVX2</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(33,150,243,0.12);border:1px solid rgba(33,150,243,0.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">sync_with_stdio</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(6,214,160,0.10);border:1px solid rgba(6,214,160,0.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">cin.tie(null)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(255,209,102,0.10);border:1px solid rgba(255,209,102,0.3);color:#ffd166;padding:2px 8px;border-radius:3px;">bits/stdc++</div>
+      <div style="font-family:'Space Mono',monospace;font-size:0.52rem;background:rgba(230,57,70,0.10);border:1px solid rgba(230,57,70,0.3);color:#ff6b6b;padding:2px 8px;border-radius:3px;">INT_MIN safe</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcR1"><div class="var-name">r1 (top row)</div>   <div class="var-value yel"  id="vR1">—</div></div>
+      <div class="var-card" id="vcC1"><div class="var-name">c1 (left col)</div>  <div class="var-value yel"  id="vC1">—</div></div>
+      <div class="var-card" id="vcR2"><div class="var-name">r2 (bot row)</div>   <div class="var-value blu"  id="vR2">—</div></div>
+      <div class="var-card" id="vcC2"><div class="var-name">c2 (right col)</div> <div class="var-value blu"  id="vC2">—</div></div>
+      <div class="var-card" id="vcSum"><div class="var-name">window sum</div>    <div class="var-value"      id="vSum" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcBest"><div class="var-name">best so far</div>  <div class="var-value grn"  id="vBest">−∞</div></div>
+    </div>
+
+    <!-- PREFIX SUM TABLE (right) -->
+    <div class="ps-section">
+      <div class="ps-title">Prefix Sum  p[i][j]</div>
+      <div class="ps-grid" id="psGrid"></div>
+    </div>
+
+    <!-- CANDIDATE LOG -->
+    <div class="clog-section">
+      <div class="clog-title">Window Log</div>
+      <div class="clog-rows" id="clogRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Maximum Sum Submatrix</div>
+      <div class="best-val"  id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MAXIMUM FOUND</div>
+</div>
+
+</div>
+
+<script>
+// ─── EXPLAIN LIBRARY ──────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {rows,cols,sz,r1,c1,r2,c2,sum,best,pTable,isNewBest} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Brute force: for every size×size window, sum all s² cells → O(rows·cols·s²). Too slow. With a <strong>prefix sum table</strong>, any rectangular subsum is just 4 table lookups → O(1). Total: <strong>O(rows·cols)</strong> to build the table, then O(rows·cols) to check all windows.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>p[i][j]</strong> = sum of all cells in the rectangle (0,0) → (i−1,j−1). It's a (rows+1)×(cols+1) table with a zero-padded border.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Window sum formula:</strong> sum(r1,c1,r2,c2) = p[r2+1][c2+1] − p[r1][c2+1] − p[r2+1][c1] + p[r1][c1]. Four pointer corners, four lookups, one subtraction.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why it works:</strong> p[r2+1][c2+1] includes everything. Subtract the top strip and left strip, but that double-subtracts the top-left corner — so add it back once.`},
+    ]
+  };
+  if(type==='prefix') return {
+    why:`<div class="ep-why-block why-prefix">Building the prefix sum table. p[i][j] = m[i−1][j−1] + p[i−1][j] + p[i][j−1] − p[i−1][j−1]. This is inclusion-exclusion in 2D — include the cell above and the cell to the left, but subtract the top-left corner because it was included twice.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> p[i][j] = sum of all cells in rows [0..i−1] and cols [0..j−1]. Zero border (row 0 and col 0) ensures the formula works for edge cells.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>After building:</strong> any submatrix sum (r1,c1)→(r2,c2) costs exactly 4 array lookups. O(1) per query regardless of matrix or window size.`},
+    ]
+  };
+  if(type==='window') return {
+    why:`<div class="ep-why-block why-window">Checking window at (${r1},${c1})→(${r2},${c2}). Sum = p[${r2+1}][${c2+1}] − p[${r1}][${c2+1}] − p[${r2+1}][${c1}] + p[${r1}][${c1}] = <strong>${sum}</strong>. This is O(1) because the prefix table is pre-built.</div>`,
+    inv:[
+      {icon:'📐',cls:'',text:`<strong>p[${r2+1}][${c2+1}]=${pTable?.[r2+1]?.[c2+1]??'?'}:</strong> total of all cells up to bottom-right. Subtract top strip (p[${r1}][${c2+1}]) and left strip (p[${r2+1}][${c1}]), add back corner (p[${r1}][${c1}]).`},
+      {icon:'🏆',cls:'inv-warn',text:`<strong>Best so far: ${best}.</strong> ${isNewBest?'NEW BEST — this window beats the previous record!':'Not a new best.'}  ${(rows-sz+1)*(cols-sz+1)} total windows to check.`},
+    ]
+  };
+  if(type==='best') return {
+    why:`<div class="ep-why-block why-best">New maximum! Window (${r1},${c1})→(${r2},${c2}) gives sum <strong>${sum}</strong>, beating the previous best. Update best = ${sum}. The gold window stays highlighted until something better is found.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>New best = ${sum}</strong> at top-left (${r1},${c1}). Keep scanning — there may be an even better window.`},
+      {icon:'🔑',cls:'inv-warn',text:`<strong>Monotone scan:</strong> We check every window exactly once (row-major order). The scan is exhaustive — guaranteed to find the global maximum.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All (rows−size+1)×(cols−size+1) windows checked. The maximum is <strong>${best}</strong>. Two-phase algorithm: O(rows·cols) prefix build + O(rows·cols) window scan = <strong>O(rows·cols)</strong> total.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${best}.</strong> Found by exhaustive O(1)-per-window scan using the prefix sum table.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Complexity:</strong> O(rows×cols) time — each cell visited twice (prefix build + window scan). O(rows×cols) space for the prefix table.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Brute force comparison:</strong> Without prefix sums this would be O(rows×cols×size²). For a 100×100 matrix with size=10, that's 1,000,000 vs 10,000 operations.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-sig2','cl-dim','cl-pdecl','cl-pre1'],       cls:'hl-prefix'},
+  prefix:{ids:['cl-pre2','cl-pre3','cl-pre4','cl-pre5','cl-pre6','cl-pre7'], cls:'hl-prefix'},
+  window:{ids:['cl-win1','cl-win2','cl-win3','cl-win4','cl-win5','cl-win6','cl-win7','cl-win8'], cls:'hl-window'},
+  best:  {ids:['cl-best1'],                                               cls:'hl-best'},
+  done:  {ids:['cl-ret','cl-close'],                                      cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(matrix, sz){
+  const rows=matrix.length, cols=matrix[0].length;
+  const steps=[];
+  const totalWindows=(rows-sz+1)*(cols-sz+1);
+  let windowsChecked=0;
+
+  // build prefix sum table (rows+1 × cols+1)
+  const p=Array.from({length:rows+1},()=>new Array(cols+1).fill(0));
+
+  const snap=(type,desc,extra={})=>{
+    const args={rows,cols,sz,pTable:p.map(r=>[...r]),totalWindows,windowsChecked,...extra};
+    steps.push({type,desc,explain:makeExplain(type,args),...args,...extra});
+  };
+
+  snap('init',
+    `🚀 <strong>Start.</strong> Matrix ${rows}×${cols}, size=${sz}. Step 1: build <span class="pur">prefix sum table</span> p[${rows+1}][${cols+1}] — then every window sum is 4 lookups. Total windows to check: <span class="blu">${totalWindows}</span>.`
+  );
+
+  // Build prefix sum
+  for(let i=1;i<=rows;i++){
+    for(let j=1;j<=cols;j++){
+      const mVal=matrix[i-1][j-1];
+      const aboveVal=p[i-1][j];
+      const leftVal=p[i][j-1];
+      const cornerVal=p[i-1][j-1];
+      p[i][j]=mVal+aboveVal+leftVal-cornerVal;
+      snap('prefix',
+        `<span class="pur">Building</span> p[${i}][${j}]`
+        +` = <span style="color:#e6a817;font-weight:700">m[${i-1}][${j-1}]</span>(${mVal})`
+        +` + <span style="color:#1565c0;font-weight:700">p[${i-1}][${j}]</span>(${aboveVal})`
+        +` + <span style="color:#028a5b;font-weight:700">p[${i}][${j-1}]</span>(${leftVal})`
+        +` − <span style="color:#c0002a;font-weight:700">p[${i-1}][${j-1}]</span>(${cornerVal})`
+        +` = <strong>${p[i][j]}</strong>`,
+        {prefR:i, prefC:j,
+         src_matR:i-1, src_matC:j-1, src_mVal:mVal,
+         src_aboveR:i-1, src_aboveC:j,  src_aboveVal:aboveVal,
+         src_leftR:i,   src_leftC:j-1,  src_leftVal:leftVal,
+         src_cornR:i-1, src_cornC:j-1,  src_cornVal:cornerVal,
+         src_destVal:p[i][j]}
+      );
+    }
+  }
+
+  // Slide window
+  let best=-Infinity, bestR1=-1, bestC1=-1;
+  const candLog=[];
+
+  for(let r1=0;r1<=rows-sz;r1++){
+    for(let c1=0;c1<=cols-sz;c1++){
+      const r2=r1+sz-1, c2=c1+sz-1;
+      const sum=p[r2+1][c2+1]-p[r1][c2+1]-p[r2+1][c1]+p[r1][c1];
+      windowsChecked++;
+      const isNewBest=sum>best;
+      if(isNewBest){best=sum;bestR1=r1;bestC1=c1;}
+      candLog.push({r1,c1,r2,c2,sum,isBest:isNewBest,bestSoFar:best});
+
+      snap(isNewBest?'best':'window',
+        isNewBest
+          ? `⭐ Window (${r1},${c1})→(${r2},${c2}): sum=<strong>${sum}</strong> — <span class="grn">NEW BEST!</span> Previous best was ${best===sum?'-∞':best}. Updated best = <strong>${best}</strong>.`
+          : `🔲 Window (${r1},${c1})→(${r2},${c2}): sum = p[${r2+1}][${c2+1}]−p[${r1}][${c2+1}]−p[${r2+1}][${c1}]+p[${r1}][${c1}] = <strong>${sum}</strong>. Best stays ${best}.`,
+        {r1,c1,r2,c2,sum,best,bestR1,bestC1,isNewBest,candLog:[...candLog]}
+      );
+    }
+  }
+
+  snap('done',
+    `🎉 <span class="grn"><strong>Done!</strong></span> Checked all <strong>${totalWindows}</strong> windows. Maximum sum submatrix = <strong>${best}</strong> at top-left (${bestR1},${bestC1}).`,
+    {r1:bestR1,c1:bestC1,r2:bestR1+sz-1,c2:bestC1+sz-1,sum:best,best,bestR1,bestC1,isNewBest:false,
+     candLog:[...candLog],result:{best,bestR1,bestC1}}
+  );
+
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let matrix=[], sz=2, rows=0, cols=0;
+
+function parseMatrix(){
+  return document.getElementById('inputMatrix').value.split('|')
+    .map(row=>row.split(',').map(v=>parseInt(v.trim())));
+}
+
+// heat class — 5 bold bands based on normalised value
+function heatClass(v, min, max){
+  const range = Math.max(max - min, 1);
+  const t = (v - min) / range; // 0 = min, 1 = max
+  if(t >= 0.75) return 'h-hot';
+  if(t >= 0.50) return 'h-warm';
+  if(t >= 0.30) return 'h-zero';
+  if(t >= 0.12) return 'h-cold';
+  return 'h-ice';
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  matrix=parseMatrix();
+  rows=matrix.length; cols=matrix[0].length;
+  sz=Math.min(parseInt(document.getElementById('inputSize').value)||2,Math.min(rows,cols));
+  document.getElementById('inputSize').value=sz;
+
+  steps=computeSteps(matrix,sz);
+  currentStep=0;
+
+  const allVals=matrix.flat();
+  const minV=Math.min(...allVals), maxV=Math.max(...allVals);
+
+  // Matrix grid
+  const mg=document.getElementById('matGrid');
+  mg.style.gridTemplateColumns=`repeat(${cols},52px)`;
+  mg.innerHTML='';
+  for(let r=0;r<rows;r++)
+    for(let c=0;c<cols;c++){
+      const d=document.createElement('div');
+      d.className=`mcell ${heatClass(matrix[r][c],minV,maxV)}`;
+      d.id=`mc-${r}-${c}`;
+      d.textContent=matrix[r][c];
+      mg.appendChild(d);
+    }
+  document.getElementById('matDims').textContent=`${rows}×${cols}, size=${sz}`;
+
+  // Prefix grid (left) — build empty shell, values filled in render
+  const pg=document.getElementById('prefGrid');
+  pg.style.gridTemplateColumns=`repeat(${cols+1},52px)`;
+  pg.innerHTML='';
+  for(let i=0;i<=rows;i++)
+    for(let j=0;j<=cols;j++){
+      const d=document.createElement('div');
+      d.className='pcell';
+      d.id=`pc-${i}-${j}`;
+      d.textContent=i===0||j===0?'0':'—';
+      pg.appendChild(d);
+    }
+
+  // Prefix grid (right panel)
+  const psgrid=document.getElementById('psGrid');
+  psgrid.style.gridTemplateColumns=`repeat(${cols+1},44px)`;
+  psgrid.innerHTML='';
+  for(let i=0;i<=rows;i++)
+    for(let j=0;j<=cols;j++){
+      const d=document.createElement('div');
+      d.className='ps-cell';
+      d.id=`ps-${i}-${j}`;
+      d.textContent=i===0||j===0?'0':'—';
+      psgrid.appendChild(d);
+    }
+
+  const totalWindows=(rows-sz+1)*(cols-sz+1);
+  document.getElementById('btTotal').textContent=`of ${totalWindows} total`;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('clogRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+// ─── OVERLAY HELPERS ──────────────────────────────────────────────────────────
+// Cell geometry: 52px wide, 44px tall, 3px gap
+const CW=55, CH=47; // stride = cell + gap
+
+function cellCx(col){ return col*CW + 26; } // center x
+function cellCy(row){ return row*CH + 22; } // center y
+function cellX(col) { return col*CW; }      // left edge
+function cellY(row) { return row*CH; }      // top edge
+
+function svgEl(tag, attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for(const [k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// Draw the prefix-build overlay: flowing arrows from 3 source cells → dest,
+// and a dashed red line through the corner (it gets subtracted)
+function drawPrefixOverlay(st){
+  const svg=document.getElementById('prefOverlay');
+  svg.innerHTML='';
+  if(st.type!=='prefix') return;
+
+  const {prefR:di, prefC:dj,
+         src_aboveR:ai, src_aboveC:aj,
+         src_leftR:li,  src_leftC:lj,
+         src_cornR:ci,  src_cornC:cj} = st;
+
+  // Destination centre
+  const dx=cellCx(dj), dy=cellCy(di);
+
+  // Arrow: ABOVE cell → dest  (blue, +)
+  drawArrow(svg, cellCx(aj), cellCy(ai), dx, dy, '#1565c0', '+', false);
+  // Arrow: LEFT cell → dest   (green, +)
+  drawArrow(svg, cellCx(lj), cellCy(li), dx, dy, '#028a5b', '+', false);
+  // Arrow: CORNER cell → dest (red, −, dashed)
+  drawArrow(svg, cellCx(cj), cellCy(ci), dx, dy, '#c0002a', '−', true);
+
+  // Star burst on destination
+  const star=svgEl('circle',{cx:dx,cy:dy,r:24,fill:'none',stroke:'#f5a623','stroke-width':'2.5','stroke-dasharray':'4 3'});
+  star.style.animation='winDash 0.5s linear infinite';
+  svg.appendChild(star);
+
+  // Resize SVG to cover grid
+  const W=(cols+1)*CW, H=(rows+1)*CH;
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+}
+
+function drawArrow(svg, x1, y1, x2, y2, color, label, dashed){
+  // shorten so arrow doesn't overlap cell centres
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
+  const shrink=22;
+  const sx=x1+(dx/len)*shrink, sy=y1+(dy/len)*shrink;
+  const ex=x2-(dx/len)*shrink, ey=y2-(dy/len)*shrink;
+
+  const line=svgEl('line',{x1:sx,y1:sy,x2:ex,y2:ey,
+    stroke:color,'stroke-width':'2','stroke-linecap':'round',
+    'marker-end':`url(#arr-${color.replace('#','')})`,
+    ...(dashed?{'stroke-dasharray':'5 3'}:{})
+  });
+  if(!dashed) line.classList.add('ov-arrow');
+  svg.appendChild(line);
+
+  // Label at midpoint
+  const mx=(sx+ex)/2, my=(sy+ey)/2;
+  // background pill
+  const bg=svgEl('rect',{x:mx-9,y:my-9,width:18,height:16,rx:4,fill:color,opacity:'0.85'});
+  svg.appendChild(bg);
+  const txt=svgEl('text',{x:mx,y:my+2,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:'white','font-family':'Space Mono,monospace','font-size':'10','font-weight':'700'});
+  txt.textContent=label;
+  svg.appendChild(txt);
+
+  // arrow head marker
+  const markerId=`arr-${color.replace('#','')}`;
+  if(!svg.querySelector(`#${markerId}`)){
+    const defs=svg.querySelector('defs')||svgEl('defs',{});
+    const marker=svgEl('marker',{id:markerId,markerWidth:'6',markerHeight:'6',
+      refX:'3',refY:'3',orient:'auto'});
+    const path=svgEl('path',{d:'M0,0 L6,3 L0,6 Z',fill:color});
+    marker.appendChild(path); defs.appendChild(marker); svg.insertBefore(defs,svg.firstChild);
+  }
+}
+
+// Draw the window-scan overlay on the MATRIX grid:
+// animated border around the active window + corner pins labeling p[r1][c1] etc.
+function drawWindowOverlay(st){
+  const matSvg=document.getElementById('matOverlay');
+  const prefSvg=document.getElementById('prefOverlay');
+  matSvg.innerHTML=''; prefSvg.innerHTML='';
+
+  if((st.type!=='window'&&st.type!=='best')||st.r1==null) return;
+
+  const {r1,c1,r2,c2} = st;
+  const W=cols*CW, H=rows*CH;
+  matSvg.setAttribute('width',W); matSvg.setAttribute('height',H);
+
+  // Animated dashed rectangle around the window on the matrix
+  const rx=cellX(c1)-2, ry=cellY(r1)-2;
+  const rw=(c2-c1+1)*CW-1, rh=(r2-r1+1)*CH-1;
+  const color=st.type==='best'?'#f5a623':'#1565c0';
+
+  const rect=svgEl('rect',{x:rx,y:ry,width:rw,height:rh,rx:8,
+    fill:'none',stroke:color,'stroke-width':'3'});
+  rect.classList.add('ov-win-rect');
+  matSvg.appendChild(rect);
+
+  // Corner pin labels on the window cells
+  const corners=[
+    {r:r1,c:c1,label:'r1,c1',ox:-2,oy:-2,anchor:'end'},
+    {r:r1,c:c2,label:'r1,c2',ox: 2,oy:-2,anchor:'start'},
+    {r:r2,c:c1,label:'r2,c1',ox:-2,oy: 2,anchor:'end'},
+    {r:r2,c:c2,label:'r2,c2',ox: 2,oy: 2,anchor:'start'},
+  ];
+  corners.forEach(({r,c,label,ox,oy,anchor})=>{
+    const px=cellCx(c)+ox*10, py=cellCy(r)+oy*10;
+    const bg=svgEl('rect',{x:px-(anchor==='end'?label.length*5.5:2),y:py-8,
+      width:label.length*5.5+4,height:14,rx:3,fill:color,opacity:'0.88'});
+    matSvg.appendChild(bg);
+    const t=svgEl('text',{x:px,y:py+2,'text-anchor':anchor,'dominant-baseline':'middle',
+      fill:'white','font-family':'Space Mono,monospace','font-size':'8','font-weight':'700'});
+    t.textContent=label;
+    matSvg.appendChild(t);
+  });
+
+  // On the prefix table: draw L-bracket lines connecting the 4 corners
+  // p[r1][c1], p[r1][c2+1], p[r2+1][c1], p[r2+1][c2+1]
+  const PW=(cols+1)*CW, PH=(rows+1)*CH;
+  prefSvg.setAttribute('width',PW); prefSvg.setAttribute('height',PH);
+
+  const pc=[ // [prefRow, prefCol, sign, label]
+    {pi:r2+1, pj:c2+1, sign:'+', col:'#028a5b', desc:'full rect'},
+    {pi:r1,   pj:c2+1, sign:'−', col:'#c0002a', desc:'top strip'},
+    {pi:r2+1, pj:c1,   sign:'−', col:'#c0002a', desc:'left strip'},
+    {pi:r1,   pj:c1,   sign:'+', col:'#028a5b', desc:'corner +back'},
+  ];
+
+  // Draw connecting lines between the 4 corners to form a rectangle
+  const pts=pc.map(p=>({x:cellCx(p.pj),y:cellCy(p.pi)}));
+  // order: TL → TR → BR → BL → TL
+  const order=[3,1,0,2,3]; // pi:r1c1 → r1c2+1 → r2+1c2+1 → r2+1c1 → back
+  for(let k=0;k<order.length-1;k++){
+    const a=pts[order[k]], b=pts[order[k+1]];
+    const l=svgEl('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,
+      stroke:'rgba(33,150,243,0.4)','stroke-width':'1.5','stroke-dasharray':'5 3'});
+    prefSvg.appendChild(l);
+  }
+
+  // Labelled pins on the 4 prefix corners
+  pc.forEach(({pi,pj,sign,col,desc})=>{
+    const px=cellCx(pj), py=cellCy(pi);
+    // outer glow ring
+    const ring=svgEl('circle',{cx:px,cy:py,r:20,fill:'none',stroke:col,'stroke-width':'2',opacity:'0.5'});
+    prefSvg.appendChild(ring);
+    // sign badge at top-right of cell
+    const bx=px+14, by=py-14;
+    const bg=svgEl('circle',{cx:bx,cy:by,r:9,fill:col});
+    prefSvg.appendChild(bg);
+    const st2=svgEl('text',{x:bx,y:by+1,'text-anchor':'middle','dominant-baseline':'middle',
+      fill:'white','font-family':'Space Mono,monospace','font-size':'11','font-weight':'900'});
+    st2.textContent=sign;
+    prefSvg.appendChild(st2);
+  });
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const allVals=matrix.flat(), minV=Math.min(...allVals), maxV=Math.max(...allVals);
+
+  // Matrix cells — heat + prefix source highlight for the matrix origin cell
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const el=document.getElementById(`mc-${r}-${c}`);
+      if(!el)continue;
+      const base=heatClass(matrix[r][c],minV,maxV);
+      const inWin=st.r1!=null&&r>=st.r1&&r<=st.r2&&c>=st.c1&&c<=st.c2;
+      const isBestWin=(isFinal||st.type==='done')&&
+        (r>=st.bestR1&&r<=st.bestR1+sz-1&&c>=st.bestC1&&c<=st.bestC1+sz-1);
+      const isPrefSrc=st.type==='prefix'&&r===st.src_matR&&c===st.src_matC;
+      if(isBestWin)       el.className='mcell in-best';
+      else if(isPrefSrc)  el.className='mcell px-src';
+      else if(inWin)      el.className='mcell in-window';
+      else                el.className=`mcell ${base}`;
+    }
+  }
+
+  // Prefix cells (left panel) — with 4-source colour coding during prefix build
+  const pt=st.pTable||[];
+  for(let i=0;i<=rows;i++){
+    for(let j=0;j<=cols;j++){
+      const el=document.getElementById(`pc-${i}-${j}`);
+      if(!el)continue;
+      const val=pt[i]?.[j];
+      const prefDone=st.type!=='prefix'||st.prefR>i||(st.prefR===i&&st.prefC>=j);
+      el.textContent=(i===0||j===0)?0:(val!==undefined&&prefDone?val:'—');
+
+      // default class first
+      let cls='pcell';
+
+      if(st.type==='prefix'){
+        const isDest  = i===st.prefR      && j===st.prefC;
+        const isAbove = i===st.src_aboveR && j===st.src_aboveC;
+        const isLeft  = i===st.src_leftR  && j===st.src_leftC;
+        const isCorner= i===st.src_cornR  && j===st.src_cornC;
+        // dest overrides everything; then individual sources
+        if(isDest)       cls='pcell px-dest';
+        else if(isAbove) cls='pcell px-above';
+        else if(isLeft)  cls='pcell px-left';
+        else if(isCorner)cls='pcell px-corner';
+        else if(prefDone)cls='pcell'; // already computed — neutral
+      } else {
+        const isActive=false;
+        const isUsed=(st.type==='window'||st.type==='best')&&
+          ((i===st.r1&&j===st.c1)||(i===st.r1&&j===(st.c2+1))||
+           (i===(st.r2+1)&&j===st.c1)||(i===(st.r2+1)&&j===(st.c2+1)));
+        if(isUsed) cls='pcell pc-used';
+      }
+      el.className=cls;
+    }
+  }
+
+  // Prefix grid (right panel) — same 4-source colour coding
+  for(let i=0;i<=rows;i++){
+    for(let j=0;j<=cols;j++){
+      const el=document.getElementById(`ps-${i}-${j}`);
+      if(!el)continue;
+      const val=pt[i]?.[j];
+      const prefDone=st.type!=='prefix'||st.prefR>i||(st.prefR===i&&st.prefC>=j);
+      el.textContent=(i===0||j===0)?0:(val!==undefined&&prefDone?val:'—');
+
+      let cls='ps-cell';
+      if(st.type==='prefix'){
+        const isDest  = i===st.prefR      && j===st.prefC;
+        const isAbove = i===st.src_aboveR && j===st.src_aboveC;
+        const isLeft  = i===st.src_leftR  && j===st.src_leftC;
+        const isCorner= i===st.src_cornR  && j===st.src_cornC;
+        if(isDest)        cls='ps-cell psc-active';
+        else if(isAbove)  cls='ps-cell' + ' psc-above';
+        else if(isLeft)   cls='ps-cell' + ' psc-left';
+        else if(isCorner) cls='ps-cell' + ' psc-corner';
+      } else {
+        const isUsed=(st.type==='window'||st.type==='best')&&
+          ((i===st.r1&&j===st.c1)||(i===st.r1&&j===(st.c2+1))||
+           (i===(st.r2+1)&&j===st.c1)||(i===(st.r2+1)&&j===(st.c2+1)));
+        if(isUsed) cls='ps-cell psc-used';
+      }
+      el.className=cls;
+    }
+  }
+
+  // Formula row
+  const fr=document.getElementById('formulaRow');
+  if((st.type==='window'||st.type==='best')&&st.r1!=null&&st.pTable){
+    const pv=st.pTable;
+    const a=pv[st.r2+1]?.[st.c2+1]??'?';
+    const b=pv[st.r1]?.[st.c2+1]??'?';
+    const c_=pv[st.r2+1]?.[st.c1]??'?';
+    const d_=pv[st.r1]?.[st.c1]??'?';
+    const res=st.sum;
+    fr.innerHTML=`
+      <div class="fval fv-pos">${a}</div>
+      <span class="fop">−</span>
+      <div class="fval fv-neg">${b}</div>
+      <span class="fop">−</span>
+      <div class="fval fv-neg">${c_}</div>
+      <span class="fop">+</span>
+      <div class="fval fv-pos">${d_}</div>
+      <span class="fop">=</span>
+      <div class="fval ${st.type==='best'?'fv-best':'fv-result'}">${res}</div>
+      ${st.type==='best'?'<span style="font-size:0.9rem">⭐ NEW BEST</span>':''}
+    `;
+  } else if(st.type==='done'&&st.pTable){
+    const pv=st.pTable;
+    fr.innerHTML=`<span style="color:#028a5b;font-family:\'Space Mono\',monospace;font-size:0.8rem;font-weight:700">★ Maximum = ${st.best}</span>`;
+  } else if(st.type==='prefix'){
+    // Full colour-coded formula showing all 4 contributing cells
+    const {src_mVal:mV, src_aboveVal:aV, src_leftVal:lV, src_cornVal:cV, src_destVal:dV} = st;
+    const i=st.prefR, j=st.prefC;
+    fr.innerHTML=`
+      <div style="display:flex;flex-direction:column;gap:6px;width:100%">
+        <div style="font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">
+          p[${i}][${j}] = ↙matrix + ↑above + ←left − ↖corner
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.52rem;font-family:'Space Mono',monospace;color:#e6a817;text-transform:uppercase;letter-spacing:1px">↙ m[${i-1}][${j-1}]</div>
+            <div class="fval" style="background:#fff3cd;border-color:#e6a817;color:#7a4800;min-width:42px">${mV}</div>
+          </div>
+          <span class="fop">+</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.52rem;font-family:'Space Mono',monospace;color:#1565c0;text-transform:uppercase;letter-spacing:1px">↑ p[${i-1}][${j}]</div>
+            <div class="fval" style="background:#bbdefb;border-color:#1565c0;color:#0d47a1;min-width:42px">${aV}</div>
+          </div>
+          <span class="fop">+</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.52rem;font-family:'Space Mono',monospace;color:#028a5b;text-transform:uppercase;letter-spacing:1px">← p[${i}][${j-1}]</div>
+            <div class="fval" style="background:#c8f7e4;border-color:#028a5b;color:#024d37;min-width:42px">${lV}</div>
+          </div>
+          <span class="fop">−</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.52rem;font-family:'Space Mono',monospace;color:#c0002a;text-transform:uppercase;letter-spacing:1px">↖ p[${i-1}][${j-1}]</div>
+            <div class="fval" style="background:#fde8e8;border-color:#c0002a;color:#8b0000;min-width:42px">${cV}</div>
+          </div>
+          <span class="fop">=</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:0.52rem;font-family:'Space Mono',monospace;color:#f5a623;text-transform:uppercase;letter-spacing:1px">★ p[${i}][${j}]</div>
+            <div class="fval fv-best" style="font-size:1rem;min-width:42px">${dV}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    fr.innerHTML=`<span style="color:var(--muted);font-family:\'Space Mono\',monospace;font-size:0.8rem">Waiting for window scan…</span>`;
+  }
+
+  // Best tracker cards
+  const btc=document.getElementById('btCurrent');
+  const btb=document.getElementById('btBest');
+  if(st.type==='window'||st.type==='best'){
+    document.getElementById('btCurrentVal').textContent=st.sum;
+    document.getElementById('btCurrentVal').style.color=
+      st.sum>0?'#028a5b':st.sum<0?'var(--accent)':'var(--ink)';
+    document.getElementById('btCurrentPos').textContent=`(${st.r1},${st.c1})→(${st.r2},${st.c2})`;
+    btc.className='bt-card bt-active';
+    document.getElementById('btBestVal').textContent=st.best;
+    document.getElementById('btBestPos').textContent=`top-left (${st.bestR1},${st.bestC1})`;
+    btb.className=st.type==='best'?'bt-card bt-active':'bt-card';
+  } else if(st.type==='done'){
+    document.getElementById('btBestVal').textContent=st.best;
+    document.getElementById('btBestPos').textContent=`top-left (${st.bestR1},${st.bestC1})`;
+    btb.className='bt-card bt-active';
+  }
+  document.getElementById('btChecked').textContent=st.windowsChecked||0;
+
+  // Candidate log
+  const cl=document.getElementById('clogRows');
+  cl.innerHTML='';
+  const clog=st.candLog||[];
+  [...clog].reverse().slice(0,20).forEach((e,i)=>{
+    const isLatest=i===0&&(st.type==='window'||st.type==='best');
+    cl.innerHTML+=`<div class="clog-row ${isLatest?'cl-current':''} ${e.isBest?'cl-best':''}">
+      <div class="cl-pos">(${e.r1},${e.c1})→(${e.r2},${e.c2})</div>
+      <div class="cl-sum ${e.sum>=0?'pos':'neg'}">${e.sum}</div>
+      <div class="cl-flag">${e.isBest?'⭐ best':''}  best=${e.bestSoFar}</div>
+    </div>`;
+  });
+
+  // Vars
+  setVar('vR1','vcR1',st.r1!=null?st.r1:'—');
+  setVar('vC1','vcC1',st.c1!=null?st.c1:'—');
+  setVar('vR2','vcR2',st.r2!=null?st.r2:'—');
+  setVar('vC2','vcC2',st.c2!=null?st.c2:'—');
+  const sumEl=document.getElementById('vSum');
+  sumEl.textContent=st.sum!=null?st.sum:'—';
+  sumEl.style.color=st.sum>0?'var(--accent3)':st.sum<0?'#ff6b6b':'#e2e8f0';
+  setVar('vBest','vcBest',st.best!=null&&st.best!==-Infinity?st.best:'−∞');
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type==='best'?'best':st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MAXIMUM SUM = ${st.result.best}`;
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.best;
+    document.getElementById('bestMeta').textContent=
+      `top-left (${st.result.bestR1},${st.result.bestC1}) · ${sz}×${sz} window · O(rows×cols)`;
+    // gold highlight on best window
+    for(let r=st.result.bestR1;r<st.result.bestR1+sz;r++)
+      for(let c=st.result.bestC1;c<st.result.bestC1+sz;c++){
+        const el=document.getElementById(`mc-${r}-${c}`);
+        if(el) el.className='mcell in-best';
+      }
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  // Draw SVG overlays
+  drawPrefixOverlay(st);
+  drawWindowOverlay(st);
+}
+
+// ─── TAB SWITCHER ──────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',prefix:'ep-prefix',window:'ep-window',best:'ep-best',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ──────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
