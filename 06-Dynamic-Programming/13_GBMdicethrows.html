@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dice Throws — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:0.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(0.9rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+/* controls */
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;width:80px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+/* dice row */
+.dice-row{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+.dice-face{
+  width:44px;height:44px;border-radius:8px;border:2px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--muted);
+  transition:all .3s;flex-shrink:0;
+}
+.dice-face.df-active{
+  border-color:var(--accent4);background:rgba(255,209,102,.12);
+  color:#7a5a00;transform:translateY(-3px) rotate(-5deg);
+  box-shadow:0 6px 14px rgba(255,209,102,.35);
+}
+.dice-face.df-done{border-color:var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+.dice-info{font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted);margin-left:6px;}
+.target-chip{background:rgba(230,57,70,.1);border:1.5px solid var(--accent);color:var(--accent);
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  padding:4px 10px;border-radius:6px;margin-left:auto;}
+
+/* accumulator strip */
+.acc-strip{display:flex;gap:6px;margin-bottom:14px;align-items:center;flex-wrap:wrap;}
+.acc-label{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:4px;flex-shrink:0;}
+.acc-chip{
+  min-width:36px;height:28px;padding:0 7px;border-radius:5px;border:1px solid var(--border);
+  background:var(--surface);font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  color:var(--muted);display:flex;align-items:center;justify-content:center;
+  transition:all .3s;
+}
+.acc-chip.ac-lit{border-color:var(--accent2);background:rgba(33,150,243,.12);color:var(--accent2);transform:scale(1.08);}
+.acc-chip.ac-done{border-color:var(--accent3);background:rgba(6,214,160,.08);color:#028a5b;}
+.acc-sum-badge{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:var(--accent4);color:#3a2800;padding:3px 10px;border-radius:5px;margin-left:4px;}
+
+/* DP TABLE */
+.dp-section{margin-bottom:12px;}
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.dp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow:auto;}
+.dp-wrap{position:relative;display:inline-block;}
+.dp-grid{display:inline-grid;gap:2px;}
+.dp-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+
+/* header cells */
+.dp-hcell{width:46px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;
+  background:rgba(33,150,243,.07);border:1px solid rgba(33,150,243,.18);color:var(--accent2);}
+.dp-hcell.hc-die{background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.3);color:#7a5a00;}
+
+/* value cells */
+.dp-cell{
+  width:46px;height:34px;border-radius:4px;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dp-cell.dc-zero  {color:#ddd;}
+.dp-cell.dc-filled{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.28);color:var(--accent2);}
+.dp-cell.dc-cur   {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  color:#7a4800!important;transform:scale(1.14) translateY(-2px);
+  box-shadow:0 6px 18px rgba(245,166,35,.45);animation:dpulse .8s ease infinite alternate;z-index:4;}
+@keyframes dpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.dp-cell.dc-src   {background:rgba(33,150,243,.14);border-color:var(--accent2);border-width:1.5px;}
+.dp-cell.dc-target{background:rgba(6,214,160,.2);border-color:#06d6a0;border-width:2.5px;color:#024d37;
+  box-shadow:0 4px 12px rgba(6,214,160,.35);animation:tpulse 1s ease infinite alternate;}
+@keyframes tpulse{from{box-shadow:0 4px 10px rgba(6,214,160,.3);}to{box-shadow:0 6px 18px rgba(6,214,160,.55);}}
+.dp-cell.dc-best  {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;}
+
+/* complexity strip */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-card .cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-card .cx-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.cx-card .cx-sub{font-size:.62rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-fill{border-color:var(--accent2);}
+.explain-panel.ep-src {border-color:var(--accent4);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-fill{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*10+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-fill{background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--bg);}
+
+/* ways log */
+.ways-log{margin-bottom:12px;}
+.wl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.wl-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+.wl-rows::-webkit-scrollbar{width:3px;}.wl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.wl-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;}
+.wl-row.wl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.wl-die{color:#ffd166;width:44px;flex-shrink:0;}
+.wl-sum{color:#4fc3f7;width:44px;flex-shrink:0;}
+.wl-ways{font-weight:700;color:var(--accent3);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Dice Throws</h1>
+    <div class="sub">Dynamic Programming · Counting · Ways to reach target sum</div>
+  </div>
+  <div class="family-badge">DP · Counting</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <div class="controls">
+    <div class="field">
+      <label>numDice</label>
+      <input type="number" id="inDice" value="2" min="1" max="8">
+    </div>
+    <div class="field">
+      <label>numSides</label>
+      <input type="number" id="inSides" value="6" min="2" max="10">
+    </div>
+    <div class="field">
+      <label>target</label>
+      <input type="number" id="inTarget" value="7" min="1">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="330">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- DICE ROW -->
+  <div class="dice-row" id="diceRow"></div>
+
+  <!-- ACCUMULATOR STRIP -->
+  <div class="section-label">Sources contributing to current cell — dp[d-1][s-face] for face in 1..numSides</div>
+  <div class="acc-strip" id="accStrip">
+    <span class="acc-label">contributions:</span>
+    <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">start to see contributions as the algorithm runs</span>
+  </div>
+
+  <!-- DP TABLE -->
+  <div class="dp-section">
+    <div class="section-label">dp[d][s] = ways to get sum s using exactly d dice</div>
+    <div class="dp-outer">
+      <div class="dp-wrap">
+        <div class="dp-grid" id="dpGrid"></div>
+        <svg class="dp-overlay" id="dpOverlay" width="1" height="1"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div>
+      <div class="cx-val" style="color:var(--accent2)">O(d·t·s)</div>
+      <div class="cx-sub">dice × target × sides</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div>
+      <div class="cx-val" style="color:var(--pur-dark)">O(d·t)</div>
+      <div class="cx-sub">DP table size</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">This run</div>
+      <div class="cx-val" id="cxVal" style="color:#7a5a00">—</div>
+      <div class="cx-sub" id="cxSub">d=? t=? s=?</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAns" style="color:#028a5b">—</div>
+      <div class="cx-sub">ways to reach target</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">diceThrows</span>(<span class="ck">int</span> numDice, <span class="ck">int</span> sides,</span>
+<span class="code-line" id="cl-sg2">             <span class="ck">int</span> target) {</span>
+<span class="code-line" id="cl-dp0">  <span class="cc">// dp[d][s]=ways to get sum s with d dice</span></span>
+<span class="code-line" id="cl-dp1">  vector&lt;vector&lt;<span class="ck">long</span>&gt;&gt; dp(</span>
+<span class="code-line" id="cl-dp2">    numDice+<span class="cn">1</span>, vector&lt;<span class="ck">long</span>&gt;(target+<span class="cn">1</span>,<span class="cn">0</span>));</span>
+<span class="code-line" id="cl-base">  dp[<span class="cn">0</span>][<span class="cn">0</span>]=<span class="cn">1</span>; <span class="cc">// 0 dice → 1 way to sum 0</span></span>
+<span class="code-line" id="cl-d">  <span class="ck">for</span>(<span class="ck">int</span> d=<span class="cn">1</span>; d&lt;=numDice; d++)</span>
+<span class="code-line" id="cl-s">   <span class="ck">for</span>(<span class="ck">int</span> s=<span class="cn">1</span>; s&lt;=target; s++)</span>
+<span class="code-line" id="cl-f">    <span class="ck">for</span>(<span class="ck">int</span> f=<span class="cn">1</span>; f&lt;=sides&amp;&amp;f&lt;=s; f++)</span>
+<span class="code-line" id="cl-add">     dp[d][s]+=dp[d-<span class="cn">1</span>][s-f]; <span class="cc">// add face f</span></span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[numDice][target]; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;letter-spacing:1px;">O(d·t·s)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> <span style="color:#c084fc">long long</span> ll;
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">solve</span>(<span style="color:#c084fc">int</span> d,<span style="color:#c084fc">int</span> s,<span style="color:#c084fc">int</span> t){
+  vector&lt;vector&lt;ll&gt;&gt; dp(d+<span style="color:#fda4af">1</span>,vector&lt;ll&gt;(t+<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>));
+  dp[<span style="color:#fda4af">0</span>][<span style="color:#fda4af">0</span>]=<span style="color:#fda4af">1</span>;                            <span style="color:#374151;font-style:italic">// base: 0 dice, sum 0 = 1 way</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;=d;i++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> j=<span style="color:#fda4af">1</span>;j&lt;=t;j++)
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> f=<span style="color:#fda4af">1</span>;f&lt;=s&amp;&amp;f&lt;=j;f++)
+        dp[i][j]+=dp[i-<span style="color:#fda4af">1</span>][j-f];          <span style="color:#374151;font-style:italic">// face f contributes dp[i-1][j-f]</span>
+  <span style="color:#c084fc">return</span> dp[d][t];                      <span style="color:#374151;font-style:italic">// answer at bottom-right</span>
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>);
+  cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> d,s,t; cin&gt;&gt;d&gt;&gt;s&gt;&gt;t;
+  cout&lt;&lt;<span style="color:#67e8f9">solve</span>(d,s,t)&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">#pragma O3+AVX2</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">3 nested loops</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">ll for overflow</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">base dp&#91;0&#93;&#91;0&#93;=1</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcD">  <div class="var-name">die d</div>    <div class="var-value" id="vD"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcS">  <div class="var-name">sum s</div>    <div class="var-value" id="vS"  style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcF">  <div class="var-name">face f</div>   <div class="var-value" id="vF"  style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcSrc"><div class="var-name">dp[d-1][s-f]</div><div class="var-value" id="vSrc" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcCur" style="grid-column:1/3"><div class="var-name">dp[d][s] so far</div><div class="var-value" id="vCur" style="font-size:1.1rem;color:var(--accent4)">—</div></div>
+    </div>
+
+    <div class="ways-log">
+      <div class="wl-title">Fill Log</div>
+      <div class="wl-rows" id="wlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Ways to Reach Target</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ DICE THROWS SOLVED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {numDice,sides,target,d,s,f,srcVal,curVal,waysLog} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">dp[d][s] = number of ways to roll exactly sum s using d dice. Base case: dp[0][0]=1 (zero dice, zero sum = one way). For each die, for each sum, we try all faces 1..numSides and add ways from the previous die's row.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[d][s]</strong> = total permutations of d dice rolls that sum to s. Order matters: [1,6] ≠ [6,1].`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Recurrence:</strong> dp[d][s] = Σ dp[d−1][s−f] for f=1..min(sides,s). Each face f contributes all ways to reach s−f with d−1 dice.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Answer:</strong> dp[numDice][target]. Time: O(d·t·s). Can be optimised with prefix sums to O(d·t).`},
+    ]
+  };
+  if(type==='fill') return {
+    why:`<div class="ep-why-block why-fill">Adding face <strong>f=${f}</strong> to dp[${d}][${s}]: we look up dp[${d-1}][${s-f}]=${srcVal}. This means there are ${srcVal} ways to get sum ${s-f} with ${d-1} dice — if we roll a ${f} on die ${d}, each of those ${srcVal} ways becomes a valid way to reach ${s}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[${d}][${s}]=${curVal}</strong> so far (accumulating face by face). Will equal Σ dp[${d-1}][${s-f}] for all valid faces.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why sum over faces?</strong> All faces are mutually exclusive outcomes. Face 1, face 2, ... face s are disjoint events — so we add (not multiply) their contributions.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">dp[${numDice}][${target}] = <strong>${curVal}</strong>. This is the count of all ordered sequences of ${numDice} dice rolls (each 1..${sides}) that sum to exactly ${target}.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${curVal}</strong> permutations. dp[numDice][target] is the final cell.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Optimisation:</strong> Replace the inner face loop with a sliding window prefix sum → O(d·t) time, same O(d·t) space.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why dp[0][0]=1?</strong> It's the identity for counting — "one way to do nothing". Without it, no cell could ever accumulate any count.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-sg2','cl-dp0','cl-dp1','cl-dp2','cl-base'],cls:'hl-init'},
+  fill: {ids:['cl-d','cl-s','cl-f','cl-add'],cls:'hl-fill'},
+  done: {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(numDice, sides, target){
+  const steps=[];
+  const dp=Array.from({length:numDice+1},()=>new Array(target+1).fill(0));
+  dp[0][0]=1;
+  const waysLog=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,numDice,sides,target,
+    dp:dp.map(r=>[...r]),
+    waysLog:[...waysLog],
+    result:null,...extra,
+    explain:makeExplain(type,{numDice,sides,target,...extra})
+  });
+
+  snap('init',
+    `🎲 <strong>Start.</strong> ${numDice} dice, ${sides} sides, target=${target}. dp[0][0]=1 (base case). Table size: ${numDice+1}×${target+1}.`,
+    {d:0,s:0,f:null,srcVal:null,curVal:1}
+  );
+
+  for(let d=1;d<=numDice;d++){
+    for(let s=1;s<=target;s++){
+      for(let f=1;f<=sides&&f<=s;f++){
+        const srcVal=dp[d-1][s-f];
+        dp[d][s]+=srcVal;
+        snap('fill',
+          `🎲 Die <strong>${d}</strong>, sum <strong>${s}</strong>, face <strong>${f}</strong>: dp[${d-1}][${s-f}]=${srcVal} → dp[${d}][${s}] now <strong>${dp[d][s]}</strong>`,
+          {d,s,f,srcVal,curVal:dp[d][s]}
+        );
+      }
+      if(dp[d][s]>0) waysLog.push({d,s,ways:dp[d][s]});
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> dp[${numDice}][${target}] = <strong>${dp[numDice][target]}</strong> ways.`,
+    {d:numDice,s:target,f:null,srcVal:null,curVal:dp[numDice][target],
+     result:{ways:dp[numDice][target]}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let numDice=2, sides=6, target=7;
+const CW=48, CH=36;
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── OVERLAY ──────────────────────────────────────────────────────────────────
+function drawOverlay(st){
+  const svg=document.getElementById('dpOverlay');
+  svg.innerHTML='';
+  if(!st||st.type!=='fill') return;
+  svg.setAttribute('width',(target+2)*CW);
+  svg.setAttribute('height',(numDice+2)*CH);
+
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+  const {d,s,f} = st;
+
+  // Cell centres (col = sum+1 for header offset, row = die+1)
+  const cx=col=>(col+1)*CW+CW/2;
+  const cy=row=>(row+1)*CH+CH/2;
+
+  const srcS=s-f;
+  const x1=cx(srcS), y1=cy(d-1);
+  const x2=cx(s),    y2=cy(d);
+
+  // translucent arrow: source dp[d-1][s-f] → dest dp[d][s]
+  const color='rgba(33,150,243,0.45)';
+  const mid='mk_dice_arrow';
+  if(!defs.querySelector('#'+mid)){
+    const mk=svgEl('marker',{id:mid,markerWidth:'7',markerHeight:'7',refX:'6',refY:'3.5',orient:'auto'});
+    mk.appendChild(svgEl('path',{d:'M0,0 L7,3.5 L0,7 Z',fill:'rgba(33,150,243,0.6)'}));
+    defs.appendChild(mk);
+  }
+  svg.appendChild(svgEl('line',{
+    x1:x1+(srcS<s?CW/2-4:-CW/2+4), y1:y1+CH/2-3,
+    x2:x2-CW/2+4, y2:y2-CH/2+4,
+    stroke:color,'stroke-width':'2',
+    'stroke-dasharray':'5 3','stroke-linecap':'round',
+    'marker-end':`url(#${mid})`
+  }));
+
+  // label badge on midpoint
+  const mx=(x1+x2)/2, my=(y1+y2)/2-10;
+  const lbl=`dp[${d-1}][${srcS}]=${st.srcVal}`;
+  const lw=lbl.length*5.6+10;
+  svg.appendChild(svgEl('rect',{x:mx-lw/2,y:my-7,width:lw,height:14,rx:4,fill:'rgba(33,150,243,0.7)'}));
+  const t=svgEl('text',{x:mx,y:my+1,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:'white','font-family':'Space Mono,monospace','font-size':'9','font-weight':'700'});
+  t.textContent=lbl; svg.appendChild(t);
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  numDice=Math.min(parseInt(document.getElementById('inDice').value)||2,8);
+  sides=Math.min(parseInt(document.getElementById('inSides').value)||6,10);
+  target=Math.min(parseInt(document.getElementById('inTarget').value)||7,numDice*sides);
+  document.getElementById('inTarget').value=target;
+
+  steps=computeSteps(numDice,sides,target);
+  currentStep=0;
+
+  document.getElementById('cxVal').textContent=numDice*target*sides;
+  document.getElementById('cxSub').textContent=`d=${numDice} t=${target} s=${sides}`;
+
+  // Dice faces
+  const dr=document.getElementById('diceRow');
+  dr.innerHTML='';
+  for(let d=1;d<=numDice;d++)
+    dr.innerHTML+=`<div class="dice-face" id="die-${d}">🎲</div>`;
+  dr.innerHTML+=`<span class="dice-info">${numDice}d${sides}</span>
+    <div class="target-chip">target = ${target}</div>`;
+
+  // DP grid
+  const dg=document.getElementById('dpGrid');
+  dg.style.gridTemplateColumns=`repeat(${target+2},${CW}px)`;
+  dg.innerHTML='';
+  // corner
+  dg.innerHTML+=`<div class="dp-hcell" style="background:transparent;border:none;"></div>`;
+  // col headers
+  for(let s=0;s<=target;s++)
+    dg.innerHTML+=`<div class="dp-hcell">s=${s}</div>`;
+  // rows
+  for(let d=0;d<=numDice;d++){
+    dg.innerHTML+=`<div class="dp-hcell hc-die">${d===0?'base':d+'🎲'}</div>`;
+    for(let s=0;s<=target;s++)
+      dg.innerHTML+=`<div class="dp-cell dc-zero" id="dpc-${d}-${s}">0</div>`;
+  }
+
+  // Set base cell
+  const bc=document.getElementById('dpc-0-0');
+  if(bc){bc.textContent='1';bc.className='dp-cell dc-filled';}
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('wlRows').innerHTML='';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // DP cells
+  for(let d=0;d<=numDice;d++){
+    for(let s=0;s<=target;s++){
+      const el=document.getElementById(`dpc-${d}-${s}`);
+      if(!el)continue;
+      const val=st.dp[d][s];
+      el.textContent=val;
+      const isCur=st.type==='fill'&&st.d===d&&st.s===s;
+      const isSrc=st.type==='fill'&&d===st.d-1&&s===st.s-st.f;
+      const isTarget=isFinal&&d===numDice&&s===target;
+      if(isTarget&&val>0)    el.className='dp-cell dc-target';
+      else if(isCur)         el.className='dp-cell dc-cur';
+      else if(isSrc&&val>0)  el.className='dp-cell dc-src';
+      else if(val>0)         el.className='dp-cell dc-filled';
+      else                   el.className='dp-cell dc-zero';
+    }
+  }
+
+  // Dice faces
+  for(let d=1;d<=numDice;d++){
+    const el=document.getElementById(`die-${d}`);
+    if(!el)continue;
+    const isActive=st.type==='fill'&&st.d===d;
+    const isDone=(st.type==='fill'&&st.d>d)||st.type==='done';
+    el.className='dice-face'+(isActive?' df-active':isDone?' df-done':'');
+    el.textContent=isActive&&st.f?['','⚀','⚁','⚂','⚃','⚄','⚅'][Math.min(st.f,6)]:'🎲';
+  }
+
+  // Accumulator strip
+  const acc=document.getElementById('accStrip');
+  if(st.type==='fill'&&st.d&&st.s){
+    let html='<span class="acc-label">face contributions:</span>';
+    for(let f=1;f<=sides&&f<=st.s;f++){
+      const srcS=st.s-f;
+      const srcVal=st.dp[st.d-1]?.[srcS]??0;
+      const isLit=f===st.f;
+      html+=`<div class="acc-chip ${isLit?'ac-lit':srcVal>0?'ac-done':''}">
+        f${f}→${srcVal}</div>`;
+    }
+    if(st.curVal>0)
+      html+=`<div class="acc-sum-badge">total=${st.curVal}</div>`;
+    acc.innerHTML=html;
+  } else {
+    acc.innerHTML='<span class="acc-label">contributions:</span><span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will appear during fill</span>';
+  }
+
+  // Ways log (right)
+  const wl=document.getElementById('wlRows');
+  wl.innerHTML='';
+  const log=st.waysLog||[];
+  [...log].slice(-12).reverse().forEach((e,i)=>{
+    const isCurRow=st.type==='fill'&&e.d===st.d&&e.s===st.s;
+    wl.innerHTML+=`<div class="wl-row ${isCurRow&&i===0?'wl-cur':''}">
+      <span class="wl-die">die=${e.d}</span>
+      <span class="wl-sum">sum=${e.s}</span>
+      <span class="wl-ways">${e.ways} ways</span>
+    </div>`;
+  });
+
+  // Vars
+  setVar('vD','vcD',st.d!=null?st.d:'—');
+  setVar('vS','vcS',st.s!=null?st.s:'—');
+  setVar('vF','vcF',st.f!=null?st.f:'—');
+  setVar('vSrc','vcSrc',st.srcVal!=null?st.srcVal:'—');
+  setVar('vCur','vcCur',st.curVal!=null?st.curVal:'—');
+  document.getElementById('vCur').style.color=
+    st.curVal>0?'var(--accent4)':'#e2e8f0';
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ANSWER = ${st.result.ways} ways`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.ways;
+    document.getElementById('bestMeta').textContent=
+      `dp[${numDice}][${target}] · ${numDice} dice · ${sides} sides · O(d·t·s)`;
+    document.getElementById('cxAns').textContent=st.result.ways;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  drawOverlay(st);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-fill',fill:'ep-fill',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-fill');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

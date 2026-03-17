@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Longest String Chain — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;width:340px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* DELETION PANEL */
+.del-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.del-panel.dp-active{border-color:var(--accent4);}
+.del-panel.dp-found {border-color:var(--accent3);}
+.del-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.del-word-display{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+.del-char{
+  width:32px;height:36px;border-radius:5px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;
+  background:var(--surface);color:var(--ink);transition:all .25s;flex-shrink:0;
+}
+.del-char.dc-strike{background:rgba(230,57,70,.1);border-color:var(--accent);color:var(--accent);text-decoration:line-through;opacity:.5;transform:scale(.9);}
+.del-char.dc-keep  {background:rgba(6,214,160,.1);border-color:var(--accent3);color:#024d37;}
+.del-arrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);margin:0 4px;}
+.del-result{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;padding:5px 12px;border-radius:6px;transition:all .3s;}
+.del-result.dr-found{background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;}
+.del-result.dr-miss {background:rgba(230,57,70,.08);border:1.5px solid rgba(230,57,70,.3);color:var(--accent);}
+
+/* WORD CARDS GRID */
+.words-section{margin-bottom:14px;}
+.words-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;}
+.words-wrap{position:relative;}
+.level-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.level-label{font-family:'Space Mono',monospace;font-size:.55rem;color:var(--muted);width:40px;flex-shrink:0;text-align:right;padding-right:6px;border-right:1.5px solid var(--border);}
+
+.wcard{
+  border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;
+  font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  position:relative;flex-shrink:0;text-align:center;
+  min-width:52px;
+}
+.wcard .wc-len{position:absolute;top:1px;right:3px;font-size:.48rem;color:var(--muted);font-weight:400;}
+
+/* card states */
+.wcard.wc-cur    {background:#fff8c5;border-color:#f5a623;border-width:2.5px;color:#7a4800;
+  transform:translateY(-4px);box-shadow:0 6px 18px rgba(245,166,35,.45);
+  animation:wcpulse .8s ease infinite alternate;z-index:4;}
+@keyframes wcpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.wcard.wc-pred   {background:rgba(33,150,243,.12);border-color:var(--accent2);border-width:2px;color:#0d47a1;
+  transform:translateY(-2px);box-shadow:0 4px 10px rgba(33,150,243,.2);}
+.wcard.wc-chain  {background:rgba(6,214,160,.15);border-color:var(--accent3);border-width:2px;color:#024d37;
+  transform:translateY(-2px);box-shadow:0 4px 10px rgba(6,214,160,.2);}
+.wcard.wc-best   {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;
+  box-shadow:0 4px 14px rgba(6,214,160,.35);}
+.wcard.wc-try    {background:rgba(192,84,252,.08);border-color:rgba(192,84,252,.3);color:var(--pur-dark);}
+
+/* chain result row */
+.chain-section{margin-bottom:14px;}
+.chain-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.chain-chip{
+  padding:5px 12px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;
+}
+.chain-chip.cc-active{background:rgba(6,214,160,.15);border-color:var(--accent3);color:#024d37;
+  transform:translateY(-2px);box-shadow:0 4px 10px rgba(6,214,160,.2);}
+.chain-chip.cc-done{background:rgba(6,214,160,.08);border-color:rgba(6,214,160,.25);color:#028a5b;}
+.chain-arrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);}
+
+/* PLAIN ENGLISH */
+.narrative-bar{
+  background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;
+}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-fill{border-color:var(--accent2);}
+.explain-panel.ep-back{border-color:var(--accent4);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-fill{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-back{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*12+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-fill{background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-back{background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--bg);line-height:1.8;}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Longest String Chain</h1>
+    <div class="sub">DP · Sort by length · Try all single deletions</div>
+  </div>
+  <div class="family-badge">DP · String</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Strings  (comma separated)</label>
+      <input type="text" id="inWords" value="abde,abc,abd,abcde,ade,ae,1abde,abcdef">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="110">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- DELETION PANEL -->
+  <div class="del-panel" id="delPanel">
+    <div class="del-title" id="delTitle">Sort words by length, then process shortest-first</div>
+    <div class="del-word-display" id="delDisplay">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">deletion attempts will appear here</span>
+    </div>
+  </div>
+
+  <!-- WORD CARDS GRID -->
+  <div class="words-section">
+    <div class="section-label">Words by length — gold = current · blue = predecessor · green = in chain</div>
+    <div class="words-outer">
+      <div class="words-wrap" id="wordsWrap"></div>
+    </div>
+  </div>
+
+  <!-- CHAIN RESULT -->
+  <div class="chain-section">
+    <div class="section-label">Chain found so far  <span id="chainSub" style="color:var(--accent3)"></span></div>
+    <div class="chain-chips" id="chainChips">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will appear during backtrack</span>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n·L²)</div>
+      <div class="cx-sub">n words · L² per word</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(n·L)</div>
+      <div class="cx-sub">hashmap + dp arrays</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Chain Length</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">max(dp[])</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-fill" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">vector&lt;string&gt; <span class="cf">longestChain</span>(</span>
+<span class="code-line" id="cl-sg2">  vector&lt;string&gt;&amp; words){</span>
+<span class="code-line" id="cl-sort">  sort(words.begin(),words.end(),</span>
+<span class="code-line" id="cl-srt2">    [](<span class="ck">auto</span>&amp; a,<span class="ck">auto</span>&amp; b){<span class="ck">return</span> a.size()&lt;b.size();});</span>
+<span class="code-line" id="cl-map">  unordered_map&lt;string,<span class="ck">int</span>&gt; dp;</span>
+<span class="code-line" id="cl-pre">  unordered_map&lt;string,string&gt; prev;</span>
+<span class="code-line" id="cl-best">  string best="";</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span>(<span class="ck">auto</span>&amp; w:words){</span>
+<span class="code-line" id="cl-init">   dp[w]=<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-inner">   <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">0</span>;i&lt;w.size();i++){</span>
+<span class="code-line" id="cl-sub">    string s=w.substr(<span class="cn">0</span>,i)+w.substr(i+<span class="cn">1</span>);</span>
+<span class="code-line" id="cl-found">    <span class="ck">if</span>(dp.count(s)&amp;&amp;dp[s]+<span class="cn">1</span>&gt;dp[w]){</span>
+<span class="code-line" id="cl-upd">     dp[w]=dp[s]+<span class="cn">1</span>; prev[w]=s;}}</span>
+<span class="code-line" id="cl-bestupd">   <span class="ck">if</span>(dp[w]&gt;dp[best]) best=w;}</span>
+<span class="code-line" id="cl-back">  <span class="cc">// backtrack</span></span>
+<span class="code-line" id="cl-bk1">  vector&lt;string&gt; res;</span>
+<span class="code-line" id="cl-bk2">  <span class="ck">for</span>(string c=best;!c.empty();c=prev[c])</span>
+<span class="code-line" id="cl-bk3">   res.push_back(c);</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[best]&gt;<span class="cn">1</span>?res:vector&lt;string&gt;{}; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n·L²) · hashmap</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+vector&lt;string&gt; <span style="color:#67e8f9">solve</span>(vector&lt;string&gt;&amp; w){
+  sort(w.begin(),w.end(),            <span style="color:#374151;font-style:italic">// sort by length ascending</span>
+    [](<span style="color:#c084fc">auto</span>&amp; a,<span style="color:#c084fc">auto</span>&amp; b){<span style="color:#c084fc">return</span> a.size()&lt;b.size();});
+  unordered_map&lt;string,<span style="color:#c084fc">int</span>&gt; dp;
+  unordered_map&lt;string,string&gt; pre; <span style="color:#374151;font-style:italic">// predecessor for backtrack</span>
+  string best;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; s:w){
+    dp[s]=<span style="color:#fda4af">1</span>;
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;(int)s.size();i++){
+      string t=s.substr(<span style="color:#fda4af">0</span>,i)+s.substr(i+<span style="color:#fda4af">1</span>); <span style="color:#374151;font-style:italic">// delete char i</span>
+      <span style="color:#c084fc">if</span>(dp.count(t)&amp;&amp;dp[t]+<span style="color:#fda4af">1</span>&gt;dp[s])
+        dp[s]=dp[t]+<span style="color:#fda4af">1</span>,pre[s]=t;         <span style="color:#374151;font-style:italic">// shorter word exists!</span>
+    }
+    <span style="color:#c084fc">if</span>(dp[s]&gt;dp[best]) best=s;
+  }
+  vector&lt;string&gt; res;
+  <span style="color:#c084fc">for</span>(string c=best;!c.empty();c=pre[c])  <span style="color:#374151;font-style:italic">// follow predecessor chain</span>
+    res.push_back(c);
+  <span style="color:#c084fc">return</span> dp[best]&gt;<span style="color:#fda4af">1</span>?res:vector&lt;string&gt;{};
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  vector&lt;string&gt; w(n);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; s:w) cin&gt;&gt;s;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; s:<span style="color:#67e8f9">solve</span>(w)) cout&lt;&lt;s&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">sort by length</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">O(L) deletion loop</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">hashmap O(1) lookup</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">pre&#91;&#93; backtrack</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcW">   <div class="var-name">word</div>     <div class="var-value" id="vW"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcDP">  <div class="var-name">dp[word]</div> <div class="var-value" id="vDP"  style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcDel"> <div class="var-name">deleting i</div><div class="var-value" id="vDel" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcSub"> <div class="var-name">shorter</div>  <div class="var-value" id="vSub" style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcFound"><div class="var-name">in dict?</div> <div class="var-value" id="vFound" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcBest"><div class="var-name">best so far</div><div class="var-value" id="vBest" style="color:var(--accent3)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Longest String Chain</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ CHAIN FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {word, delIdx, shorter, found, dpWord, bestWord, n} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Key insight: sort words by length first. Then for word W, try removing each character one at a time. If the result exists in our dp map, we can extend that chain. Because we process shorter words before longer ones, dp[shorter] is always ready when we need it.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[w]</strong> = length of longest chain ending at word w. Base: dp[w]=1 (every word alone is a chain of length 1).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Recurrence:</strong> for each position i in w, let s = w with character i removed. If s is in dp: dp[w] = max(dp[w], dp[s]+1).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why sort by length?</strong> A predecessor must be strictly shorter. Sorting ensures shorter words are processed first, so dp[predecessor] is computed before dp[word].`},
+    ]
+  };
+  if(type==='fill') return {
+    why: found
+      ? `<div class="ep-why-block why-fill">Removed position ${delIdx} from "<strong>${word}</strong>" → "<strong>${shorter}</strong>". That word IS in our dictionary with dp=${dpWord-1}. Extending gives dp["${word}"]=${dpWord}!</div>`
+      : `<div class="ep-why-block why-fill">Removed position ${delIdx} from "<strong>${word}</strong>" → "<strong>${shorter}</strong>". That word is <em>not</em> in our dictionary — can't form a chain link here. Skip.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp["${word}"]=${dpWord}</strong> — best chain length ending at "${word}".`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why O(L²)?</strong> For each word (n words), we try L deletions, each creating a string in O(L) time → O(n·L²) total.`},
+    ]
+  };
+  if(type==='backtrack') return {
+    why:`<div class="ep-why-block why-back">Tracing the chain backwards from "<strong>${bestWord}</strong>". Each step: follow prev["${word}"] to find which shorter word this was built from. Stop when prev is empty.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-pur',text:`<strong>prev[w]</strong> = the predecessor word that gave dp[w] its best value. Following this chain in reverse gives the full sequence from longest to shortest.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Longest chain found. Total time O(n·L²) where n=${n} words and L = max word length. The hashmap gives O(1) lookup per deletion candidate.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Chain length = ${dpWord}</strong>. Answer returned in descending order (longest to shortest).`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Edge case:</strong> if no chain of length ≥ 2 exists, return empty array. A single word is not a valid chain.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Deletion = predecessor check:</strong> removing one char from A gives B means B is a predecessor of A in the chain.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:     {ids:['cl-sig','cl-sg2','cl-sort','cl-srt2','cl-map','cl-pre','cl-best'],cls:'hl-init'},
+  fill:     {ids:['cl-loop','cl-init','cl-inner','cl-sub','cl-found','cl-upd','cl-bestupd'],cls:'hl-fill'},
+  backtrack:{ids:['cl-back','cl-bk1','cl-bk2','cl-bk3'],cls:'hl-back'},
+  done:     {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,word,delIdx,shorter,found,dpWord,bestWord,backChain,words} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have <strong>${words.length}</strong> words. The trick: sort them from shortest to longest, then for each word try removing one character at a time and see if that shorter word is already in our list. If it is, we can extend its chain!`};
+  if(type==='fill'){
+    const del = word&&delIdx!=null ? word[delIdx] : '?';
+    if(found) return {color:'var(--accent3)',
+      text:`✅ "<strong>${word}</strong>": delete '<strong>${del}</strong>' at position ${delIdx} → "<strong>${shorter}</strong>". That word exists! Chain length now <strong>${dpWord}</strong>.`};
+    return {color:'var(--muted)',
+      text:`"<strong>${word}</strong>": delete '${del}' → "<strong>${shorter}</strong>". Not in our word list — no chain link here.`};
+  }
+  if(type==='backtrack') return {color:'var(--accent4)',
+    text:`Tracing back the chain from "<strong>${bestWord}</strong>". Following the predecessor links: each step goes to the shorter word that was the best stepping stone.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Longest chain has <strong>${dpWord}</strong> words: <strong>[${(backChain||[]).join(' → ')}]</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(inputWords){
+  const words=[...inputWords].sort((a,b)=>a.length-b.length);
+  const n=words.length;
+  const dpMap={}, prevMap={};
+  const steps=[];
+  let bestWord='';
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,words,n,
+    dpMap:{...dpMap},prevMap:{...prevMap},
+    bestWord,backChain:[],
+    result:null,...extra,
+    explain:makeExplain(type,{n,words,...extra})
+  });
+
+  snap('init',`🔗 <strong>Start.</strong> ${n} words sorted by length. dp[w]=chain length ending at w.`,
+    {word:'',delIdx:null,shorter:'',found:false,dpWord:0});
+
+  for(const word of words){
+    dpMap[word]=1;
+    for(let i=0;i<word.length;i++){
+      const shorter=word.slice(0,i)+word.slice(i+1);
+      const found=dpMap[shorter]!=null;
+      const newLen=(found?dpMap[shorter]:0)+1;
+      const isUpdate=found&&newLen>dpMap[word];
+      if(isUpdate){dpMap[word]=newLen;prevMap[word]=shorter;}
+      snap('fill',
+        found&&isUpdate
+          ? `✅ "${word}" del[${i}]="${word[i]}" → "${shorter}" found! dp["${word}"]=${dpMap[word]}`
+          : found
+          ? `  "${word}" del[${i}]→"${shorter}" found but dp=${newLen}≤${dpMap[word]}`
+          : `  "${word}" del[${i}]→"${shorter}" NOT in dict`,
+        {word,delIdx:i,shorter,found,dpWord:dpMap[word],isUpdate,
+         charDel:word[i],bestWord}
+      );
+    }
+    if(!bestWord||dpMap[word]>dpMap[bestWord]) bestWord=word;
+    snap('fill',
+      `📌 Finished "${word}": dp=${dpMap[word]}. Best word so far: "${bestWord}" (dp=${dpMap[bestWord]})`,
+      {word,delIdx:null,shorter:'',found:false,dpWord:dpMap[word],isUpdate:false,
+       charDel:'',bestWord}
+    );
+  }
+
+  // Backtrack
+  const chain=[];
+  let cur=bestWord;
+  while(cur&&cur.length>0){
+    chain.push(cur);
+    snap('backtrack',
+      `🔙 Adding "${cur}" to chain. Next: prev["${cur}"]="${prevMap[cur]||'none'}"`,
+      {word:cur,delIdx:null,shorter:prevMap[cur]||'',found:true,
+       dpWord:dpMap[cur],bestWord,backChain:[...chain]}
+    );
+    cur=prevMap[cur]||'';
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Chain: <strong>[${chain.join(' → ')}]</strong>, length ${dpMap[bestWord]>=2?dpMap[bestWord]:0}.`,
+    {word:bestWord,delIdx:null,shorter:'',found:true,
+     dpWord:dpMap[bestWord]>=2?chain.length:0,
+     bestWord,backChain:[...chain],
+     result:{chain:[...chain],length:dpMap[bestWord]>=2?chain.length:0}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let sortedWords=[], wordSet=new Set();
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inWords').value.split(',').map(s=>s.trim()).filter(Boolean);
+  sortedWords=[...raw].sort((a,b)=>a.length-b.length);
+  wordSet=new Set(sortedWords);
+  steps=computeSteps(raw);
+  currentStep=0;
+
+  // Build word cards by length level
+  const wrap=document.getElementById('wordsWrap');
+  wrap.innerHTML='';
+  // group by length
+  const byLen={};
+  sortedWords.forEach(w=>{
+    if(!byLen[w.length]) byLen[w.length]=[];
+    byLen[w.length].push(w);
+  });
+  Object.keys(byLen).sort((a,b)=>a-b).forEach(len=>{
+    const row=document.createElement('div');
+    row.className='level-row';
+    row.innerHTML=`<div class="level-label">len ${len}</div>`;
+    byLen[len].forEach(w=>{
+      row.innerHTML+=`<div class="wcard wc-default" id="wc-${w}">
+        ${w}<span class="wc-len" id="wl-${w}"></span>
+      </div>`;
+    });
+    wrap.appendChild(row);
+  });
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('chainSub').textContent='';
+  document.getElementById('chainChips').innerHTML=
+    `<span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will appear during backtrack</span>`;
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+  const chainSet=new Set(st.backChain||[]);
+
+  // Word cards
+  sortedWords.forEach(w=>{
+    const el=document.getElementById(`wc-${w}`);
+    const ll=document.getElementById(`wl-${w}`);
+    if(!el)return;
+    const dp=st.dpMap[w];
+    if(ll) ll.textContent=dp>1?`×${dp}`:'';
+    const isCur=st.word===w&&st.type!=='backtrack';
+    const isPred=st.shorter===w&&st.found;
+    const isChain=chainSet.has(w);
+    const isBest=isFinal&&chainSet.has(w);
+    if(isBest||isChain&&st.type==='done') el.className='wcard wc-best';
+    else if(isChain)  el.className='wcard wc-chain';
+    else if(isCur)    el.className='wcard wc-cur';
+    else if(isPred)   el.className='wcard wc-pred';
+    else if(dp>1)     el.className='wcard wc-try';
+    else              el.className='wcard';
+  });
+
+  // Deletion panel
+  const dp2=document.getElementById('delPanel');
+  const dt=document.getElementById('delTitle');
+  const dd=document.getElementById('delDisplay');
+
+  if(st.type==='fill'&&st.word&&st.delIdx!=null&&st.charDel!==''){
+    dp2.className='del-panel'+(st.found?st.isUpdate?' dp-found':' dp-active':' dp-active');
+    dt.textContent=`"${st.word}" — trying delete position ${st.delIdx} ('${st.charDel}')`;
+    let html='';
+    for(let k=0;k<st.word.length;k++){
+      const cls=k===st.delIdx?'dc-strike':'dc-keep';
+      html+=`<div class="del-char ${cls}">${st.word[k]}</div>`;
+    }
+    html+=`<span class="del-arrow">→</span>`;
+    html+=`<div class="del-result ${st.found?'dr-found':'dr-miss'}">${st.shorter} ${st.found?'✓ IN DICT':'✗ not found'}</div>`;
+    if(st.found&&st.isUpdate)
+      html+=`<span class="del-arrow"> → dp=${st.dpWord}</span>`;
+    dd.innerHTML=html;
+  } else if(st.type==='fill'&&st.word&&st.delIdx==null){
+    dp2.className='del-panel';
+    dt.textContent=`✓ Finished processing "${st.word}" — dp=${st.dpWord}, best="${st.bestWord}"`;
+    dd.innerHTML='';
+  } else if(st.type==='backtrack'){
+    dp2.className='del-panel dp-found';
+    dt.textContent=`Backtracking chain from "${st.bestWord}"`;
+    dd.innerHTML='';
+  } else {
+    dp2.className='del-panel';
+    dt.textContent='Sort words by length, then process shortest-first';
+    dd.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">deletion attempts will appear here</span>';
+  }
+
+  // Chain chips
+  const cc=document.getElementById('chainChips');
+  if(st.backChain&&st.backChain.length>0){
+    cc.innerHTML='';
+    st.backChain.forEach((w,k)=>{
+      if(k>0) cc.innerHTML+=`<span class="chain-arrow">→</span>`;
+      const isLatest=k===st.backChain.length-1&&st.type==='backtrack';
+      cc.innerHTML+=`<div class="chain-chip ${isLatest?'cc-active':'cc-done'}">${w}</div>`;
+    });
+    document.getElementById('chainSub').textContent=`${st.backChain.length} words`;
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vW','vcW',st.word||'—');
+  setVar('vDP','vcDP',st.word&&st.dpMap[st.word]!=null?st.dpMap[st.word]:'—');
+  setVar('vDel','vcDel',st.delIdx!=null?`[${st.delIdx}]='${st.charDel||''}'`:'—');
+  setVar('vSub','vcSub',st.shorter||'—');
+  setVar('vFound','vcFound',st.found!=null?(st.found?'YES ✓':'NO ✗'):'—');
+  document.getElementById('vFound').style.color=st.found?'var(--accent3)':'var(--accent)';
+  setVar('vBest','vcBest',st.bestWord||'—');
+
+  // 3-tab
+  updateExplain(st); highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ CHAIN: ${st.result.chain.join(' → ')}`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.chain.join(' → ');
+    document.getElementById('bestMeta').textContent=`length ${st.result.length} · O(n·L²)`;
+    document.getElementById('cxAns').textContent=st.result.length;
+    document.getElementById('chainSub').textContent=`${st.result.length} words ✓`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-fill',fill:'ep-fill',backtrack:'ep-back',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-fill');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

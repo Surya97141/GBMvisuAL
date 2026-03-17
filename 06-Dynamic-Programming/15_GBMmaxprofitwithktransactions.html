@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Max Profit With K Transactions — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.25rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.wide{width:220px;} .field input.small{width:70px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+/* STOCK CHART */
+.chart-section{margin-bottom:14px;}
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.chart-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{
+  background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;
+  border-left:4px solid var(--accent4);min-height:52px;transition:border-color .3s;
+}
+.narrative-bar .nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* DP TABLE */
+.dp-section{margin-bottom:14px;}
+.dp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow:auto;}
+.dp-wrap{position:relative;display:inline-block;}
+.dp-grid{display:inline-grid;gap:2px;}
+.dp-overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+
+.dp-hcell{width:48px;height:30px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.58rem;font-weight:700;
+  background:rgba(33,150,243,.07);border:1px solid rgba(33,150,243,.18);color:var(--accent2);}
+.dp-hcell.hc-t{background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.3);color:#7a5a00;}
+
+.dp-cell{
+  width:48px;height:36px;border-radius:4px;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dp-cell.dc-zero  {color:#ddd;}
+.dp-cell.dc-filled{background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.28);color:var(--accent2);}
+.dp-cell.dc-cur   {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  color:#7a4800!important;transform:scale(1.12) translateY(-2px);
+  box-shadow:0 6px 18px rgba(245,166,35,.45);animation:dpulse .8s ease infinite alternate;z-index:4;}
+@keyframes dpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.dp-cell.dc-prev  {background:rgba(33,150,243,.12);border-color:rgba(33,150,243,.4);border-width:1.5px;}
+.dp-cell.dc-best  {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;
+  box-shadow:0 4px 12px rgba(6,214,160,.3);}
+.dp-cell.dc-back  {background:rgba(255,209,102,.15);border-color:var(--accent4);border-width:2px;}
+
+/* COMPARISON PANEL */
+.cmp-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;transition:border-color .3s;}
+.cmp-panel.cp-fill{border-color:var(--accent2);}
+.cmp-panel.cp-done{border-color:var(--accent3);}
+.cmp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+.cmp-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.cmp-box{flex:1;min-width:90px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.cmp-box.cb-win{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.cmp-box.cb-lose{opacity:.5;}
+.cb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.cb-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);}
+.cb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.cmp-op{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--muted);flex-shrink:0;}
+.cmp-result{min-width:80px;border:2.5px solid var(--accent4);border-radius:7px;padding:7px 10px;text-align:center;background:rgba(255,209,102,.08);}
+.cmp-result .cb-lbl{color:#7a5a00;} .cmp-result .cb-val{color:#7a5a00;}
+
+/* complexity */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.cx-sub{font-size:.62rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-fill{border-color:var(--accent2);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-fill{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*10+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-fill{background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--bg);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Max Profit With K Transactions</h1>
+    <div class="sub">Dynamic Programming · 2D Table · Buy Low Sell High</div>
+  </div>
+  <div class="family-badge">DP · Stock Trading</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Prices (comma separated)</label>
+      <input type="text" id="inPrices" class="wide" value="5,11,3,50,60,90">
+    </div>
+    <div class="field">
+      <label>k (transactions)</label>
+      <input type="number" id="inK" class="small" value="2" min="1">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="600">1×</button>
+        <button class="speed-btn" data-ms="280">2×</button>
+        <button class="speed-btn" data-ms="100">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- STOCK CHART -->
+  <div class="chart-section">
+    <div class="section-label">Stock Price Chart</div>
+    <div class="chart-wrap">
+      <canvas id="stockChart" height="110"></canvas>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- DP TABLE -->
+  <div class="dp-section">
+    <div class="section-label">dp[t][d] = max profit using at most t transactions through day d</div>
+    <div class="dp-outer">
+      <div class="dp-wrap" id="dpWrap">
+        <div class="dp-grid" id="dpGrid"></div>
+        <svg class="dp-overlay" id="dpOverlay" width="1" height="1"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(k·n²)</div>
+      <div class="cx-sub">k txns × n days × n buy days</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(k·n)</div>
+      <div class="cx-sub">DP table</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Max Profit</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">dp[k][n-1]</div>
+    </div>
+  </div>
+
+  <!-- COMPARISON PANEL -->
+  <div class="cmp-panel" id="cmpPanel">
+    <div class="cmp-title" id="cmpTitle">Press RUN to start</div>
+    <div class="cmp-body" id="cmpBody"></div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-fill" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">maxProfit</span>(vector&lt;<span class="ck">int</span>&gt;&amp; p, <span class="ck">int</span> k){</span>
+<span class="code-line" id="cl-n">  <span class="ck">int</span> n=p.size();</span>
+<span class="code-line" id="cl-dp0">  <span class="cc">// dp[t][d] = max profit, t txns, day d</span></span>
+<span class="code-line" id="cl-dp1">  vvi dp(k+<span class="cn">1</span>,vector&lt;<span class="ck">int</span>&gt;(n,<span class="cn">0</span>));</span>
+<span class="code-line" id="cl-t">  <span class="ck">for</span>(<span class="ck">int</span> t=<span class="cn">1</span>;t&lt;=k;t++){</span>
+<span class="code-line" id="cl-d">   <span class="ck">for</span>(<span class="ck">int</span> d=<span class="cn">1</span>;d&lt;n;d++){</span>
+<span class="code-line" id="cl-nd">    dp[t][d]=dp[t][d-<span class="cn">1</span>]; <span class="cc">// no txn today</span></span>
+<span class="code-line" id="cl-b">    <span class="ck">for</span>(<span class="ck">int</span> b=<span class="cn">0</span>;b&lt;d;b++){</span>
+<span class="code-line" id="cl-cand">     <span class="ck">int</span> c=p[d]-p[b]+dp[t-<span class="cn">1</span>][b];</span>
+<span class="code-line" id="cl-max">     dp[t][d]=max(dp[t][d],c);}}</span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> dp[k][n-<span class="cn">1</span>]; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(k·n²)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; vvi;
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">solve</span>(vector&lt;<span style="color:#c084fc">int</span>&gt;&amp; p,<span style="color:#c084fc">int</span> k){
+  <span style="color:#c084fc">int</span> n=p.size();
+  vvi dp(k+<span style="color:#fda4af">1</span>,vector&lt;<span style="color:#c084fc">int</span>&gt;(n,<span style="color:#fda4af">0</span>));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> t=<span style="color:#fda4af">1</span>;t&lt;=k;t++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> d=<span style="color:#fda4af">1</span>;d&lt;n;d++){
+      dp[t][d]=dp[t][d-<span style="color:#fda4af">1</span>];          <span style="color:#374151;font-style:italic">// skip: no new txn on day d</span>
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> b=<span style="color:#fda4af">0</span>;b&lt;d;b++)
+        dp[t][d]=max(dp[t][d],      <span style="color:#374151;font-style:italic">// sell on d, buy on b</span>
+          p[d]-p[b]+dp[t-<span style="color:#fda4af">1</span>][b]);   <span style="color:#374151;font-style:italic">// + best (t-1) txns before b</span>
+    }
+  <span style="color:#c084fc">return</span> dp[k][n-<span style="color:#fda4af">1</span>];
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>);
+  cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n,k; cin&gt;&gt;n&gt;&gt;k;
+  vector&lt;<span style="color:#c084fc">int</span>&gt; p(n);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:p) cin&gt;&gt;x;
+  cout&lt;&lt;<span style="color:#67e8f9">solve</span>(p,k)&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">#pragma O3+AVX2</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">3 nested loops</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">dp&#91;t-1&#93;&#91;b&#93; reuse</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">answer dp&#91;k&#93;&#91;n-1&#93;</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcT"><div class="var-name">transaction t</div><div class="var-value" id="vT" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcD"><div class="var-name">sell day d</div>  <div class="var-value" id="vD" style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcB"><div class="var-name">buy day b</div>   <div class="var-value" id="vB" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcPD"><div class="var-name">price[d]</div>   <div class="var-value" id="vPD" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcPB"><div class="var-name">price[b]</div>   <div class="var-value" id="vPB" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcC"><div class="var-name">candidate</div>   <div class="var-value" id="vC" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcDP" style="grid-column:1/3"><div class="var-name">dp[t][d] best so far</div><div class="var-value" id="vDP" style="font-size:1.1rem;color:var(--accent4)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Maximum Profit</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MAX PROFIT FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {n,k,t,d,b,pd,pb,cand,dpTD,prices} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">dp[t][d] = max profit using at most t transactions, where day d is the last day considered. For each (t,d), we either make no new transaction on day d (dp[t][d-1]), or we sell on day d and buy on some earlier day b (prices[d]-prices[b]+dp[t-1][b]).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[t][d]</strong> = best profit using ≤ t transactions across days 0..d. Base: dp[0][d]=0 (no transactions=no profit). dp[t][0]=0 (one day=no sell).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Recurrence:</strong> dp[t][d] = max(dp[t][d-1], max over b<d of (prices[d]-prices[b]+dp[t-1][b])). The inner max tries all possible buy days.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Key insight:</strong> dp[t-1][b] = best profit from t-1 transactions on days 0..b. Selling on day d after buying on day b completes transaction t.`},
+    ]
+  };
+  if(type==='fill') return {
+    why:`<div class="ep-why-block why-fill">Sell on day <strong>${d}</strong> (price ${pd}), bought on day <strong>${b}</strong> (price ${pb}): profit = ${pd}-${pb} = ${pd-pb}. Plus best ${t-1} transactions before day ${b}: dp[${t-1}][${b}]=${cand-(pd-pb)}. Total = <strong>${cand}</strong>. ${cand>dpTD?'New best!':'Not better than '+dpTD+'.'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[${t}][${d}]=${dpTD}</strong> — best profit with ≤${t} transactions through day ${d}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why dp[t-1][b]?</strong> Buying on day b starts transaction t. Everything before day b used t-1 transactions. dp[t-1][b] carries the optimal pre-buy profit forward.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">dp[${k}][${n-1}] = <strong>${dpTD}</strong>. That's the maximum profit from ≤${k} transactions over all ${n} days. Time O(k·n²), Space O(k·n).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${dpTD}</strong>. dp[k][n-1] considers all possible final sell days with all k transactions.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Optimisation:</strong> The inner loop can be replaced with a running max of (dp[t-1][b]-prices[b]), reducing time to O(k·n).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Edge cases:</strong> If k ≥ n/2, we can make unlimited transactions — just sum every positive daily gain.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:{ids:['cl-sig','cl-n','cl-dp0','cl-dp1','cl-t','cl-d'],cls:'hl-init'},
+  fill:{ids:['cl-nd','cl-b','cl-cand','cl-max'],cls:'hl-fill'},
+  done:{ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,t,d,b,pd,pb,cand,dpTD,isWin,n,k,prices} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have <strong>${n}</strong> days of prices and can make up to <strong>${k}</strong> buy-sell transactions. We'll build a table where each cell answers: "What's the most profit I can make using up to <em>t</em> transactions, if today is day <em>d</em>?"` };
+  if(type==='fill'){
+    const profit=pd-pb;
+    const prev=cand-profit;
+    if(b===0 && d===1)
+      return {color:'var(--accent2)',
+        text:`Transaction ${t}, day ${d}: if we skip making a new transaction today, we carry forward dp[${t}][${d-1}]=${st.dp[t][d-1]}. Now we try each possible buy day b to see if selling today does better.`};
+    if(isWin) return {color:'var(--accent3)',
+      text:`📈 Buy on day <strong>${b}</strong> at <strong>$${pb}</strong>, sell on day <strong>${d}</strong> at <strong>$${pd}</strong> → profit <strong>$${profit}</strong>. Plus best profit from ${t-1} earlier transactions: $${prev}. Total = <strong>$${cand}</strong>. New best for dp[${t}][${d}]!`};
+    return {color:'var(--accent2)',
+      text:`Try: buy day <strong>${b}</strong> ($${pb}) → sell day <strong>${d}</strong> ($${pd}). Profit $${profit} + $${prev} from earlier = $${cand}. Current best is $${dpTD} — no improvement.`};
+  }
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Maximum profit with ${k} transaction${k>1?'s':''} over ${n} days = <strong>$${dpTD}</strong>. Found in dp[${k}][${n-1}].`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(prices, k){
+  const n=prices.length;
+  const dp=Array.from({length:k+1},()=>new Array(n).fill(0));
+  const steps=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,k,prices,
+    dp:dp.map(r=>[...r]),
+    result:null,...extra,
+    explain:makeExplain(type,{n,k,prices,...extra})
+  });
+
+  snap('init',`📈 <strong>Start.</strong> ${n} days, k=${k} transactions. dp[${k+1}][${n}] all zeros. dp[t][d] = max profit with ≤t transactions through day d.`,
+    {t:0,d:0,b:null,dpTD:0});
+
+  for(let t=1;t<=k;t++){
+    for(let d=1;d<n;d++){
+      dp[t][d]=dp[t][d-1]; // no transaction
+      for(let b=0;b<d;b++){
+        const pd=prices[d], pb=prices[b];
+        const cand=pd-pb+dp[t-1][b];
+        const isWin=cand>dp[t][d];
+        if(isWin) dp[t][d]=cand;
+        snap('fill',
+          isWin
+            ? `✅ t=${t},d=${d},b=${b}: sell $${pd}-buy $${pb}+dp[${t-1}][${b}]=${dp[t-1][b]}=<strong>${cand}</strong> → <span style="color:var(--accent3)">NEW BEST</span> dp[${t}][${d}]=${dp[t][d]}`
+            : `  t=${t},d=${d},b=${b}: $${pd}-$${pb}+dp[${t-1}][${b}]=${dp[t-1][b]}=${cand} ≤ ${dp[t][d]}`,
+          {t,d,b,pd,pb,cand,dpTD:dp[t][d],isWin}
+        );
+      }
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Max profit = <strong>${dp[k][n-1]}</strong> with ${k} transaction${k>1?'s':''}.`,
+    {t:k,d:n-1,b:null,dpTD:dp[k][n-1],result:{profit:dp[k][n-1]}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=600;
+let prices=[], K=2, N=0;
+const CW=50, CH=38;
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── CHART ────────────────────────────────────────────────────────────────────
+function drawChart(prices, curD, curB, isFinal, finalDp){
+  const canvas=document.getElementById('stockChart');
+  const W=canvas.parentElement.clientWidth-28||400;
+  canvas.width=W; canvas.height=110;
+  const ctx=canvas.getContext('2d');
+  const n=prices.length;
+  const minP=Math.min(...prices), maxP=Math.max(...prices);
+  const pad={l:32,r:16,t:14,b:24};
+  const fw=W-pad.l-pad.r, fh=canvas.height-pad.t-pad.b;
+  const px=i=>pad.l+i*(fw/(n-1));
+  const py=v=>pad.t+fh-(v-minP)/(maxP-minP||1)*fh;
+
+  ctx.clearRect(0,0,W,canvas.height);
+
+  // grid lines
+  ctx.strokeStyle='rgba(212,204,184,0.5)'; ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(frac=>{
+    const y=pad.t+fh*frac;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    const v=Math.round(maxP-(maxP-minP)*frac);
+    ctx.fillStyle='#8a8070';ctx.font='9px Space Mono';ctx.textAlign='right';
+    ctx.fillText(v,pad.l-4,y+3);
+  });
+
+  // area fill under line
+  ctx.beginPath();ctx.moveTo(px(0),py(prices[0]));
+  prices.forEach((_,i)=>ctx.lineTo(px(i),py(prices[i])));
+  ctx.lineTo(px(n-1),pad.t+fh);ctx.lineTo(px(0),pad.t+fh);ctx.closePath();
+  ctx.fillStyle='rgba(33,150,243,0.06)';ctx.fill();
+
+  // price line
+  ctx.beginPath();ctx.moveTo(px(0),py(prices[0]));
+  prices.forEach((_,i)=>ctx.lineTo(px(i),py(prices[i])));
+  ctx.strokeStyle='rgba(33,150,243,0.7)';ctx.lineWidth=2;ctx.stroke();
+
+  // day labels
+  ctx.fillStyle='#8a8070';ctx.font='9px Space Mono';ctx.textAlign='center';
+  prices.forEach((_,i)=>ctx.fillText('d'+i,px(i),canvas.height-6));
+
+  // highlight current sell day
+  if(curD!=null&&curD>0){
+    ctx.beginPath();ctx.arc(px(curD),py(prices[curD]),5,0,Math.PI*2);
+    ctx.fillStyle='#ffd166';ctx.fill();
+    ctx.fillStyle='#3a2800';ctx.font='bold 9px Space Mono';ctx.textAlign='center';
+    ctx.fillText('$'+prices[curD],px(curD),py(prices[curD])-8);
+  }
+  // highlight current buy day
+  if(curB!=null){
+    ctx.beginPath();ctx.arc(px(curB),py(prices[curB]),5,0,Math.PI*2);
+    ctx.fillStyle='#06d6a0';ctx.fill();
+    ctx.fillStyle='#024d37';ctx.font='bold 9px Space Mono';ctx.textAlign='center';
+    ctx.fillText('$'+prices[curB],px(curB),py(prices[curB])-8);
+    // arrow between buy and sell
+    if(curD!=null&&curD>curB){
+      ctx.beginPath();ctx.moveTo(px(curB)+7,py(prices[curB]));
+      ctx.lineTo(px(curD)-7,py(prices[curD]));
+      ctx.strokeStyle='rgba(255,209,102,0.7)';ctx.lineWidth=1.5;
+      ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+    }
+  }
+}
+
+// ─── OVERLAY ──────────────────────────────────────────────────────────────────
+function drawOverlay(st){
+  const svg=document.getElementById('dpOverlay');
+  svg.innerHTML='';
+  if(!st||st.type!=='fill') return;
+  const {t,d,b,cand,dpTD,isWin} = st;
+  const W=(N+1)*CW, H=(K+2)*CH;
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+
+  // cell centres: col = d+1 (header offset), row = t+1 (header offset)
+  const cx=col=>(col+1)*CW+CW/2;
+  const cy=row=>(row+1)*CH+CH/2;
+
+  const color=isWin?'rgba(6,214,160,0.7)':'rgba(230,57,70,0.5)';
+  const headC=isWin?'rgba(6,214,160,0.9)':'rgba(230,57,70,0.7)';
+
+  // Curved arc from dp[t-1][b] → dp[t][d]
+  const x1=cx(b), y1=cy(t-1);
+  const x2=cx(d), y2=cy(t);
+  const mx=(x1+x2)/2, my=Math.min(y1,y2)-(Math.abs(x2-x1)*0.25+20);
+
+  const mid='mk_k';
+  if(!defs.querySelector('#'+mid)){
+    const mk=svgEl('marker',{id:mid,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+    mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:headC}));
+    defs.appendChild(mk);
+  }
+  svg.appendChild(svgEl('path',{
+    d:`M${x1},${y1} Q${mx},${my} ${x2},${y2}`,
+    fill:'none',stroke:color,'stroke-width':'2',
+    'stroke-dasharray':'5 3',
+    'marker-end':`url(#${mid})`
+  }));
+
+  // badge at arc peak
+  const bx=mx, by=my-8;
+  const lbl=`p[${d}]-p[${b}]+dp[${t-1}][${b}]=${cand}`;
+  const lw=lbl.length*5.0+10;
+  svg.appendChild(svgEl('rect',{x:bx-lw/2,y:by-7,width:lw,height:14,rx:4,
+    fill:isWin?'rgba(6,214,160,0.82)':'rgba(230,57,70,0.65)'}));
+  const txt=svgEl('text',{x:bx,y:by+1,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:'white','font-family':'Space Mono,monospace','font-size':'7.5','font-weight':'700'});
+  txt.textContent=lbl; svg.appendChild(txt);
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  prices=document.getElementById('inPrices').value.split(',').map(Number);
+  K=parseInt(document.getElementById('inK').value)||2;
+  N=prices.length;
+  steps=computeSteps(prices,K);
+  currentStep=0;
+
+  // DP grid
+  const dg=document.getElementById('dpGrid');
+  dg.style.gridTemplateColumns=`repeat(${N+1},${CW}px)`;
+  dg.innerHTML='';
+  // corner
+  dg.innerHTML+=`<div class="dp-hcell" style="background:transparent;border:none;"></div>`;
+  // day headers
+  for(let d=0;d<N;d++)
+    dg.innerHTML+=`<div class="dp-hcell">d${d}<br><span style="font-size:.5rem;color:#aaa">$${prices[d]}</span></div>`;
+  // rows
+  for(let t=0;t<=K;t++){
+    dg.innerHTML+=`<div class="dp-hcell hc-t">${t===0?'0 txn':t+'txn'}</div>`;
+    for(let d=0;d<N;d++)
+      dg.innerHTML+=`<div class="dp-cell dc-zero" id="dpc-${t}-${d}">0</div>`;
+  }
+
+  document.getElementById('dpOverlay').setAttribute('width',(N+1)*CW);
+  document.getElementById('dpOverlay').setAttribute('height',(K+2)*CH);
+
+  drawChart(prices,null,null,false,null);
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // DP cells
+  for(let t=0;t<=K;t++)
+    for(let d=0;d<N;d++){
+      const el=document.getElementById(`dpc-${t}-${d}`);
+      if(!el)continue;
+      const val=st.dp[t][d];
+      el.textContent=val;
+      const isCur=st.type==='fill'&&st.t===t&&st.d===d;
+      const isPrev=st.type==='fill'&&st.t===t-1&&st.b!=null&&d===st.b;
+      const isBest=isFinal&&t===K&&d===N-1;
+      if(isBest)      el.className='dp-cell dc-best';
+      else if(isCur)  el.className='dp-cell dc-cur';
+      else if(isPrev&&val>0) el.className='dp-cell dc-prev';
+      else if(val>0)  el.className='dp-cell dc-filled';
+      else            el.className='dp-cell dc-zero';
+    }
+
+  // Stock chart
+  drawChart(prices, st.d, st.b, isFinal, st.dp);
+
+  // Narrative
+  const narr=getNarrative(st);
+  const nb=document.getElementById('narrativeBar');
+  if(nb){nb.style.borderLeftColor=narr.color;}
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Comparison panel
+  const cp=document.getElementById('cmpPanel');
+  cp.className='cmp-panel'+(st.type==='fill'?' cp-fill':st.type==='done'?' cp-done':'');
+  document.getElementById('cmpTitle').textContent=
+    st.type==='fill'?`Transaction ${st.t}, sell day ${st.d} — trying buy day ${st.b}`:
+    st.type==='done'?'Complete — answer is dp[k][n-1]':'Initialising...';
+  const cb=document.getElementById('cmpBody');
+  if(st.type==='fill'&&st.b!=null){
+    const noTxn=st.dp[st.t][st.d-1]??0;
+    cb.innerHTML=`
+      <div class="cmp-box ${!st.isWin&&st.cand<=noTxn?'cb-win':'cb-lose'}">
+        <div class="cb-lbl">skip (no txn)</div>
+        <div class="cb-val">${noTxn}</div>
+        <div class="cb-sub">dp[${st.t}][${st.d-1}]</div>
+      </div>
+      <span class="cmp-op">vs</span>
+      <div class="cmp-box ${st.isWin?'cb-win':'cb-lose'}">
+        <div class="cb-lbl">sell d${st.d}, buy b${st.b}</div>
+        <div class="cb-val">${st.pd}-${st.pb}+${st.dp[st.t-1]?.[st.b]??0}=${st.cand}</div>
+        <div class="cb-sub">${st.isWin?'✅ new best':''}</div>
+      </div>
+      <span class="cmp-op">=</span>
+      <div class="cmp-result">
+        <div class="cb-lbl">dp[${st.t}][${st.d}]</div>
+        <div class="cb-val">${st.dpTD}</div>
+      </div>`;
+  } else { cb.innerHTML=''; }
+
+  // Vars
+  setVar('vT','vcT',st.t!=null?st.t:'—');
+  setVar('vD','vcD',st.d!=null?st.d:'—');
+  setVar('vB','vcB',st.b!=null?st.b:'—');
+  setVar('vPD','vcPD',st.pd!=null?'$'+st.pd:'—');
+  setVar('vPB','vcPB',st.pb!=null?'$'+st.pb:'—');
+  setVar('vC','vcC',st.cand!=null?st.cand:'—');
+  setVar('vDP','vcDP',st.dpTD!=null?st.dpTD:'—');
+
+  // 3-tab
+  updateExplain(st); highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MAX PROFIT = $${st.result.profit}`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent='$'+st.result.profit;
+    document.getElementById('bestMeta').textContent=`dp[${K}][${N-1}] · ${K} transaction${K>1?'s':''} · O(k·n²)`;
+    document.getElementById('cxAns').textContent='$'+st.result.profit;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+  drawOverlay(st);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  ep.className='explain-panel '+(st.type==='done'?'ep-done':'ep-fill');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
