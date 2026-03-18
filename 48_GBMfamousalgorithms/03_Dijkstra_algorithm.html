@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dijkstra's Algorithm — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input,.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.75rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input{width:80px;}
+.field textarea{width:360px;min-height:72px;resize:vertical;font-size:.72rem;}
+.field input:focus,.field textarea:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* GRAPH CANVAS */
+.graph-section{margin-bottom:14px;}
+.graph-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;}
+#graphCanvas{display:block;border-radius:6px;background:#fdfaf4;}
+
+/* DISTANCES ROW */
+.dist-section{margin-bottom:14px;}
+.dist-row{display:flex;gap:4px;flex-wrap:wrap;}
+.dcell{
+  min-width:52px;height:52px;border-radius:7px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);color:var(--muted);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dcell .dv{font-size:.88rem;}
+.dcell .di{font-size:.48rem;color:var(--muted);margin-top:1px;}
+.dcell.dc-inf    {color:#ccc;}
+.dcell.dc-filled {background:rgba(33,150,243,.1);border-color:rgba(33,150,243,.35);color:var(--accent2);}
+.dcell.dc-cur    {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  color:#7a4800!important;transform:scale(1.12) translateY(-4px);
+  box-shadow:0 6px 18px rgba(245,166,35,.45);animation:dcpulse .8s ease infinite alternate;z-index:4;}
+@keyframes dcpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.dcell.dc-updated{background:rgba(6,214,160,.15)!important;border-color:var(--accent3)!important;border-width:2px!important;color:#024d37!important;animation:dupdated .5s ease;}
+@keyframes dupdated{from{transform:scale(1.15) translateY(-4px);}to{transform:scale(1) translateY(0);}}
+.dcell.dc-done   {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;
+  box-shadow:0 3px 10px rgba(6,214,160,.2);}
+.dcell.dc-unreachable{color:#e5786d;font-size:.7rem;}
+
+/* PRIORITY QUEUE */
+.pq-section{margin-bottom:14px;}
+.pq-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;min-height:54px;}
+.pq-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.pq-item{
+  padding:5px 12px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;flex-shrink:0;
+}
+.pq-item.pqi-head{background:rgba(255,209,102,.18);border-color:var(--accent4);color:#7a4800;
+  transform:scale(1.06) translateY(-2px);box-shadow:0 4px 10px rgba(255,209,102,.3);}
+.pq-item.pqi-done{background:rgba(6,214,160,.1);border-color:rgba(6,214,160,.3);color:#028a5b;}
+.pq-empty{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);}
+
+/* RELAXATION PANEL */
+.relax-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.relax-panel.rp-visit {border-color:var(--accent4);}
+.relax-panel.rp-better{border-color:var(--accent3);}
+.relax-panel.rp-worse {border-color:var(--border);}
+.rp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.rp-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.rp-box{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.rp-box.rb-win{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.07);}
+.rp-box.rb-lose{opacity:.5;}
+.rb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.rb-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.rb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.rp-op{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--muted);flex-shrink:0;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-visit{border-color:var(--accent4);}
+.explain-panel.ep-relax{border-color:var(--accent2);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-visit{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-relax{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*13+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-visit{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-relax{background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.dist-log{margin-bottom:12px;}
+.dl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.dl-rows{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;}
+.dl-rows::-webkit-scrollbar{width:3px;}.dl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.dl-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;}
+.dl-row.dl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.dl-row.dl-upd{border-color:rgba(6,214,160,.4);background:rgba(6,214,160,.06);}
+.dl-node{color:#ffd166;width:44px;flex-shrink:0;}
+.dl-dist{color:var(--accent3);font-weight:700;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);line-height:1.8;word-break:break-all;}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Dijkstra's Algorithm</h1>
+    <div class="sub">Shortest Paths · Min-Heap Priority Queue · O((V+E) log V)</div>
+  </div>
+  <div class="family-badge">Graph · Greedy</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Start vertex</label>
+      <input type="number" id="inStart" value="0" min="0">
+    </div>
+    <div class="field">
+      <label>Edges (adjacency list — rows by |, each edge as dst,wt)</label>
+      <textarea id="inEdges">1,7|2,6;3,20;4,3|3,14|4,2||</textarea>
+      <div class="hint">Row i = vertex i's outgoing edges. Separate edges with ; and edge fields with comma. Empty row = no edges.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1600">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="350">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- GRAPH -->
+  <div class="graph-section">
+    <div class="section-label">Graph — gold=current · green=finalized · blue=in queue · grey=unvisited</div>
+    <div class="graph-outer">
+      <canvas id="graphCanvas" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- DISTANCES -->
+  <div class="dist-section">
+    <div class="section-label">dist[] — shortest distance from start to each vertex</div>
+    <div class="dist-row" id="distRow"></div>
+  </div>
+
+  <!-- PRIORITY QUEUE -->
+  <div class="pq-section">
+    <div class="section-label">Priority Queue — sorted by distance · gold = next to process</div>
+    <div class="pq-outer"><div class="pq-row" id="pqRow"><span class="pq-empty">will fill on start</span></div></div>
+  </div>
+
+  <!-- RELAXATION PANEL -->
+  <div class="relax-panel" id="relaxPanel">
+    <div class="rp-title" id="rpTitle">Edge relaxation happens here each step</div>
+    <div class="rp-body" id="rpBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">press RUN to begin</span></div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O((V+E)logV)</div>
+      <div class="cx-sub">with min-heap</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(V+E)</div>
+      <div class="cx-sub">graph + heap + dist</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Vertices</div>
+      <div class="cx-val" id="cxV" style="color:#7a5a00">—</div>
+      <div class="cx-sub">this run</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Edges</div>
+      <div class="cx-val" id="cxE" style="color:#028a5b">—</div>
+      <div class="cx-sub">this run</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-visit" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Dijkstra Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">vector&lt;<span class="ck">int</span>&gt; <span class="cf">dijkstra</span>(</span>
+<span class="code-line" id="cl-sg2">  <span class="ck">int</span> start, vvii&amp; edges){</span>
+<span class="code-line" id="cl-n">  <span class="ck">int</span> n=edges.size();</span>
+<span class="code-line" id="cl-dist">  vector&lt;<span class="ck">int</span>&gt; dist(n,INT_MAX); <span class="cc">// ∞</span></span>
+<span class="code-line" id="cl-ds">  dist[start]=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-pq">  priority_queue&lt;pii,</span>
+<span class="code-line" id="cl-pq2">   vector&lt;pii&gt;,greater&lt;pii&gt;&gt; pq;</span>
+<span class="code-line" id="cl-push">  pq.push({<span class="cn">0</span>,start});</span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span>(!pq.empty()){</span>
+<span class="code-line" id="cl-pop">   <span class="ck">auto</span> [d,u]=pq.top(); pq.pop();</span>
+<span class="code-line" id="cl-skip">   <span class="ck">if</span>(d&gt;dist[u]) <span class="ck">continue</span>; <span class="cc">// stale</span></span>
+<span class="code-line" id="cl-for">   <span class="ck">for</span>(<span class="ck">auto</span> [v,w]:edges[u]){</span>
+<span class="code-line" id="cl-newdist">    <span class="ck">int</span> nd=dist[u]+w;</span>
+<span class="code-line" id="cl-if">    <span class="ck">if</span>(nd&lt;dist[v]){</span>
+<span class="code-line" id="cl-upd">     dist[v]=nd; pq.push({nd,v});}}</span>
+<span class="code-line" id="cl-fin">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">for</span>(<span class="ck">auto</span>&amp; x:dist)</span>
+<span class="code-line" id="cl-ret2">   <span class="ck">if</span>(x==INT_MAX) x=-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-ret3">  <span class="ck">return</span> dist; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O((V+E)logV)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt; pii;
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;pii&gt;&gt; vvii;
+
+vector&lt;<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">dijkstra</span>(<span style="color:#c084fc">int</span> s, vvii&amp; g){
+  <span style="color:#c084fc">int</span> n=g.size();
+  vector&lt;<span style="color:#c084fc">int</span>&gt; d(n,INT_MAX);
+  d[s]=<span style="color:#fda4af">0</span>;
+  priority_queue&lt;pii,vector&lt;pii&gt;,greater&lt;pii&gt;&gt; pq;
+  pq.push({<span style="color:#fda4af">0</span>,s});                       <span style="color:#374151;font-style:italic">// {dist, node} — dist first for ordering</span>
+  <span style="color:#c084fc">while</span>(!pq.empty()){
+    <span style="color:#c084fc">auto</span> [dist,u]=pq.top(); pq.pop();  <span style="color:#374151;font-style:italic">// structured binding (C++17)</span>
+    <span style="color:#c084fc">if</span>(dist&gt;d[u]) <span style="color:#c084fc">continue</span>;            <span style="color:#374151;font-style:italic">// stale entry — skip</span>
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span> [v,w]:g[u])
+      <span style="color:#c084fc">if</span>(d[u]+w&lt;d[v])
+        d[v]=d[u]+w, pq.push({d[v],v});
+  }
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:d) <span style="color:#c084fc">if</span>(x==INT_MAX) x=-<span style="color:#fda4af">1</span>; <span style="color:#374151;font-style:italic">// unreachable = -1</span>
+  <span style="color:#c084fc">return</span> d;
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n,s; cin&gt;&gt;n&gt;&gt;s;
+  vvii g(n);
+  <span style="color:#c084fc">int</span> u,v,w;
+  <span style="color:#c084fc">while</span>(cin&gt;&gt;u&gt;&gt;v&gt;&gt;w) g[u].push_back({v,w});
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> x:<span style="color:#67e8f9">dijkstra</span>(s,g)) cout&lt;&lt;x&lt;&lt;<span style="color:#fda4af">' '</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">structured bindings</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">stale-skip trick</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">min-heap {d,v}</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">INT_MAX→-1</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcU">    <div class="var-name">current u</div>    <div class="var-value" id="vU"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcDistU"><div class="var-name">dist[u]</div>       <div class="var-value" id="vDistU" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcV">    <div class="var-name">neighbour v</div>  <div class="var-value" id="vV"    style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcW">    <div class="var-name">edge weight</div>  <div class="var-value" id="vW"    style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcNd">   <div class="var-name">dist[u]+w</div>    <div class="var-value" id="vNd"   style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcDistV"><div class="var-name">dist[v] (old)</div><div class="var-value" id="vDistV" style="color:#e2e8f0">—</div></div>
+    </div>
+
+    <div class="dist-log">
+      <div class="dl-title">Distance Update Log</div>
+      <div class="dl-rows" id="dlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Final Distances</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ ALL SHORTEST PATHS FOUND</div>
+</div>
+</div>
+
+<script>
+const INF=1e9;
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {n,u,v,w,nd,distU,distV,isBetter,start} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Dijkstra's key insight: always process the unvisited vertex with the smallest known distance first (greedy). Because all edge weights are non-negative, this vertex's distance is final — no future path can be shorter. Use a min-heap (priority queue) to efficiently find the minimum.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dist[v]</strong> = shortest known distance from start to v. Initially ∞ for all, 0 for start. Once a vertex is popped from the heap, its distance is final.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Relaxation:</strong> for each edge (u,v,w): if dist[u]+w < dist[v], update dist[v] and push (dist[v],v) into the heap. Old stale entries are skipped when popped.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why greedy works:</strong> with non-negative weights, the shortest path to u cannot go through any vertex with a larger distance than u. So when we pop u, it's finalized.`},
+    ]
+  };
+  if(type==='visit') return {
+    why:`<div class="ep-why-block why-visit">Popped vertex <strong>${u}</strong> from the heap with distance <strong>${distU}</strong>. This distance is now <strong>final</strong> — no other path can be shorter (all edges are non-negative). Now relax all edges from ${u}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dist[${u}]=${distU}</strong> is finalized. Vertex ${u} is marked as visited.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Stale-skip trick:</strong> if a vertex appears multiple times in the heap with different distances, we check if dist==dist[u] before processing. Old entries are stale and skipped.`},
+    ]
+  };
+  if(type==='relax') return {
+    why: isBetter
+      ? `<div class="ep-why-block why-relax">Edge (${u}→${v}, weight ${w}): dist[${u}](${distU}) + ${w} = <strong>${nd}</strong> &lt; dist[${v}](${distV===INF?'∞':distV}) → <strong>UPDATE!</strong> Push (${nd}, ${v}) to heap.</div>`
+      : `<div class="ep-why-block why-relax">Edge (${u}→${v}, weight ${w}): dist[${u}](${distU}) + ${w} = ${nd} ≥ dist[${v}](${distV===INF?'∞':distV}) → no improvement. Skip.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dist[${v}]=${nd<distV?nd:(distV===INF?'∞':distV)}</strong>${isBetter?' (just updated)':' (unchanged)'}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why only push on improvement?</strong> Pushing regardless would add stale entries — but the stale-skip check at pop time handles them. Standard competitive programming trick.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Heap is empty — all reachable vertices have been finalized. Unreachable vertices keep dist=∞, reported as -1. Time O((V+E)logV), Space O(V+E).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>All shortest paths computed</strong> from vertex ${start}. Unreachable = -1.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Limitation:</strong> Dijkstra's fails with negative edge weights. Use Bellman-Ford (O(VE)) for negative weights.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Optimisation:</strong> with a Fibonacci heap, time reduces to O(V logV + E). In practice, binary heap (priority_queue) is fast enough for CP.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-sg2','cl-n','cl-dist','cl-ds','cl-pq','cl-pq2','cl-push'],cls:'hl-visit'},
+  visit:{ids:['cl-loop','cl-pop','cl-skip'],cls:'hl-visit'},
+  relax:{ids:['cl-for','cl-newdist','cl-if','cl-upd'],cls:'hl-relax'},
+  done: {ids:['cl-ret','cl-ret2','cl-ret3'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,u,v,w,nd,distU,distV,isBetter,n,start,dist} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Starting from vertex <strong>${start}</strong>. Every vertex starts with distance ∞ except vertex ${start} which is 0. We'll always visit the closest unvisited vertex first, then update its neighbours' distances.`};
+  if(type==='visit') return {color:'var(--accent4)',
+    text:`📍 Visiting vertex <strong>${u}</strong> (distance <strong>${distU}</strong> from start). This is final — no shortcut exists. Now checking all roads leaving vertex ${u}...`};
+  if(type==='relax'){
+    if(isBetter) return {color:'var(--accent3)',
+      text:`🛣️ Road from ${u}→${v} (weight ${w}): currently ${distV===INF?'∞':distV} to reach ${v}, but going through ${u} costs only <strong>${nd}</strong>. Found a shorter path! Update distance to ${v}.`};
+    return {color:'var(--muted)',
+      text:`Road from ${u}→${v} (weight ${w}): costs ${nd} via ${u}, but we already know a way to reach ${v} in ${distV}. No improvement — skip.`};
+  }
+  if(type==='done'){
+    const final=dist.map((d,i)=>d===INF?-1:d);
+    return {color:'var(--accent3)',
+      text:`✅ Done! Shortest distances from vertex ${start}: [${final.join(', ')}]. Vertices showing -1 are unreachable from the start.`};
+  }
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(start, edges){
+  const n=edges.length;
+  const dist=new Array(n).fill(INF);
+  dist[start]=0;
+  const visited=new Array(n).fill(false);
+  // min-heap sim: array of [d, node], sorted
+  let heap=[[0,start]];
+  const steps=[];
+  const distLog=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,start,edges,
+    dist:[...dist],visited:[...visited],
+    heap:heap.map(x=>[...x]),
+    distLog:[...distLog],
+    result:null,...extra,
+    explain:makeExplain(type,{n,start,...extra,dist})
+  });
+
+  const heapPush=(d,v)=>{
+    heap.push([d,v]);
+    heap.sort((a,b)=>a[0]-b[0]);
+  };
+
+  snap('init',`🚀 <strong>Start.</strong> ${n} vertices. dist[${start}]=0, all others=∞. Push (0,${start}) to min-heap.`,
+    {u:start,distU:0,v:null,w:null});
+
+  while(heap.length>0){
+    const [d,u]=heap.shift();
+    if(d>dist[u]) continue; // stale
+    visited[u]=true;
+
+    snap('visit',
+      `📍 Pop vertex <strong>${u}</strong> (dist=${d}) from heap. ${d>dist[u]?'STALE skip.':'Finalized! Relax all edges.'}`,
+      {u,distU:dist[u],v:null,w:null}
+    );
+
+    for(const [v,w] of edges[u]){
+      const nd=dist[u]+w;
+      const isBetter=nd<dist[v];
+      const oldDistV=dist[v];
+      if(isBetter){
+        dist[v]=nd;
+        heapPush(nd,v);
+        distLog.push({u,v,w,nd,oldDistV});
+      }
+      snap('relax',
+        isBetter
+          ? `✅ Edge (${u}→${v}, w=${w}): ${dist[u]}+${w}=${nd} < ${oldDistV===INF?'∞':oldDistV} → <strong>dist[${v}]=${nd}</strong>`
+          : `  Edge (${u}→${v}, w=${w}): ${dist[u]}+${w}=${nd} ≥ ${oldDistV===INF?'∞':oldDistV} — no update`,
+        {u,v,w,nd,distU:dist[u],distV:oldDistV,isBetter}
+      );
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Shortest paths: [${dist.map(d=>d===INF?-1:d).join(', ')}]`,
+    {u:null,v:null,w:null,result:{dist:[...dist].map(d=>d===INF?-1:d)}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let edges=[], startV=0, N=0;
+// computed node positions for graph canvas
+let nodePos=[];
+
+// ─── GRAPH CANVAS ─────────────────────────────────────────────────────────────
+function computeLayout(){
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2;
+  const r=Math.min(W,H)*0.35;
+  nodePos=[];
+  for(let i=0;i<N;i++){
+    const angle=(2*Math.PI*i/N)-Math.PI/2;
+    nodePos.push({x:cx+r*Math.cos(angle), y:cy+r*Math.sin(angle)});
+  }
+}
+
+function drawGraph(st){
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=220;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,220);
+
+  computeLayout();
+
+  const NRAD=20;
+  // current relaxation edge
+  const curU=st.u, curV=st.v;
+
+  // Draw edges
+  for(let u=0;u<N;u++){
+    for(const [v,w] of edges[u]){
+      const p1=nodePos[u], p2=nodePos[v];
+      const isCurEdge=u===curU&&v===curV;
+      const isVisitedEdge=st.visited[u]&&st.dist[v]<INF;
+
+      ctx.beginPath();
+      ctx.strokeStyle=isCurEdge?(st.isBetter?'rgba(6,214,160,0.9)':'rgba(230,57,70,0.7)'):
+        isVisitedEdge?'rgba(33,150,243,0.35)':'rgba(212,204,184,0.7)';
+      ctx.lineWidth=isCurEdge?2.5:1.5;
+      ctx.setLineDash(isCurEdge?[]:isVisitedEdge?[4,3]:[]);
+
+      // arrow with slight offset to avoid overlap
+      const dx=p2.x-p1.x, dy=p2.y-p1.y, len=Math.sqrt(dx*dx+dy*dy);
+      const ox=dx/len, oy=dy/len;
+      const sx=p1.x+ox*NRAD, sy=p1.y+oy*NRAD;
+      const ex=p2.x-ox*(NRAD+6), ey=p2.y-oy*(NRAD+6);
+
+      ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // arrowhead
+      const angle=Math.atan2(ey-sy,ex-sx);
+      ctx.beginPath();
+      ctx.fillStyle=isCurEdge?(st.isBetter?'rgba(6,214,160,0.9)':'rgba(230,57,70,0.7)'):'rgba(180,170,155,0.8)';
+      ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-10*Math.cos(angle-0.3),ey-10*Math.sin(angle-0.3));
+      ctx.lineTo(ex-10*Math.cos(angle+0.3),ey-10*Math.sin(angle+0.3));
+      ctx.closePath(); ctx.fill();
+
+      // edge weight label
+      const mx=(p1.x+p2.x)/2+(-oy)*12, my=(p1.y+p2.y)/2+(ox)*12;
+      ctx.fillStyle=isCurEdge?'#028a5b':'#8a8070';
+      ctx.font=`${isCurEdge?'bold ':''} 11px Space Mono`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(w,mx,my);
+    }
+  }
+
+  // Draw nodes
+  for(let i=0;i<N;i++){
+    const {x,y}=nodePos[i];
+    const isStart=i===startV;
+    const isCurNode=i===curU&&st.type==='visit';
+    const isRelaxSrc=i===curU&&st.type==='relax';
+    const isRelaxDst=i===curV&&st.type==='relax';
+    const isVisited=st.visited[i];
+    const inHeap=st.heap.some(([,v])=>v===i);
+    const isFinal=!!st.result;
+
+    // Node circle
+    let fill='#f5f0e8', stroke='#d4ccb8', lw=1.5;
+    if(isFinal&&st.dist[i]<INF)    {fill='#ccf5e5';stroke='#06d6a0';lw=2.5;}
+    else if(isCurNode)              {fill='#fff8c5';stroke='#f5a623';lw=3;}
+    else if(isRelaxSrc)             {fill='rgba(255,209,102,.3)';stroke='#f5a623';lw=2;}
+    else if(isRelaxDst&&st.isBetter){fill='rgba(6,214,160,.25)';stroke='#06d6a0';lw=2.5;}
+    else if(isRelaxDst)             {fill='rgba(230,57,70,.12)';stroke='#e63946';lw=1.5;}
+    else if(isVisited)              {fill='rgba(6,214,160,.18)';stroke='#06d6a0';lw=2;}
+    else if(inHeap)                 {fill='rgba(33,150,243,.12)';stroke='#2196f3';lw=1.5;}
+
+    ctx.beginPath();
+    ctx.arc(x,y,NRAD,0,Math.PI*2);
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
+
+    if(isStart){
+      ctx.beginPath(); ctx.arc(x,y,NRAD+4,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,209,102,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    // Node label
+    ctx.fillStyle='#1a1a2e';
+    ctx.font='bold 13px Space Mono';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(i,x,y);
+
+    // Distance label
+    const d=st.dist[i];
+    const dStr=d===INF?'∞':String(d);
+    ctx.fillStyle=isVisited?'#028a5b':inHeap?'#0d47a1':'#8a8070';
+    ctx.font='bold 10px Space Mono';
+    ctx.fillText(dStr,x,y+NRAD+10);
+  }
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  startV=parseInt(document.getElementById('inStart').value)||0;
+  const raw=document.getElementById('inEdges').value.trim();
+  edges=raw.split('|').map(row=>{
+    const r=row.trim();
+    if(!r) return [];
+    return r.split(';').map(e=>{
+      const p=e.trim().split(',');
+      return [parseInt(p[0]),parseInt(p[1])];
+    }).filter(([d,w])=>!isNaN(d)&&!isNaN(w));
+  });
+  N=edges.length;
+
+  // count edges
+  let totalEdges=0; edges.forEach(r=>totalEdges+=r.length);
+  document.getElementById('cxV').textContent=N;
+  document.getElementById('cxE').textContent=totalEdges;
+
+  steps=computeSteps(startV, edges);
+  currentStep=0;
+
+  // Distances row
+  const dr=document.getElementById('distRow');
+  dr.innerHTML='';
+  for(let i=0;i<N;i++)
+    dr.innerHTML+=`<div class="dcell dc-inf" id="dc-${i}">
+      <span class="dv" id="dv-${i}">${i===startV?0:'∞'}</span>
+      <span class="di">v${i}</span>
+    </div>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('dlRows').innerHTML='';
+  document.getElementById('pqRow').innerHTML='<span class="pq-empty">will fill on start</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Distance cells
+  for(let i=0;i<N;i++){
+    const el=document.getElementById(`dc-${i}`);
+    const vEl=document.getElementById(`dv-${i}`);
+    if(!el||!vEl)continue;
+    const d=st.dist[i];
+    const dStr=d===INF?'∞':String(d);
+    vEl.textContent=dStr;
+    const isCur=st.u===i&&st.type==='visit';
+    const isUpdate=st.type==='relax'&&st.v===i&&st.isBetter;
+    if(isFinal&&d<INF)   el.className='dcell dc-done';
+    else if(isFinal&&d===INF) el.className='dcell dc-unreachable';
+    else if(isCur)       el.className='dcell dc-cur';
+    else if(isUpdate)    el.className='dcell dc-updated';
+    else if(st.visited[i]) el.className='dcell dc-done';
+    else if(d<INF)       el.className='dcell dc-filled';
+    else                 el.className='dcell dc-inf';
+  }
+
+  // Priority Queue
+  const pqEl=document.getElementById('pqRow');
+  if(st.heap.length===0){
+    pqEl.innerHTML='<span class="pq-empty">empty — algorithm done</span>';
+  } else {
+    pqEl.innerHTML=st.heap.slice(0,8).map(([d,v],k)=>
+      `<div class="pq-item ${k===0?'pqi-head':''}">(${d}, v${v})</div>`
+    ).join('').concat(st.heap.length>8?`<span class="pq-empty">+${st.heap.length-8} more</span>`:'');
+  }
+
+  // Relaxation panel
+  const rp=document.getElementById('relaxPanel');
+  const rt=document.getElementById('rpTitle');
+  const rb=document.getElementById('rpBody');
+  if(st.type==='relax'&&st.v!=null){
+    rp.className='relax-panel'+(st.isBetter?' rp-better':' rp-worse');
+    rt.textContent=`Edge (${st.u}→${st.v}, weight ${st.w})`;
+    const mkBox=(lbl,val,sub,cls)=>
+      `<div class="rp-box ${cls}"><div class="rb-lbl">${lbl}</div><div class="rb-val">${val}</div><div class="rb-sub">${sub}</div></div>`;
+    rb.innerHTML=
+      mkBox(`dist[${st.u}]`,st.distU,'source dist','')+
+      '<span class="rp-op">+</span>'+
+      mkBox(`w`,st.w,'edge weight','')+
+      '<span class="rp-op">=</span>'+
+      mkBox(`new dist`,st.nd,st.isBetter?'✅ better':'not better',st.isBetter?'rp-box rb-win':'')+
+      '<span class="rp-op">vs</span>'+
+      mkBox(`dist[${st.v}]`,st.distV===INF?'∞':st.distV,'current',st.isBetter?'rp-box rb-lose':'rp-box rb-win');
+  } else if(st.type==='visit'){
+    rp.className='relax-panel rp-visit';
+    rt.textContent=`Visiting vertex ${st.u} — distance ${st.distU} is FINAL`;
+    rb.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.75rem;color:#7a5a00;font-weight:700">
+      Popped from heap · All edges from v${st.u} will be relaxed next</span>`;
+  } else {
+    rp.className='relax-panel';
+    rt.textContent='Edge relaxation happens here each step';
+    rb.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">press RUN to begin</span>';
+  }
+
+  // Dist log
+  const dl=document.getElementById('dlRows');
+  dl.innerHTML='';
+  [...(st.distLog||[])].reverse().slice(0,8).forEach((e,k)=>{
+    const isCurUpdate=st.type==='relax'&&st.isBetter&&e.v===st.v&&k===0;
+    dl.innerHTML+=`<div class="dl-row ${isCurUpdate?'dl-cur dl-upd':''}">
+      <span class="dl-node">v${e.u}→v${e.v}</span>
+      <span class="dl-dist">= ${e.nd}</span>
+      <span style="font-family:'Space Mono',monospace;font-size:.58rem;color:#6b7280;">(was ${e.oldDistV===INF?'∞':e.oldDistV})</span>
+    </div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vU','vcU',st.u!=null?`v${st.u}`:'—');
+  setVar('vDistU','vcDistU',st.distU!=null?(st.distU===INF?'∞':st.distU):'—');
+  setVar('vV','vcV',st.v!=null?`v${st.v}`:'—');
+  setVar('vW','vcW',st.w!=null?st.w:'—');
+  setVar('vNd','vcNd',st.nd!=null?st.nd:'—');
+  setVar('vDistV','vcDistV',st.distV!=null?(st.distV===INF?'∞':st.distV):'—');
+
+  // 3-tab
+  updateExplain(st);
+  const codeType=st.type==='relax'?'relax':st.type==='visit'?'visit':st.type==='done'?'done':'init';
+  highlightCode(codeType);
+
+  // Graph canvas
+  drawGraph(st);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ SHORTEST PATHS: [${st.result.dist.join(', ')}]`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`[${st.result.dist.join(', ')}]`;
+    document.getElementById('bestMeta').textContent=`from vertex ${startV} · -1 = unreachable`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-visit',visit:'ep-visit',relax:'ep-relax',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-visit');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

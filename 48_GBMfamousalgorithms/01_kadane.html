@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kadane's Algorithm — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.3rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;width:320px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ── ARRAY SECTION ─────────────────────────────────────────────── */
+.arr-section{margin-bottom:6px;}
+.arr-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px 14px;overflow-x:auto;}
+.arr-wrap{position:relative;display:inline-flex;flex-direction:column;gap:0;}
+.arr-svg{display:block;overflow:visible;pointer-events:none;}
+.arr-row{display:flex;gap:4px;}
+
+/* array tiles */
+.atile{
+  width:52px;height:52px;border-radius:7px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.atile .av{font-size:.92rem;}
+.atile .ai{font-size:.48rem;color:var(--muted);margin-top:1px;}
+
+.atile.at-cur   {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  color:#7a4800!important;transform:scale(1.12) translateY(-5px);
+  box-shadow:0 6px 18px rgba(245,166,35,.45);animation:tp .8s ease infinite alternate;z-index:5;}
+@keyframes tp{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.atile.at-window{background:rgba(33,150,243,.1);border-color:var(--accent2);border-width:1.5px;color:#0d47a1;}
+.atile.at-best  {background:rgba(6,214,160,.15);border-color:var(--accent3);border-width:2px;color:#024d37;}
+.atile.at-reset {background:rgba(230,57,70,.1);border-color:var(--accent);border-width:2px;color:#7a0000;
+  transform:scale(.95);opacity:.75;}
+.atile.at-both  {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;
+  box-shadow:0 4px 14px rgba(6,214,160,.35);}
+.atile.at-done  {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;color:#024d37;}
+
+/* ── BAR CHART ─────────────────────────────────────────────────── */
+.chart-section{margin-bottom:14px;}
+.chart-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;}
+
+/* ── DECISION PANEL ────────────────────────────────────────────── */
+.dec-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.dec-panel.dp-extend{border-color:var(--accent2);}
+.dec-panel.dp-reset {border-color:var(--accent);}
+.dec-panel.dp-update{border-color:var(--accent3);}
+.dec-panel.dp-done  {border-color:var(--accent3);}
+.dec-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+.dec-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.dec-box{flex:1;min-width:90px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.dec-box.db-win{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.07);}
+.dec-box.db-lose{opacity:.5;}
+.dec-box.db-red {border-color:var(--accent);background:rgba(230,57,70,.05);}
+.db-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.db-val{font-family:'Space Mono',monospace;font-size:1.15rem;font-weight:700;color:var(--ink);}
+.db-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.dec-op{font-family:'Space Mono',monospace;font-size:.9rem;color:var(--muted);flex-shrink:0;}
+
+/* ── PLAIN ENGLISH ─────────────────────────────────────────────── */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+
+/* complexity */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;}
+.cx-sub{font-size:.62rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-ext{border-color:var(--accent2);}
+.explain-panel.ep-rst{border-color:var(--accent);}
+.explain-panel.ep-upd{border-color:var(--accent3);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-ext{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-rst{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-upd{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*11+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-ext {background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-rst {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-upd {background:rgba(6,214,160,.16);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--bg);}
+
+/* subarray chips right panel */
+.sub-log{margin-bottom:12px;}
+.sub-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.sub-chips{display:flex;flex-wrap:wrap;gap:4px;max-height:72px;overflow-y:auto;}
+.sub-chip{padding:2px 7px;border-radius:4px;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;color:#4fc3f7;}
+.sub-chip.sc-best{background:rgba(6,214,160,.15);border-color:rgba(6,214,160,.4);color:var(--accent3);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Kadane's Algorithm</h1>
+    <div class="sub">Greedy · DP · Maximum Subarray Sum · O(n)</div>
+  </div>
+  <div class="family-badge">Greedy · DP</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Array  (comma separated)</label>
+      <input type="text" id="inArr" value="3,5,-9,1,3,-2,3,4,7,2,-9,6,3,1,-5,4">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="650">1×</button>
+        <button class="speed-btn" data-ms="300">2×</button>
+        <button class="speed-btn" data-ms="110">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- ARRAY + CHART -->
+  <div class="arr-section">
+    <div class="section-label">Array tiles + running sum bars — gold=current · blue=window · green=best</div>
+    <div class="arr-outer">
+      <div class="arr-wrap" id="arrWrap">
+        <!-- SVG arcs above tiles -->
+        <svg class="arr-svg" id="arrSvg" width="1" height="44"></svg>
+        <!-- tiles row -->
+        <div class="arr-row" id="arrRow"></div>
+        <!-- bar chart row (canvas) -->
+        <canvas id="barChart" height="80"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- DECISION PANEL -->
+  <div class="dec-panel" id="decPanel">
+    <div class="dec-title" id="decTitle">The decision Kadane makes at each step</div>
+    <div class="dec-body" id="decBody">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">press RUN to begin</span>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">single pass</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(1)</div>
+      <div class="cx-sub">just 4 variables</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">vs Brute</div><div class="cx-val" style="color:#028a5b">O(n²)</div>
+      <div class="cx-sub">all subarrays</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Max Sum</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">global best</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-ext" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">vector&lt;<span class="ck">int</span>&gt; <span class="cf">kadane</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a){</span>
+<span class="code-line" id="cl-ini">  <span class="ck">int</span> cur=a[<span class="cn">0</span>],best=a[<span class="cn">0</span>];</span>
+<span class="code-line" id="cl-in2">  <span class="ck">int</span> s=<span class="cn">0</span>,e=<span class="cn">0</span>,ts=<span class="cn">0</span>; <span class="cc">// best/temp start</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">1</span>;i&lt;a.size();i++){</span>
+<span class="code-line" id="cl-ext">   <span class="ck">if</span>(cur+a[i]&gt;a[i]){        <span class="cc">// extend</span></span>
+<span class="code-line" id="cl-ext2">    cur+=a[i];</span>
+<span class="code-line" id="cl-rst">   }<span class="ck">else</span>{                     <span class="cc">// reset</span></span>
+<span class="code-line" id="cl-rst2">    cur=a[i]; ts=i;}</span>
+<span class="code-line" id="cl-upd">   <span class="ck">if</span>(cur&gt;best){              <span class="cc">// new best?</span></span>
+<span class="code-line" id="cl-upd2">    best=cur; s=ts; e=i;}}</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> {a.begin()+s,</span>
+<span class="code-line" id="cl-ret2">          a.begin()+e+<span class="cn">1</span>}; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n) · O(1) space</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#cc">// Returns max sum only (O(1) space)</span>
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">kadaneSum</span>(vector&lt;<span style="color:#c084fc">int</span>&gt;&amp; a){
+  <span style="color:#c084fc">int</span> cur=a[<span style="color:#fda4af">0</span>], best=a[<span style="color:#fda4af">0</span>];
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;(int)a.size();i++){
+    cur=max(a[i],cur+a[i]);       <span style="color:#374151;font-style:italic">// extend or restart</span>
+    best=max(best,cur);
+  }
+  <span style="color:#c084fc">return</span> best;
+}
+
+<span style="color:#cc">// Returns actual subarray [s..e]</span>
+vector&lt;<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">kadane</span>(vector&lt;<span style="color:#c084fc">int</span>&gt;&amp; a){
+  <span style="color:#c084fc">int</span> cur=a[<span style="color:#fda4af">0</span>],best=a[<span style="color:#fda4af">0</span>],s=<span style="color:#fda4af">0</span>,e=<span style="color:#fda4af">0</span>,ts=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>;i&lt;(int)a.size();i++){
+    <span style="color:#c084fc">if</span>(cur+a[i]&gt;a[i]) cur+=a[i];   <span style="color:#374151;font-style:italic">// extend current window</span>
+    <span style="color:#c084fc">else</span>{cur=a[i];ts=i;}            <span style="color:#374151;font-style:italic">// restart from i</span>
+    <span style="color:#c084fc">if</span>(cur&gt;best){best=cur;s=ts;e=i;}
+  }
+  <span style="color:#c084fc">return</span> {a.begin()+s,a.begin()+e+<span style="color:#fda4af">1</span>};
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  vector&lt;<span style="color:#c084fc">int</span>&gt; a(n);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:a) cin&gt;&gt;x;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> x:<span style="color:#67e8f9">kadane</span>(a)) cout&lt;&lt;x&lt;&lt;<span style="color:#fda4af">' '</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">max(a[i],cur+a[i])</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">track ts,s,e</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">single pass</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">   <div class="var-name">index i</div>    <div class="var-value" id="vI"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcAI">  <div class="var-name">a[i]</div>       <div class="var-value" id="vAI"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcCur"> <div class="var-name">curSum</div>     <div class="var-value" id="vCur" style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcBest"><div class="var-name">bestSum</div>    <div class="var-value" id="vBest" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcTs">  <div class="var-name">tempStart</div> <div class="var-value" id="vTs"  style="color:var(--muted)">—</div></div>
+      <div class="var-card" id="vcSE">  <div class="var-name">best [s..e]</div><div class="var-value" id="vSE"  style="color:var(--accent3)">—</div></div>
+    </div>
+
+    <div class="sub-log">
+      <div class="sub-title">Subarray Log</div>
+      <div class="sub-chips" id="subChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Maximum Subarray Sum</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MAX SUM FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {i,ai,cur,best,ts,s,e,isNewBest,arr} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Kadane's key insight: at each position i, the best subarray ending at i is either just a[i] alone, or a[i] extended from the best subarray ending at i-1. We never need to look further back. This gives us O(n) in a single pass.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>curSum</strong> = max sum of any subarray ending at current index. <strong>bestSum</strong> = max curSum seen so far. Both initialised to a[0].`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Decision per step:</strong> if curSum + a[i] > a[i], extend (curSum was positive, worth keeping). Otherwise restart from a[i] (curSum was negative drag).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why this works:</strong> a negative curSum can only make the sum worse. Starting fresh from a[i] is always at least as good as dragging a negative prefix.`},
+    ]
+  };
+  if(type==='extend') return {
+    why:`<div class="ep-why-block why-ext">curSum(${cur-ai}) + a[${i}](${ai}) = ${cur} &gt; a[${i}](${ai}) alone → <strong>extend</strong>. The previous window had a positive sum, so including it helps. curSum is now ${cur}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>curSum=${cur}</strong> — best sum of any subarray ending at index ${i}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Extend condition:</strong> curSum_old + a[i] > a[i] is equivalent to curSum_old > 0. Any positive prefix is worth keeping.`},
+    ]
+  };
+  if(type==='reset') return {
+    why:`<div class="ep-why-block why-rst">curSum(${cur-ai}) + a[${i}](${ai}) = ${cur-ai+ai} ≤ a[${i}](${ai}) alone → <strong>restart</strong>. The previous window was a negative drag — drop it and start fresh from a[${i}]. tempStart = ${i}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>curSum=${cur}</strong> — fresh start at index ${i}. The old window is abandoned.`},
+      {icon:'🔑',cls:'inv-key',text:`<strong>Reset condition:</strong> previous curSum was ≤ 0. Carrying it would only hurt. Starting fresh is strictly better (or equal).`},
+    ]
+  };
+  if(type==='update') return {
+    why:`<div class="ep-why-block why-upd">curSum=${cur} &gt; bestSum=${best-(cur>best?0:cur)} → <strong>new global best!</strong> Update bestSum=${cur}, best window = [${ts}..${i}] = [${arr?.slice(ts,i+1).join(', ')}].</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>New best: ${cur}</strong> at window [${ts}..${i}].`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Tracking indices:</strong> tempStart records where the current window began. When bestSum updates, save tempStart→s and i→e.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Single pass complete. Maximum subarray sum = <strong>${best}</strong>, subarray [${s}..${e}] = [${arr?.slice(s,e+1).join(', ')}]. Time O(n), Space O(1).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${best}</strong>. Subarray indices [${s}..${e}].`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n) vs O(n²):</strong> brute force checks all n(n+1)/2 subarrays. Kadane's eliminates them all with the single "extend or reset" insight.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>All-negative arrays:</strong> Kadane's still works — bestSum is initialised to a[0] and the reset condition handles it correctly (returns the largest single element).`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-ini','cl-in2','cl-loop'],cls:'hl-ext'},
+  extend:{ids:['cl-ext','cl-ext2'],cls:'hl-ext'},
+  reset: {ids:['cl-rst','cl-rst2'],cls:'hl-rst'},
+  update:{ids:['cl-upd','cl-upd2'],cls:'hl-upd'},
+  done:  {ids:['cl-ret','cl-ret2'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,i,ai,cur,best,ts,s,e,arr} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We scan the array once from left to right. At each element we ask: <em>"Should I extend my current running window, or start fresh?"</em> We extend if the running total is positive (it helps), or restart if it's negative (it only drags us down).`};
+  if(type==='extend') return {color:'var(--accent2)',
+    text:`Index ${i}: adding <strong>${ai>=0?'+':''}${ai}</strong> to the running sum. Previous sum was positive, so it's worth keeping. Running sum: <strong>${cur}</strong>.`};
+  if(type==='reset') return {color:'var(--accent)',
+    text:`Index ${i}: value is <strong>${ai}</strong> but the running total was negative — it would only drag us down. <strong>Drop the old window</strong> and start fresh here. New running sum: <strong>${cur}</strong>.`};
+  if(type==='update') return {color:'var(--accent3)',
+    text:`📈 Running sum <strong>${cur}</strong> beats the previous best of ${best===cur?best-ai:best}! New global best = <strong>${cur}</strong>. Best subarray so far: [${arr?.slice(ts,i+1).join(', ')}].`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Maximum subarray sum = <strong>${best}</strong>. The subarray [${arr?.slice(s,e+1).join(', ')}] gives this sum. Found in one pass — O(n) time, O(1) space!`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const n=arr.length;
+  const steps=[];
+  let cur=arr[0], best=arr[0], ts=0, s=0, e=0;
+  const subLog=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,arr,n,cur,best,ts,s,e,
+    subLog:[...subLog],result:null,...extra,
+    explain:makeExplain(type,{arr,cur,best,ts,s,e,...extra})
+  });
+
+  snap('init',`🚀 <strong>Start.</strong> curSum=bestSum=a[0]=${arr[0]}. Scan from index 1.`,
+    {i:0,ai:arr[0]});
+
+  for(let i=1;i<n;i++){
+    const ai=arr[i];
+    const extendSum=cur+ai;
+    const doExtend=extendSum>ai;
+
+    if(doExtend){
+      cur=extendSum;
+      snap('extend',
+        `i=${i}(${ai>=0?'+':''}${ai}): ${cur-ai}+${ai}=${cur} > ${ai} → <span style="color:var(--accent2);font-weight:700">EXTEND</span>. curSum=${cur}`,
+        {i,ai,isNewBest:false});
+    } else {
+      cur=ai; ts=i;
+      snap('reset',
+        `i=${i}(${ai}): ${extendSum}≤${ai} → <span style="color:var(--accent);font-weight:700">RESET</span>. Start fresh. curSum=${cur}, tempStart=${i}`,
+        {i,ai,isNewBest:false});
+    }
+
+    if(cur>best){
+      best=cur; s=ts; e=i;
+      subLog.push({s,e,sum:best,vals:arr.slice(s,e+1)});
+      snap('update',
+        `⭐ curSum=${cur} &gt; bestSum → <span style="color:var(--accent3);font-weight:700">NEW BEST=${cur}</span>, window=[${s}..${e}]`,
+        {i,ai,isNewBest:true});
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Max sum = <strong>${best}</strong>. Subarray [${s}..${e}] = [${arr.slice(s,e+1).join(', ')}].`,
+    {i:n-1,ai:arr[n-1],isNewBest:false,
+     result:{sum:best,s,e,subarray:arr.slice(s,e+1)}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=650;
+let arr=[], n=0;
+const TW=56; // tile width+gap
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── BAR CHART ────────────────────────────────────────────────────────────────
+function drawBars(st){
+  const canvas=document.getElementById('barChart');
+  const W=n*TW; canvas.width=W; canvas.height=80;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,80);
+
+  // compute running sums history up to current step
+  const history=[];
+  let rCur=arr[0];
+  history.push(rCur);
+  for(let i=1;i<n;i++){
+    const ext=rCur+arr[i];
+    rCur=ext>arr[i]?ext:arr[i];
+    history.push(rCur);
+  }
+
+  const maxV=Math.max(...history,0);
+  const minV=Math.min(...history,0);
+  const range=maxV-minV||1;
+  const zero=Math.round(80*maxV/range);
+
+  // zero line
+  ctx.strokeStyle='rgba(212,204,184,0.7)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,zero);ctx.lineTo(W,zero);ctx.stroke();
+
+  // bars
+  for(let k=0;k<n;k++){
+    const v=history[k];
+    const barH=Math.abs(Math.round(80*v/range));
+    const y=v>=0?zero-barH:zero;
+    const isCur=st.i===k;
+    const inBest=k>=st.s&&k<=st.e;
+    const isFin=!!st.result;
+    ctx.fillStyle=isFin&&inBest?'rgba(6,214,160,0.7)':
+      isCur?'rgba(255,209,102,0.85)':
+      inBest?'rgba(33,150,243,0.45)':'rgba(33,150,243,0.25)';
+    ctx.beginPath();
+    ctx.roundRect?ctx.roundRect(k*TW+4,y,TW-8,barH||2,3):ctx.rect(k*TW+4,y,TW-8,barH||2);
+    ctx.fill();
+
+    // value label on bar
+    ctx.fillStyle=isCur?'#7a4800':inBest?'#0d47a1':'#8a8070';
+    ctx.font=`bold 9px Space Mono`;ctx.textAlign='center';
+    const lY=v>=0?y-3:y+barH+10;
+    if(k<n) ctx.fillText(v,k*TW+TW/2,Math.max(9,Math.min(76,lY)));
+  }
+}
+
+// ─── SVG ARC OVERLAY ──────────────────────────────────────────────────────────
+function drawArcOverlay(st){
+  const svg=document.getElementById('arrSvg');
+  svg.innerHTML='';
+  const W=n*TW; svg.setAttribute('width',W); svg.setAttribute('height',44);
+  if(st.type==='init'||st.i==null) return;
+
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+  const cx=k=>k*TW+TW/2;
+  const Y=40;
+
+  // arc from tempStart → i (current window span)
+  const spanL=st.ts, spanR=st.i;
+  if(spanR>spanL){
+    const x1=cx(spanL), x2=cx(spanR);
+    const arcH=Math.min(32,(x2-x1)*.3+8);
+    const mx=(x1+x2)/2, my=Y-arcH;
+    const col=st.type==='reset'?'rgba(230,57,70,0.55)':'rgba(33,150,243,0.55)';
+    const hcol=st.type==='reset'?'rgba(230,57,70,0.8)':'rgba(33,150,243,0.8)';
+    const mid='mk_k';
+    if(!defs.querySelector('#'+mid)){
+      const mk=svgEl('marker',{id:mid,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+      mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:hcol}));
+      defs.appendChild(mk);
+    }
+    svg.appendChild(svgEl('path',{
+      d:`M${x1},${Y} Q${mx},${my} ${x2},${Y}`,
+      fill:'none',stroke:col,'stroke-width':'2',
+      'stroke-dasharray': st.type==='reset'?'5 3':'none',
+      'marker-end':`url(#${mid})`
+    }));
+    // label at peak
+    const lbl=`sum=${st.cur}`;
+    const lw=lbl.length*5.2+10;
+    svg.appendChild(svgEl('rect',{x:mx-lw/2,y:my-16,width:lw,height:13,rx:3,
+      fill:st.type==='update'?'rgba(6,214,160,.82)':col.replace('.55','.82')}));
+    const t=svgEl('text',{x:mx,y:my-9,'text-anchor':'middle','dominant-baseline':'middle',
+      fill:'white','font-family':'Space Mono,monospace','font-size':'8','font-weight':'700'});
+    t.textContent=lbl; svg.appendChild(t);
+  }
+
+  // best window bracket (green, below the span arc) if different from current
+  if(st.s<st.e&&(st.s!==st.ts||st.e!==st.i)){
+    const bx1=cx(st.s), bx2=cx(st.e), by=Y-2;
+    svg.appendChild(svgEl('line',{x1:bx1,y1:by,x2:bx2,y2:by,
+      stroke:'rgba(6,214,160,0.5)','stroke-width':'2.5',
+      'stroke-dasharray':'4 2'}));
+    [bx1,bx2].forEach(bx=>svg.appendChild(svgEl('line',{
+      x1:bx,y1:by-4,x2:bx,y2:by+4,
+      stroke:'rgba(6,214,160,0.6)','stroke-width':'2'})));
+  }
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  arr=document.getElementById('inArr').value.split(',').map(Number);
+  n=arr.length;
+  steps=computeSteps(arr);
+  currentStep=0;
+
+  // Array tiles
+  const ar=document.getElementById('arrRow');
+  ar.innerHTML='';
+  arr.forEach((v,k)=>{
+    ar.innerHTML+=`<div class="atile at-default" id="at-${k}">
+      <span class="av">${v}</span>
+      <span class="ai">${k}</span>
+    </div>`;
+  });
+
+  // SVG width
+  document.getElementById('arrSvg').setAttribute('width',n*TW);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('subChips').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const sv=String(val);
+  el.textContent=sv;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==sv){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=sv;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Array tiles
+  for(let k=0;k<n;k++){
+    const el=document.getElementById(`at-${k}`);
+    if(!el)continue;
+    const isCur=st.i===k&&!isFinal;
+    const inWindow=k>=st.ts&&k<=st.i&&!isFinal;
+    const inBest=k>=st.s&&k<=st.e;
+    const isReset=st.type==='reset'&&k===st.i;
+    if(isFinal&&inBest)   el.className='atile at-done';
+    else if(isCur&&isReset) el.className='atile at-reset';
+    else if(isCur)        el.className='atile at-cur';
+    else if(inWindow&&inBest) el.className='atile at-both';
+    else if(inWindow)     el.className='atile at-window';
+    else if(inBest)       el.className='atile at-best';
+    else                  el.className='atile';
+  }
+
+  // Decision panel
+  const dp=document.getElementById('decPanel');
+  const dt=document.getElementById('decTitle');
+  const db=document.getElementById('decBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="dec-box ${cls}"><div class="db-lbl">${lbl}</div><div class="db-val">${val}</div><div class="db-sub">${sub}</div></div>`;
+
+  if(st.type==='extend'){
+    dp.className='dec-panel dp-extend';
+    dt.textContent=`i=${st.i}: extend the window`;
+    const prev=st.cur-st.ai;
+    db.innerHTML=
+      mkBox('prev+a[i]',`${prev}+${st.ai}=${st.cur}`,'winner','dec-box db-win')+
+      '<span class="dec-op">vs</span>'+
+      mkBox('a[i] alone',st.ai,'lost','dec-box db-lose')+
+      '<span class="dec-op">→</span>'+
+      mkBox('curSum',st.cur,'extended','dec-box');
+  } else if(st.type==='reset'){
+    dp.className='dec-panel dp-reset';
+    dt.textContent=`i=${st.i}: reset! Drop the old window`;
+    const prev=st.cur-st.ai;
+    db.innerHTML=
+      mkBox('prev+a[i]',`${prev}+${st.ai}=${prev+st.ai}`,'loser — negative drag','dec-box db-lose')+
+      '<span class="dec-op">vs</span>'+
+      mkBox('a[i] alone',st.ai,'winner — start fresh','dec-box db-red db-win')+
+      '<span class="dec-op">→</span>'+
+      mkBox('curSum',st.cur,'reset here','dec-box');
+  } else if(st.type==='update'){
+    dp.className='dec-panel dp-update';
+    dt.textContent=`New global best!`;
+    db.innerHTML=mkBox('curSum',st.cur,'new best','dec-box db-win')+
+      mkBox('window',`[${st.s}..${st.e}]`,arr.slice(st.s,st.e+1).join(', '),'dec-box db-win')+
+      mkBox('bestSum',st.best,'updated','dec-box');
+  } else if(st.type==='done'){
+    dp.className='dec-panel dp-done';
+    dt.textContent='Complete';
+    db.innerHTML=mkBox('Max Sum',st.best,'answer','dec-box db-win')+
+      mkBox('Subarray',`[${st.s}..${st.e}]`,arr.slice(st.s,st.e+1).join(', '),'dec-box db-win');
+  } else {
+    dp.className='dec-panel';
+    dt.textContent='The decision Kadane makes at each step';
+    db.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">extend or reset will appear here</span>';
+  }
+
+  // Subarray log right panel
+  const sc=document.getElementById('subChips');
+  sc.innerHTML='';
+  (st.subLog||[]).forEach((e,k)=>{
+    const isLatest=k===st.subLog.length-1;
+    sc.innerHTML+=`<div class="sub-chip ${isLatest?'sc-best':''}">[${e.s}..${e.e}]=${e.sum}</div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vI','vcI',st.i!=null?st.i:'0');
+  setVar('vAI','vcAI',st.ai!=null?st.ai:'—');
+  setVar('vCur','vcCur',st.cur);
+  setVar('vBest','vcBest',st.best);
+  setVar('vTs','vcTs',st.ts);
+  setVar('vSE','vcSE',`[${st.s}..${st.e}]`);
+
+  // 3-tab
+  updateExplain(st);
+  const codeType=st.type==='extend'?'extend':st.type==='reset'?'reset':
+    st.type==='update'?'update':st.type==='done'?'done':'init';
+  highlightCode(codeType);
+
+  // Bar chart
+  drawBars(st);
+  // Arc overlay
+  drawArcOverlay(st);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MAX SUM = ${st.result.sum}  |  [${st.result.subarray.join(', ')}]`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=st.result.sum;
+    document.getElementById('bestMeta').textContent=`[${st.result.subarray.join(', ')}] · indices [${st.result.s}..${st.result.e}]`;
+    document.getElementById('cxAns').textContent=st.result.sum;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-ext',extend:'ep-ext',reset:'ep-rst',update:'ep-upd',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-ext');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

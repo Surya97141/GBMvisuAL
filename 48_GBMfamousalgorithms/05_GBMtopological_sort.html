@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Topological Sort — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.78rem;color:var(--ink);outline:none;transition:border-color .2s;width:200px;}
+.field input.wide{width:280px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* GRAPH CANVAS */
+.graph-section{margin-bottom:14px;}
+.graph-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;}
+
+/* IN-DEGREE ROW */
+.indeg-section{margin-bottom:14px;}
+.indeg-row{display:flex;gap:4px;flex-wrap:wrap;}
+.idcell{
+  min-width:52px;height:52px;border-radius:7px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.idcell .iv{font-size:.88rem;color:var(--ink);}
+.idcell .ik{font-size:.5rem;color:var(--muted);margin-top:1px;}
+.idcell.id-zero  {background:rgba(6,214,160,.14);border-color:var(--accent3);border-width:2px;}
+.idcell.id-zero .iv{color:#024d37;}
+.idcell.id-cur   {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  transform:scale(1.12) translateY(-4px);box-shadow:0 6px 18px rgba(245,166,35,.45);
+  animation:idpulse .8s ease infinite alternate;z-index:4;}
+.idcell.id-cur .iv{color:#7a4800!important;}
+@keyframes idpulse{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.idcell.id-done  {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;}
+.idcell.id-done .iv{color:#024d37;}
+.idcell.id-updated{animation:idup .4s ease;background:rgba(6,214,160,.1);border-color:var(--accent3);}
+@keyframes idup{from{transform:scale(1.1);}to{transform:none;}}
+
+/* QUEUE DISPLAY */
+.queue-section{margin-bottom:14px;}
+.queue-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;min-height:48px;}
+.queue-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.qchip{
+  padding:5px 14px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;flex-shrink:0;
+}
+.qchip.qc-head{background:rgba(255,209,102,.18);border-color:var(--accent4);color:#7a4800;
+  transform:scale(1.06);box-shadow:0 4px 10px rgba(255,209,102,.3);}
+.qchip.qc-in  {background:rgba(6,214,160,.12);border-color:var(--accent3);color:#028a5b;
+  animation:qin .4s ease;}
+@keyframes qin{from{transform:scale(1.15) translateY(-4px);}to{transform:none;}}
+.qchip.qc-empty{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);}
+
+/* RESULT ROW */
+.result-section{margin-bottom:14px;}
+.result-chips{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.rchip{
+  min-width:44px;height:44px;border-radius:7px;border:2px solid var(--accent3);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;
+  background:rgba(6,214,160,.12);color:#024d37;transition:all .3s;
+}
+.rchip.rc-new{animation:rcnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rcnew{from{transform:scale(1.4) translateY(-6px);opacity:0;}to{transform:none;opacity:1;}}
+.rchip.rc-cycle{background:rgba(230,57,70,.12);border-color:var(--accent);color:#7a0000;}
+.rarrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);}
+
+/* PANEL */
+.proc-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.proc-panel.pp-pop   {border-color:var(--accent4);}
+.proc-panel.pp-push  {border-color:var(--accent3);}
+.proc-panel.pp-cycle {border-color:var(--accent);}
+.proc-panel.pp-done  {border-color:var(--accent3);}
+.pp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.pp-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.ppbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.ppbox.pb-hi{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.ppbox.pb-push{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.ppbox.pb-red{border-color:var(--accent);background:rgba(230,57,70,.05);}
+.pb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.pb-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.pb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-pop  {border-color:var(--accent4);}
+.explain-panel.ep-push {border-color:var(--accent3);}
+.explain-panel.ep-cycle{border-color:var(--accent);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-pop {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-push{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-cycle{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-pop  {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-push {background:rgba(6,214,160,.16);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-cycle{background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.result-log{margin-bottom:12px;}
+.rl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.rl-chips{display:flex;flex-wrap:wrap;gap:4px;max-height:72px;overflow-y:auto;}
+.rl-chip{padding:2px 8px;border-radius:4px;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.3);font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;color:var(--accent3);}
+.rl-chip.rl-new{animation:rcnew .4s ease;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);line-height:1.8;}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Topological Sort</h1>
+    <div class="sub">Kahn's Algorithm · BFS · In-degree Queue · O(V+E)</div>
+  </div>
+  <div class="family-badge">Graph · DAG</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Jobs  (comma separated)</label>
+      <input type="text" id="inJobs" value="1,2,3,4" class="wide">
+    </div>
+    <div class="field">
+      <label>Dependencies  (pairs: a,b = a before b, separate pairs with |)</label>
+      <input type="text" id="inDeps" value="1,2|1,3|3,2|4,2|4,3" class="wide">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1600">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="380">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- GRAPH CANVAS -->
+  <div class="graph-section">
+    <div class="section-label">DAG — gold=current · green=done · blue=in queue · number inside=in-degree</div>
+    <div class="graph-outer">
+      <canvas id="graphCanvas" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- IN-DEGREE ROW -->
+  <div class="indeg-section">
+    <div class="section-label">inDegree[] — drops to 0 when all prerequisites are done</div>
+    <div class="indeg-row" id="indegRow"></div>
+  </div>
+
+  <!-- QUEUE -->
+  <div class="queue-section">
+    <div class="section-label">Queue — jobs with inDegree=0 (ready to process)</div>
+    <div class="queue-outer"><div class="queue-chips" id="queueChips"><span class="qchip qc-empty">will fill on start</span></div></div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result-section">
+    <div class="section-label">Topological order — built left to right  <span id="resultSub" style="color:var(--accent3)"></span></div>
+    <div class="result-chips" id="resultChips">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will build here as jobs are processed</span>
+    </div>
+  </div>
+
+  <!-- PROCESS PANEL -->
+  <div class="proc-panel" id="procPanel">
+    <div class="pp-title" id="ppTitle">Press RUN to begin Kahn's algorithm</div>
+    <div class="pp-body" id="ppBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(V+E)</div>
+      <div class="cx-sub">vertices + edges</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(V+E)</div>
+      <div class="cx-sub">graph + inDeg + queue</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Cycle detect</div><div class="cx-val" style="color:#7a5a00">✓</div>
+      <div class="cx-sub">if result.len &lt; V</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAns" style="color:#028a5b">—</div>
+      <div class="cx-sub">jobs sorted</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-pop" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Kahn's Topological Sort</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">topoSort</span>(jobs, deps):</span>
+<span class="code-line" id="cl-graph">  graph={j:[] <span class="ck">for</span> j <span class="ck">in</span> jobs}</span>
+<span class="code-line" id="cl-ind">  inDeg={j:<span class="cn">0</span> <span class="ck">for</span> j <span class="ck">in</span> jobs}</span>
+<span class="code-line" id="cl-build">  <span class="ck">for</span> a,b <span class="ck">in</span> deps:</span>
+<span class="code-line" id="cl-build2">   graph[a].append(b); inDeg[b]+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-q">  queue=[j <span class="ck">for</span> j <span class="ck">in</span> jobs <span class="ck">if</span> inDeg[j]==<span class="cn">0</span>]</span>
+<span class="code-line" id="cl-res">  result=[]</span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> queue:</span>
+<span class="code-line" id="cl-pop">   job=queue.pop(<span class="cn">0</span>)  <span class="cc"># dequeue</span></span>
+<span class="code-line" id="cl-app">   result.append(job)</span>
+<span class="code-line" id="cl-nbr">   <span class="ck">for</span> nb <span class="ck">in</span> graph[job]:</span>
+<span class="code-line" id="cl-dec">    inDeg[nb]-=<span class="cn">1</span></span>
+<span class="code-line" id="cl-if">    <span class="ck">if</span> inDeg[nb]==<span class="cn">0</span>:</span>
+<span class="code-line" id="cl-push">     queue.append(nb)</span>
+<span class="code-line" id="cl-cycle">  <span class="ck">if</span> len(result)!=len(jobs):</span>
+<span class="code-line" id="cl-empty">   <span class="ck">return</span> []  <span class="cc"># cycle detected</span></span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> result</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(V+E) · Kahn's</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+vector&lt;<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">topoSort</span>(<span style="color:#c084fc">int</span> n,
+    vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt;&amp; deps){
+  vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; g(n);
+  vector&lt;<span style="color:#c084fc">int</span>&gt; indeg(n,<span style="color:#fda4af">0</span>);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span> [a,b]:deps)
+    g[a].push_back(b), indeg[b]++;
+  queue&lt;<span style="color:#c084fc">int</span>&gt; q;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;n;i++)
+    <span style="color:#c084fc">if</span>(!indeg[i]) q.push(i);    <span style="color:#374151;font-style:italic">// no prerequisites</span>
+  vector&lt;<span style="color:#c084fc">int</span>&gt; res;
+  <span style="color:#c084fc">while</span>(!q.empty()){
+    <span style="color:#c084fc">int</span> u=q.front(); q.pop();
+    res.push_back(u);
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> v:g[u])
+      <span style="color:#c084fc">if</span>(--indeg[v]==<span style="color:#fda4af">0</span>) q.push(v); <span style="color:#374151;font-style:italic">// newly ready</span>
+  }
+  <span style="color:#c084fc">if</span>((int)res.size()!=n) <span style="color:#c084fc">return</span> {}; <span style="color:#374151;font-style:italic">// cycle!</span>
+  <span style="color:#c084fc">return</span> res;
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n,m; cin&gt;&gt;n&gt;&gt;m;
+  vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; deps(m);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; [a,b]:deps) cin&gt;&gt;a&gt;&gt;b;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> x:<span style="color:#67e8f9">topoSort</span>(n,deps)) cout&lt;&lt;x&lt;&lt;<span style="color:#fda4af">' '</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">structured bindings</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">--indeg[v]==0</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">cycle: res.size()!=n</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">BFS queue</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcJob">   <div class="var-name">current job</div>  <div class="var-value" id="vJob"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcNb">    <div class="var-name">neighbour</div>    <div class="var-value" id="vNb"   style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcIndNb"> <div class="var-name">inDeg[nb]</div>    <div class="var-value" id="vIndNb" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcQLen">  <div class="var-name">queue size</div>   <div class="var-value" id="vQLen" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcDone" style="grid-column:1/3"><div class="var-name">result so far</div><div class="var-value" id="vDone" style="color:var(--accent3);font-size:.75rem">—</div></div>
+    </div>
+
+    <div class="result-log">
+      <div class="rl-title">Topological Order Built</div>
+      <div class="rl-chips" id="rlChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Final Order</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ TOPOLOGICAL ORDER FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {job,nb,newIndeg,pushed,queueLen,resultLen,totalJobs} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Kahn's algorithm: count in-degrees (prerequisites) for each job. All jobs with in-degree 0 (no prerequisites) go into the queue immediately. Process them one by one — when a job is processed, decrement its successors' in-degrees. When a successor reaches 0, it's ready and enters the queue.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>inDegree[v]</strong> = number of unprocessed prerequisites for job v. Job v is "ready" when inDegree[v]=0.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Invariant:</strong> queue always contains exactly the set of jobs with inDegree=0 that haven't been processed yet.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Cycle detection:</strong> if result.length &lt; totalJobs, a cycle exists — some jobs always have inDegree &gt; 0 and never enter the queue.`},
+    ]
+  };
+  if(type==='pop') return {
+    why:`<div class="ep-why-block why-pop">Dequeue job <strong>${job}</strong>. Its inDegree is 0 — all prerequisites are done. Add it to the result. Now decrement inDegrees of all jobs that depend on ${job}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Job ${job} is finalized.</strong> Its position in the topological order is fixed. No future job will be its prerequisite (would have been blocked).`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why FIFO?</strong> BFS order gives one valid topological sort. DFS gives another. Both are correct — the problem often accepts any valid order.`},
+    ]
+  };
+  if(type==='relax') return {
+    why: pushed
+      ? `<div class="ep-why-block why-push">Processed edge (${job}→${nb}): decremented inDeg[${nb}] → <strong>${newIndeg}</strong>. That's 0! Job <strong>${nb}</strong> is now ready — all its prerequisites are done. Push to queue.</div>`
+      : `<div class="ep-why-block why-push">Processed edge (${job}→${nb}): decremented inDeg[${nb}] → <strong>${newIndeg}</strong>. Still has ${newIndeg} unprocessed prerequisites. Not ready yet.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>inDeg[${nb}]=${newIndeg}</strong>${pushed?' → pushed to queue!':` — ${newIndeg} more prerequisites remaining.`}`},
+      {icon:'💡',cls:'inv-warn',text:`Each edge is processed exactly once when its source job is popped. Total work = O(V + E).`},
+    ]
+  };
+  if(type==='cycle') return {
+    why:`<div class="ep-why-block why-cycle">Queue is empty but only ${resultLen}/${totalJobs} jobs processed. The remaining ${totalJobs-resultLen} jobs form a cycle — each depends (directly or indirectly) on another in the cycle. Topological order is impossible. Return [].</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Cycle detected!</strong> In a cyclic dependency, every job in the cycle has inDegree ≥ 1 permanently — nobody can ever free it.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${totalJobs} jobs processed in valid topological order. Every job appears after all its prerequisites. Time O(V+E), Space O(V+E).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Valid order found.</strong> Every dependency (a→b) is satisfied: a appears before b in the result.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E):</strong> each vertex enqueued once, each edge relaxed once. Optimal — you must at minimum read all edges.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Alternative:</strong> DFS-based topological sort (add to result on post-visit, reverse). Same complexity, different valid order.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-graph','cl-ind','cl-build','cl-build2','cl-q','cl-res'],cls:'hl-init'},
+  pop:   {ids:['cl-loop','cl-pop','cl-app'],cls:'hl-pop'},
+  relax: {ids:['cl-nbr','cl-dec','cl-if','cl-push'],cls:'hl-push'},
+  cycle: {ids:['cl-cycle','cl-empty'],cls:'hl-cycle'},
+  done:  {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,job,nb,newIndeg,pushed,result,totalJobs,queue} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have <strong>${totalJobs}</strong> jobs to schedule. Some depend on others — we can't do job B before job A if B requires A. First we count how many unfinished prerequisites each job has. Jobs with zero prerequisites go straight into the ready queue.`};
+  if(type==='pop') return {color:'var(--accent4)',
+    text:`🔄 Picking job <strong>${job}</strong> from the queue — it has no remaining prerequisites. Adding it to our schedule at position ${result.length}. Now unlock its dependents...`};
+  if(type==='relax'){
+    if(pushed) return {color:'var(--accent3)',
+      text:`✅ Job ${job} was a prerequisite for job <strong>${nb}</strong>. Removing that dependency: inDeg[${nb}] drops to <strong>0</strong>. Job ${nb} is now ready — added to queue!`};
+    return {color:'var(--accent2)',
+      text:`Job ${job} was a prereq for job ${nb}. Removing it: inDeg[${nb}] drops to <strong>${newIndeg}</strong>. Job ${nb} still has ${newIndeg} other prerequisites — not ready yet.`};
+  }
+  if(type==='cycle') return {color:'var(--accent)',
+    text:`❌ Queue is empty but ${totalJobs-result.length} jobs remain unscheduled. There's a <strong>circular dependency</strong> — some jobs are waiting on each other forever. Return empty array.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ All ${totalJobs} jobs scheduled! Valid order: <strong>[${result.join(' → ')}]</strong>. Every job appears after all its prerequisites.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(jobs, deps){
+  const n=jobs.length;
+  const graph={}, inDeg={};
+  jobs.forEach(j=>{graph[j]=[];inDeg[j]=0;});
+  deps.forEach(([a,b])=>{graph[a].push(b);inDeg[b]++;});
+
+  const steps=[];
+  const inDegCopy={...inDeg};
+  let queue=jobs.filter(j=>inDegCopy[j]===0);
+  const result=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,jobs,deps,
+    inDeg:{...inDegCopy},
+    queue:[...queue],
+    result:[...result],
+    totalJobs:n,
+    result:null,...extra,
+    explain:makeExplain(type,{totalJobs:n,result:[...result],queue:[...queue],...extra})
+  });
+
+  snap('init',`🚀 <strong>Start.</strong> ${n} jobs. Compute inDegrees. Queue: [${queue.join(',')}] (all with inDeg=0).`,
+    {job:null,nb:null});
+
+  while(queue.length>0){
+    const job=queue.shift();
+    result.push(job);
+    snap('pop',
+      `⬇️ Pop <strong>${job}</strong> from queue. Add to result: [${result.join(',')}]. Now decrement neighbours.`,
+      {job,nb:null,pushed:false}
+    );
+
+    for(const nb of graph[job]){
+      inDegCopy[nb]--;
+      const pushed=inDegCopy[nb]===0;
+      if(pushed) queue.push(nb);
+      snap('relax',
+        pushed
+          ? `✅ Edge (${job}→${nb}): inDeg[${nb}]→0 → <span style="color:var(--accent3);font-weight:700">PUSH ${nb} to queue</span>`
+          : `  Edge (${job}→${nb}): inDeg[${nb}]→${inDegCopy[nb]} (still blocked)`,
+        {job,nb,newIndeg:inDegCopy[nb],pushed}
+      );
+    }
+  }
+
+  if(result.length<n){
+    snap('cycle',
+      `❌ <strong>Cycle detected!</strong> Only ${result.length}/${n} jobs processed. No valid order exists.`,
+      {job:null,nb:null,resultLen:result.length,
+       result:{order:[],cycle:true}}
+    );
+  } else {
+    snap('done',
+      `🎉 <strong>Done!</strong> Valid topological order: [${result.join(', ')}].`,
+      {job:null,nb:null,
+       result:{order:[...result],cycle:false}}
+    );
+  }
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let jobs=[], deps=[], nodePos={};
+const NRAD=20;
+
+// ─── GRAPH CANVAS ─────────────────────────────────────────────────────────────
+function layoutNodes(jobs, deps){
+  // topological levels for nice layout
+  const graph={}, inDeg={};
+  jobs.forEach(j=>{graph[j]=[];inDeg[j]=0;});
+  deps.forEach(([a,b])=>{graph[a].push(b);inDeg[b]++;});
+  const levels={};
+  const queue=jobs.filter(j=>inDeg[j]===0);
+  const tempIndeg={...inDeg};
+  queue.forEach(j=>levels[j]=0);
+  const q=[...queue];
+  while(q.length>0){
+    const j=q.shift();
+    for(const nb of graph[j]){
+      levels[nb]=Math.max(levels[nb]||0,(levels[j]||0)+1);
+      tempIndeg[nb]--;
+      if(tempIndeg[nb]===0) q.push(nb);
+    }
+  }
+  // Assign unlevelled (cycle) nodes
+  jobs.forEach(j=>{ if(levels[j]===undefined) levels[j]=0; });
+  // Group by level
+  const byLevel={};
+  jobs.forEach(j=>{ const l=levels[j]; if(!byLevel[l]) byLevel[l]=[]; byLevel[l].push(j); });
+  const maxLevel=Math.max(...Object.keys(byLevel).map(Number));
+
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.width, H=canvas.height;
+  const margin=40;
+
+  for(let l=0;l<=maxLevel;l++){
+    const lvJobs=byLevel[l]||[];
+    const x=margin+(l*(W-2*margin)/Math.max(maxLevel,1));
+    lvJobs.forEach((j,k)=>{
+      const y=margin+(k+0.5)*((H-2*margin)/Math.max(lvJobs.length,1));
+      nodePos[j]={x,y};
+    });
+  }
+}
+
+function drawGraph(st){
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=230;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,230);
+
+  layoutNodes(jobs,deps);
+
+  const queueSet=new Set(st.queue);
+  const doneSet=new Set(st.result);
+  const isFinal=!!st.result;
+
+  // Draw edges
+  deps.forEach(([a,b])=>{
+    const p1=nodePos[a], p2=nodePos[b];
+    if(!p1||!p2) return;
+    const dx=p2.x-p1.x, dy=p2.y-p1.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+    const ox=dx/len, oy=dy/len;
+    const sx=p1.x+ox*NRAD, sy=p1.y+oy*NRAD;
+    const ex=p2.x-ox*(NRAD+6), ey=p2.y-oy*(NRAD+6);
+
+    const isActive=st.job===a&&st.type==='relax'&&st.nb===b;
+    const isDone=doneSet.has(a);
+    ctx.beginPath();
+    ctx.moveTo(sx,sy); ctx.lineTo(ex,ey);
+    ctx.strokeStyle=isActive?(st.pushed?'rgba(6,214,160,0.8)':'rgba(230,57,70,0.6)'):
+      isDone?'rgba(6,214,160,0.3)':'rgba(180,170,155,0.6)';
+    ctx.lineWidth=isActive?2.5:1.5;
+    ctx.setLineDash(isActive&&!st.pushed?[5,3]:[]);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // arrowhead
+    const angle=Math.atan2(ey-sy,ex-sx);
+    ctx.beginPath(); ctx.fillStyle=isActive?(st.pushed?'rgba(6,214,160,0.8)':'rgba(230,57,70,0.6)'):'rgba(160,150,140,0.7)';
+    ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-9*Math.cos(angle-0.35),ey-9*Math.sin(angle-0.35));
+    ctx.lineTo(ex-9*Math.cos(angle+0.35),ey-9*Math.sin(angle+0.35));
+    ctx.closePath(); ctx.fill();
+
+    // weight not needed, but show dep label
+    if(isActive){
+      const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2-8;
+      ctx.fillStyle=st.pushed?'rgba(6,214,160,0.8)':'rgba(230,57,70,0.6)';
+      ctx.font='bold 10px Space Mono'; ctx.textAlign='center';
+      ctx.fillText(st.pushed?'ready!':'blocked',mx,my);
+    }
+  });
+
+  // Draw nodes
+  jobs.forEach(j=>{
+    const p=nodePos[j]; if(!p) return;
+    const isCur=(st.job===j&&st.type==='pop')||(st.nb===j&&st.type==='relax');
+    const isInQueue=queueSet.has(j)&&!doneSet.has(j);
+    const isDone=doneSet.has(j);
+    const isCycled=isFinal&&st.result?.cycle&&!isDone;
+
+    let fill='#fdfaf4', stroke='#d4ccb8', lw=1.5, textColor='#1a1a2e';
+    if(isFinal&&isDone)   {fill='#ccf5e5';stroke='#06d6a0';lw=2.5;textColor='#024d37';}
+    else if(isFinal&&isCycled){fill='rgba(230,57,70,.12)';stroke='#e63946';lw=2;textColor='#7a0000';}
+    else if(isCur)         {fill='#fff8c5';stroke='#f5a623';lw=3;textColor='#7a4800';}
+    else if(isDone)        {fill='rgba(6,214,160,.18)';stroke='#06d6a0';lw=2;textColor='#024d37';}
+    else if(isInQueue)     {fill='rgba(33,150,243,.12)';stroke='#2196f3';lw=2;textColor='#0d47a1';}
+
+    ctx.beginPath(); ctx.arc(p.x,p.y,NRAD,0,Math.PI*2);
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
+
+    // in-degree badge inside node
+    const ind=st.inDeg[j];
+    ctx.fillStyle=textColor;
+    ctx.font='bold 13px Space Mono'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(j,p.x,p.y-4);
+    ctx.font='9px Space Mono';
+    ctx.fillStyle=ind===0?'#06d6a0':'#8a8070';
+    ctx.fillText(`[${ind}]`,p.x,p.y+9);
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  jobs=document.getElementById('inJobs').value.split(',').map(Number);
+  deps=document.getElementById('inDeps').value.trim()
+    .split('|').map(p=>p.trim().split(',').map(Number)).filter(p=>p.length===2&&!isNaN(p[0])&&!isNaN(p[1]));
+
+  steps=computeSteps(jobs, deps);
+  currentStep=0;
+
+  // inDegree row
+  const ir=document.getElementById('indegRow');
+  ir.innerHTML='';
+  const initInDeg={};
+  jobs.forEach(j=>initInDeg[j]=0);
+  deps.forEach(([a,b])=>initInDeg[b]++);
+  jobs.forEach(j=>ir.innerHTML+=`<div class="idcell ${initInDeg[j]===0?'id-zero':''}" id="idc-${j}">
+    <span class="iv" id="idv-${j}">${initInDeg[j]}</span>
+    <span class="ik">job ${j}</span>
+  </div>`);
+
+  document.getElementById('cxAns').textContent=`${jobs.length}j/${deps.length}e`;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('rlChips').innerHTML='';
+  document.getElementById('resultChips').innerHTML=
+    '<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build here</span>';
+  document.getElementById('queueChips').innerHTML='<span class="qchip qc-empty">will fill on start</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // inDegree cells
+  jobs.forEach(j=>{
+    const el=document.getElementById(`idc-${j}`);
+    const vEl=document.getElementById(`idv-${j}`);
+    if(!el||!vEl)return;
+    const v=st.inDeg[j];
+    vEl.textContent=v;
+    const isDone=st.result.includes(j)&&st.type!=='init';
+    const isCur=st.job===j&&(st.type==='pop');
+    const isUpdated=st.nb===j&&st.type==='relax';
+    if(isFinal&&st.result?.order?.includes(j)) el.className='idcell id-done';
+    else if(isCur)     el.className='idcell id-cur';
+    else if(isUpdated) el.className=`idcell ${v===0?'id-zero':'id-updated'}`;
+    else if(isDone)    el.className='idcell id-done';
+    else if(v===0)     el.className='idcell id-zero';
+    else               el.className='idcell';
+  });
+
+  // Queue chips
+  const qEl=document.getElementById('queueChips');
+  if(st.queue.length===0){
+    qEl.innerHTML='<span class="qchip qc-empty">empty</span>';
+  } else {
+    qEl.innerHTML=st.queue.map((j,k)=>
+      `<div class="qchip ${k===0?'qc-head':''}">${j}</div>`
+    ).join('');
+  }
+
+  // Result chips
+  const rc=document.getElementById('resultChips');
+  const rs=document.getElementById('resultSub');
+  if(st.result.length>0){
+    rc.innerHTML=st.result.map((j,k)=>{
+      const isNew=k===st.result.length-1&&(st.type==='pop');
+      return (k>0?'<span class="rarrow">→</span>':'')+
+        `<div class="rchip ${isNew?'rc-new':''}">${j}</div>`;
+    }).join('');
+    if(rs) rs.textContent=`${st.result.length}/${jobs.length} jobs`;
+  } else {
+    rc.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build here</span>';
+    if(rs) rs.textContent='';
+  }
+  if(isFinal&&st.result?.cycle){
+    rc.innerHTML='<div class="rchip rc-cycle" style="padding:5px 14px;">CYCLE DETECTED — no valid order</div>';
+  }
+
+  // Process panel
+  const pp=document.getElementById('procPanel');
+  const pt=document.getElementById('ppTitle');
+  const pb=document.getElementById('ppBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="ppbox ${cls}"><div class="pb-lbl">${lbl}</div><div class="pb-val">${val}</div><div class="pb-sub">${sub}</div></div>`;
+  if(st.type==='pop'){
+    pp.className='proc-panel pp-pop';
+    pt.textContent=`Dequeue job ${st.job} → add to result`;
+    pb.innerHTML=mkBox('dequeued',st.job,'inDeg was 0','ppbox pb-hi')+
+      mkBox('result size',st.result.length,'so far','')+
+      mkBox('queue left',st.queue.length,'remaining','');
+  } else if(st.type==='relax'){
+    pp.className=`proc-panel ${st.pushed?'pp-push':''}`;
+    pt.textContent=`Edge ${st.job}→${st.nb}: inDeg[${st.nb}]→${st.newIndeg}${st.pushed?' → PUSH to queue':''}`;
+    pb.innerHTML=mkBox('source',st.job,'processed','ppbox pb-hi')+
+      mkBox('target',st.nb,`was ${st.newIndeg+1}→now ${st.newIndeg}`,st.pushed?'ppbox pb-push':'')+
+      mkBox(st.pushed?'→ pushed!':'still blocked',st.newIndeg,st.pushed?'added to queue':'needs more prereqs',st.pushed?'ppbox pb-push':'ppbox pb-red');
+  } else if(st.type==='cycle'){
+    pp.className='proc-panel pp-cycle';
+    pt.textContent='Cycle detected! Queue empty but not all jobs done.';
+    pb.innerHTML=mkBox('processed',st.result.length,'jobs','ppbox pb-hi')+
+      mkBox('total',jobs.length,'jobs','ppbox pb-red')+
+      mkBox('missing',jobs.length-st.result.length,'stuck in cycle','ppbox pb-red');
+  } else if(st.type==='done'){
+    pp.className='proc-panel pp-done';
+    pt.textContent='All jobs scheduled!';
+    pb.innerHTML=mkBox('order',`[${st.result.join(',')}]`,'valid topo sort','ppbox pb-hi');
+  } else {
+    pp.className='proc-panel';
+    pt.textContent='Building inDegrees and initial queue...';
+    pb.innerHTML='';
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vJob','vcJob',st.job!=null?st.job:'—');
+  setVar('vNb','vcNb',st.nb!=null?st.nb:'—');
+  setVar('vIndNb','vcIndNb',st.nb!=null?st.inDeg[st.nb]:'—');
+  setVar('vQLen','vcQLen',st.queue.length);
+  setVar('vDone','vcDone',st.result.length>0?`[${st.result.join(', ')}]`:'[]');
+
+  // Right panel result log
+  const rl=document.getElementById('rlChips');
+  rl.innerHTML=st.result.map((j,k)=>{
+    const isNew=k===st.result.length-1&&st.type==='pop';
+    return `<div class="rl-chip ${isNew?'rl-new':''}">${j}</div>`;
+  }).join('');
+
+  // 3-tab
+  updateExplain(st);
+  const codeType=st.type==='pop'?'pop':st.type==='relax'?'relax':st.type==='cycle'?'cycle':st.type==='done'?'done':'init';
+  highlightCode(codeType);
+
+  // Graph
+  drawGraph(st);
+
+  // Done
+  if(isFinal){
+    const found=!st.result.cycle;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=found?
+      `★ ORDER: [${st.result.order.join(' → ')}]`:'★ CYCLE DETECTED — EMPTY ARRAY RETURNED';
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=found?`[${st.result.order.join(', ')}]`:'[] (cycle)';
+    document.getElementById('bestMeta').textContent=found?`${jobs.length} jobs · O(V+E)`:'cycle in dependency graph';
+    document.getElementById('cxAns').textContent=found?jobs.length:'cycle';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-pop',pop:'ep-pop',relax:st?.pushed?'ep-push':'ep-pop',cycle:'ep-cycle',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-pop');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

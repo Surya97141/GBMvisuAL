@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Union Find — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+/* OPERATION CONTROLS */
+.op-section{margin-bottom:14px;}
+.op-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:90px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-create{background:var(--accent2);color:#fff;}.btn-create:hover{background:#0d47a1;}
+.btn-union {background:var(--accent4);color:#3a2800;}.btn-union:hover{background:#f5a623;}
+.btn-find  {background:var(--accent3);color:#024d37;}.btn-find:hover{background:#04b87a;}
+.btn-reset {background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-reset:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* FOREST CANVAS */
+.forest-section{margin-bottom:14px;}
+.forest-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;}
+#forestCanvas{display:block;border-radius:6px;background:#fdfaf4;}
+
+/* PARENT & RANK ARRAYS */
+.arrays-section{margin-bottom:14px;}
+.arr-rows{display:flex;flex-direction:column;gap:8px;}
+.arr-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.arr-label{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;width:80px;flex-shrink:0;letter-spacing:1px;}
+.arr-label.al-par{color:var(--accent2);}
+.arr-label.al-rank{color:var(--pur-dark);}
+.arr-label.al-val{color:var(--accent3);}
+.arr-cells{display:flex;gap:4px;flex-wrap:wrap;}
+.acell{
+  min-width:52px;height:46px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);color:var(--muted);transition:all .3s;
+}
+.acell .av{font-size:.82rem;}
+.acell .ak{font-size:.5rem;color:var(--muted);margin-top:1px;}
+.acell.ac-root  {background:rgba(6,214,160,.14);border-color:var(--accent3);border-width:2px;color:#024d37;}
+.acell.ac-cur   {background:#fff8c5;border-color:#f5a623;border-width:2.5px;color:#7a4800;
+  transform:scale(1.1) translateY(-3px);box-shadow:0 5px 14px rgba(245,166,35,.4);animation:acpulse .8s ease infinite alternate;}
+@keyframes acpulse{from{box-shadow:0 3px 8px rgba(245,166,35,.35);}to{box-shadow:0 7px 18px rgba(245,166,35,.6);}}
+.acell.ac-compressed{background:rgba(6,214,160,.1);border-color:var(--accent3);border-width:2px;color:#028a5b;animation:acomp .5s ease;}
+@keyframes acomp{from{transform:scale(1.12) translateY(-4px);}to{transform:none;}}
+.acell.ac-found {background:rgba(33,150,243,.12);border-color:var(--accent2);border-width:2px;color:#0d47a1;}
+.acell.ac-union1{background:rgba(255,209,102,.15);border-color:var(--accent4);border-width:2px;color:#7a4800;}
+.acell.ac-union2{background:rgba(192,84,252,.12);border-color:var(--pur);border-width:2px;color:var(--pur-dark);}
+
+/* OP LOG */
+.log-section{margin-bottom:14px;}
+.log-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;max-height:160px;overflow-y:auto;}
+.log-outer::-webkit-scrollbar{width:4px;}.log-outer::-webkit-scrollbar-thumb{background:var(--border);}
+.log-entry{display:flex;gap:10px;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(212,204,184,.4);font-family:'Space Mono',monospace;font-size:.65rem;}
+.log-entry:last-child{border-bottom:none;}
+.le-op  {min-width:100px;font-weight:700;}
+.le-op.lo-create{color:var(--accent2);}
+.le-op.lo-union {color:#7a5a00;}
+.le-op.lo-find  {color:#028a5b;}
+.le-op.lo-sys   {color:var(--muted);}
+.le-result{color:var(--muted);font-size:.6rem;}
+.le-result.lr-val{color:var(--accent3);font-weight:700;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-create{border-color:var(--accent2);}
+.explain-panel.ep-union {border-color:var(--accent4);}
+.explain-panel.ep-find  {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init  {border-left-color:var(--muted);background:rgba(138,128,112,.04);}
+.ep-why-block.why-create{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-union {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-find  {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*12+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+/* sets display right panel */
+.sets-section{margin-bottom:12px;}
+.sets-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.sets-chips{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;}
+.sets-chips::-webkit-scrollbar{width:3px;}.sets-chips::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.set-chip{padding:5px 10px;border-radius:5px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.65rem;transition:all .3s;}
+.set-chip.sc-highlight{border-color:var(--accent4);background:rgba(255,209,102,.07);}
+.sc-root{color:#ffd166;font-weight:700;}
+.sc-members{color:#9ca3af;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Union Find</h1>
+    <div class="sub">Disjoint Set · Path Compression · Union by Rank</div>
+  </div>
+  <div class="family-badge">Data Structure</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+
+  <!-- OPERATION PANEL -->
+  <div class="op-section">
+    <div class="section-label">Operations — interact with the data structure</div>
+    <div class="op-row">
+      <div class="field">
+        <label>createSet</label>
+        <input type="number" id="inCreate" placeholder="value" value="5">
+      </div>
+      <button class="btn btn-create" id="btnCreate">+ createSet</button>
+
+      <div class="field">
+        <label>union (v1)</label>
+        <input type="number" id="inUnion1" placeholder="val 1" value="5">
+      </div>
+      <div class="field">
+        <label>union (v2)</label>
+        <input type="number" id="inUnion2" placeholder="val 2" value="10">
+      </div>
+      <button class="btn btn-union" id="btnUnion">⬡ union</button>
+
+      <div class="field">
+        <label>find</label>
+        <input type="number" id="inFind" placeholder="value" value="5">
+      </div>
+      <button class="btn btn-find" id="btnFind">? find</button>
+
+      <button class="btn btn-reset" id="btnReset">↺ Reset</button>
+    </div>
+
+    <!-- QUICK DEMO -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+      <span style="font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);align-self:center;">Quick demo:</span>
+      <button class="btn btn-reset" style="font-size:.62rem;padding:5px 10px;" id="btnDemo">▶ Run sample</button>
+    </div>
+  </div>
+
+  <!-- FOREST CANVAS -->
+  <div class="forest-section">
+    <div class="section-label">Forest — each tree = one disjoint set · root = representative</div>
+    <div class="forest-outer">
+      <canvas id="forestCanvas" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- ARRAYS -->
+  <div class="arrays-section">
+    <div class="section-label">Internal arrays (indexed by value)</div>
+    <div class="arr-rows">
+      <div class="arr-row">
+        <div class="arr-label al-val">value</div>
+        <div class="arr-cells" id="valRow"></div>
+      </div>
+      <div class="arr-row">
+        <div class="arr-label al-par">parent[]</div>
+        <div class="arr-cells" id="parRow"></div>
+      </div>
+      <div class="arr-row">
+        <div class="arr-label al-rank">rank[]</div>
+        <div class="arr-cells" id="rankRow"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OP LOG -->
+  <div class="log-section">
+    <div class="section-label">Operation Log</div>
+    <div class="log-outer" id="opLog">
+      <div class="log-entry"><span class="le-op lo-sys">—</span><span class="le-result">no operations yet</span></div>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Use the buttons above to create sets, union them, and find representatives. Watch the forest and arrays update in real time.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">createSet</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">add new node</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">union</div><div class="cx-val" style="color:#7a5a00">O(α(n))</div>
+      <div class="cx-sub">≈ O(1) amortized</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">find</div><div class="cx-val" style="color:#028a5b">O(α(n))</div>
+      <div class="cx-sub">path compression</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">α(n)</div><div class="cx-val" style="color:var(--pur-dark)">&lt; 5</div>
+      <div class="cx-sub">inverse Ackermann</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-create" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Use operations above to interact. Each action updates the forest, arrays, and explanation in real time.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Union Find with Path Compression + Union by Rank</div>
+    <pre class="code-block">
+<span class="ck">class</span> <span class="cf">UnionFind</span>:
+  <span class="ck">def</span> __init__(self):
+    self.parents={}
+    self.ranks={}
+
+  <span class="ck">def</span> <span class="cf">createSet</span>(self,v):
+    <span class="cc"># each value starts as its own parent</span>
+    self.parents[v]=v
+    self.ranks[v]=<span class="cn">0</span>  <span class="cc"># rank=0: no children</span>
+
+  <span class="ck">def</span> <span class="cf">find</span>(self,v):
+    <span class="ck">if</span> v <span class="ck">not in</span> self.parents:
+      <span class="ck">return None</span>
+    <span class="ck">if</span> self.parents[v]!=v:
+      <span class="cc"># path compression: point to root</span>
+      self.parents[v]=self.<span class="cf">find</span>(
+        self.parents[v])
+    <span class="ck">return</span> self.parents[v]
+
+  <span class="ck">def</span> <span class="cf">union</span>(self,v1,v2):
+    r1=self.<span class="cf">find</span>(v1)
+    r2=self.<span class="cf">find</span>(v2)
+    <span class="ck">if</span> r1 <span class="ck">is None or</span> r2 <span class="ck">is None</span>:
+      <span class="ck">return</span>
+    <span class="ck">if</span> r1==r2: <span class="ck">return</span>  <span class="cc"># same set</span>
+    <span class="cc"># union by rank: attach smaller to larger</span>
+    <span class="ck">if</span> self.ranks[r1]&lt;self.ranks[r2]:
+      self.parents[r1]=r2
+    <span class="ck">elif</span> self.ranks[r1]&gt;self.ranks[r2]:
+      self.parents[r2]=r1
+    <span class="ck">else</span>:
+      self.parents[r2]=r1
+      self.ranks[r1]+=<span class="cn">1</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(α(n)) ≈ O(1)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">struct</span> DSU {
+  vector&lt;<span style="color:#c084fc">int</span>&gt; par,rnk;
+  DSU(<span style="color:#c084fc">int</span> n):par(n),rnk(n,<span style="color:#fda4af">0</span>){
+    iota(par.begin(),par.end(),<span style="color:#fda4af">0</span>);  <span style="color:#374151;font-style:italic">// par[i]=i</span>
+  }
+  <span style="color:#c084fc">int</span> <span style="color:#67e8f9">find</span>(<span style="color:#c084fc">int</span> x){
+    <span style="color:#c084fc">if</span>(par[x]!=x)
+      par[x]=<span style="color:#67e8f9">find</span>(par[x]);        <span style="color:#374151;font-style:italic">// path compression</span>
+    <span style="color:#c084fc">return</span> par[x];
+  }
+  <span style="color:#c084fc">bool</span> <span style="color:#67e8f9">unite</span>(<span style="color:#c084fc">int</span> a,<span style="color:#c084fc">int</span> b){
+    a=<span style="color:#67e8f9">find</span>(a); b=<span style="color:#67e8f9">find</span>(b);
+    <span style="color:#c084fc">if</span>(a==b) <span class="c084fc">return</span> <span style="color:#fda4af">false</span>;    <span style="color:#374151;font-style:italic">// same set</span>
+    <span style="color:#c084fc">if</span>(rnk[a]&lt;rnk[b]) swap(a,b); <span style="color:#374151;font-style:italic">// attach b under a</span>
+    par[b]=a;
+    <span style="color:#c084fc">if</span>(rnk[a]==rnk[b]) rnk[a]++;
+    <span style="color:#c084fc">return true</span>;
+  }
+  <span style="color:#c084fc">bool</span> <span style="color:#67e8f9">same</span>(<span style="color:#c084fc">int</span> a,<span style="color:#c084fc">int</span> b){
+    <span style="color:#c084fc">return</span> <span style="color:#67e8f9">find</span>(a)==<span style="color:#67e8f9">find</span>(b);
+  }
+};
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  DSU dsu(n);
+  <span style="color:#cc">// unite edges, check connectivity, etc.</span>
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">path compression</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">union by rank</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">O(α(n)) ≈ O(1)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">iota init</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live State</div>
+    <div class="var-grid">
+      <div class="var-card"><div class="var-name">last operation</div><div class="var-value" id="vOp" style="color:var(--accent4)">—</div></div>
+      <div class="var-card"><div class="var-name">result</div>         <div class="var-value" id="vRes" style="color:var(--accent3)">—</div></div>
+      <div class="var-card"><div class="var-name"># distinct sets</div><div class="var-value" id="vSets" style="color:#4fc3f7">0</div></div>
+      <div class="var-card"><div class="var-name"># values</div>       <div class="var-value" id="vN" style="color:var(--pur)">0</div></div>
+    </div>
+
+    <div class="sets-section">
+      <div class="sets-title">Current Disjoint Sets</div>
+      <div class="sets-chips" id="setsChips">
+        <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:#6b6b8a;">no sets yet</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ─── UNION FIND DATA STRUCTURE ─────────────────────────────────────────────────
+class UnionFind {
+  constructor(){ this.parents={}; this.ranks={}; }
+
+  createSet(v){
+    if(v in this.parents) return; // already exists
+    this.parents[v]=v;
+    this.ranks[v]=0;
+  }
+
+  find(v){
+    if(!(v in this.parents)) return null;
+    if(this.parents[v]!==v){
+      this.parents[v]=this.find(this.parents[v]); // path compression
+    }
+    return this.parents[v];
+  }
+
+  union(v1,v2){
+    const r1=this.find(v1), r2=this.find(v2);
+    if(r1===null||r2===null||r1===r2) return false;
+    if(this.ranks[r1]<this.ranks[r2]) this.parents[r1]=r2;
+    else if(this.ranks[r1]>this.ranks[r2]) this.parents[r2]=r1;
+    else { this.parents[r2]=r1; this.ranks[r1]++; }
+    return true;
+  }
+
+  // Get sets: root → [members]
+  getSets(){
+    const sets={};
+    for(const v of Object.keys(this.parents)){
+      const r=this.find(+v);
+      if(!sets[r]) sets[r]=[];
+      sets[r].push(+v);
+    }
+    return sets;
+  }
+
+  getValues(){ return Object.keys(this.parents).map(Number).sort((a,b)=>a-b); }
+  size(){ return Object.keys(this.parents).length; }
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let uf=new UnionFind();
+let opLog=[];
+let lastOp=null; // {type, args, result, highlight}
+const PALETTE=['#2196f3','#e63946','#06d6a0','#c084fc','#ffd166','#ff6b6b','#4fc3f7','#a5f3cb'];
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function getExplain(type, args){
+  const {v,v1,v2,root,r1,r2,merged,compressedFrom,compressedTo,sameSet} = args||{};
+  const inv=[
+    {icon:'🔒',cls:'',text:`<strong>parent[v]</strong>: every value points to its parent. Roots point to themselves. Following parents leads to the set representative.`},
+    {icon:'📐',cls:'inv-warn',text:`<strong>rank[v]</strong>: upper bound on tree height. Only increases when two equal-rank trees merge. Keeps trees flat.`},
+    {icon:'🔑',cls:'inv-pur',text:`<strong>Path compression:</strong> on find, all nodes on the path to root are redirected to point directly at root. Flattens the tree permanently.`},
+  ];
+
+  if(type==='createSet') return {
+    why:`<div class="ep-why-block why-create">createSet(${v}): creates a new isolated node. parent[${v}]=${v} (points to itself — it IS the root). rank[${v}]=0 (no children yet). The node forms its own set {${v}}.</div>`,
+    inv
+  };
+  if(type==='union') return {
+    why: sameSet
+      ? `<div class="ep-why-block why-union">union(${v1}, ${v2}): find(${v1})=<strong>${r1}</strong>, find(${v2})=<strong>${r2}</strong>. Same root → <strong>already in the same set</strong>. No change.</div>`
+      : `<div class="ep-why-block why-union">union(${v1}, ${v2}): roots are <strong>${r1}</strong> (rank ${uf.ranks[r1]??'?'}) and <strong>${r2}</strong> (rank ${uf.ranks[r2]??'?'}). ${merged?`Attached root ${merged[0]} under root ${merged[1]} (union by rank).`:'Merged sets.'}</div>`,
+    inv
+  };
+  if(type==='find') return {
+    why: root===null
+      ? `<div class="ep-why-block why-find">find(${v}): value ${v} is not in any set → returns <strong>null</strong>.</div>`
+      : compressedFrom
+      ? `<div class="ep-why-block why-find">find(${v}): followed path to root <strong>${root}</strong>. <strong>Path compression</strong> applied — ${compressedFrom.map(f=>`${f}→${root}`).join(', ')} (nodes now point directly to root). Future finds will be O(1).</div>`
+      : `<div class="ep-why-block why-find">find(${v}): ${v} is already the root (parent[${v}]=${v}) OR is one hop from root. Returns representative <strong>${root}</strong>.</div>`,
+    inv
+  };
+  return {why:'',inv};
+}
+
+// ─── NARRATIVE ────────────────────────────────────────────────────────────────
+function getNarrative(type, args){
+  const {v,v1,v2,root,r1,r2,sameSet,merged,compressedFrom,rank1,rank2} = args||{};
+  if(type==='createSet') return {color:'var(--accent2)',
+    text:`Created a new set containing just <strong>${v}</strong>. It's its own root (parent[${v}]=${v}) and has rank 0. It forms an isolated group of one.`};
+  if(type==='union'){
+    if(sameSet) return {color:'var(--muted)',
+      text:`union(${v1}, ${v2}) — both values trace back to the same root <strong>${r1}</strong>. They're already in the same group. No change.`};
+    if(merged) return {color:'var(--accent4)',
+      text:`union(${v1}, ${v2}) — root <strong>${r1}</strong> (rank ${rank1}) and root <strong>${r2}</strong> (rank ${rank2}). The shorter tree (root ${merged[0]}) attaches under the taller (root ${merged[1]}). One group now!`};
+  }
+  if(type==='find'){
+    if(root===null) return {color:'var(--accent)',text:`find(${v}) → <strong>null</strong>. Value ${v} was never added with createSet.`};
+    if(compressedFrom&&compressedFrom.length>0) return {color:'var(--accent3)',
+      text:`find(${v}) → <strong>${root}</strong>. Path compression: ${compressedFrom.map(n=>`${n}`).join(', ')} now point directly to root ${root}. Future finds from these nodes will be instant!`};
+    return {color:'var(--accent3)',
+      text:`find(${v}) → <strong>${root}</strong>. This is the representative of the set containing ${v}.`};
+  }
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── CANVAS: DRAW FOREST ──────────────────────────────────────────────────────
+function buildTree(roots, parents){
+  // Build adjacency (parent → children)
+  const children={};
+  const values=Object.keys(parents).map(Number);
+  values.forEach(v=>{ children[v]=[]; });
+  values.forEach(v=>{ if(parents[v]!==v) children[parents[v]].push(v); });
+  return {roots, children};
+}
+
+// Layout: assign x,y to each node in the forest
+function layoutForest(roots, children){
+  const pos={};
+  const subtreeWidth=(v)=>{ const c=children[v]; if(c.length===0) return 1; return c.reduce((s,ch)=>s+subtreeWidth(ch),0); };
+  const assign=(v,x,y,xOff)=>{
+    pos[v]={x:xOff+x*60+30, y:y*70+30};
+    let cx=x;
+    for(const ch of children[v]){ assign(ch,cx,y+1,xOff); cx+=subtreeWidth(ch); }
+  };
+  let xOff=0;
+  roots.forEach(r=>{ assign(r,0,0,xOff); xOff+=subtreeWidth(r)*60+20; });
+  return pos;
+}
+
+function getColorForRoot(root){
+  const roots=Object.values(uf.parents).filter((v,i,a)=>a[i]===+Object.keys(uf.parents)[i]).length;
+  const allRoots=[...new Set(Object.keys(uf.parents).map(v=>uf.parents[v]))];
+  const idx=allRoots.indexOf(root);
+  return PALETTE[idx%PALETTE.length];
+}
+
+function drawForest(){
+  const canvas=document.getElementById('forestCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=220;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,220);
+
+  const values=uf.getValues();
+  if(values.length===0){
+    ctx.fillStyle='#8a8070'; ctx.font='13px DM Sans'; ctx.textAlign='center';
+    ctx.fillText('No sets yet. Create some using the buttons above.',W/2,110);
+    return;
+  }
+
+  const parents=uf.parents;
+  const roots=[...new Set(values.map(v=>uf.find(v)))].sort((a,b)=>a-b);
+  const children={};
+  values.forEach(v=>{children[v]=[];});
+  values.forEach(v=>{ if(parents[v]!==v) children[parents[v]].push(v); });
+
+  const subtreeW=(v)=>{const c=children[v];if(!c||c.length===0) return 1; return c.reduce((s,ch)=>s+subtreeW(ch),0);};
+
+  // Estimate total width needed
+  const totalUnits=roots.reduce((s,r)=>s+subtreeW(r),0)+roots.length;
+  const cellW=Math.min(70, (W-20)/Math.max(totalUnits,1));
+  const cellH=65;
+
+  const pos={};
+  const assign=(v,x,depth,xOff)=>{
+    pos[v]={x:xOff+(x+0.5)*cellW, y:depth*cellH+35};
+    const c=children[v]||[];
+    let cx=x;
+    for(const ch of c){ assign(ch,cx,depth+1,xOff); cx+=subtreeW(ch); }
+  };
+  let xOff=0;
+  roots.forEach(r=>{ assign(r,0,0,xOff*cellW); xOff+=subtreeW(r)+0.5; });
+
+  // Highlight
+  const hi=lastOp;
+  const hiVals=new Set();
+  const hiEdges=new Set(); // "from-to" strings
+  if(hi){
+    if(hi.type==='createSet') hiVals.add(hi.args.v);
+    if(hi.type==='find') {
+      if(hi.args.root!==null) hiVals.add(hi.args.root);
+      hiVals.add(hi.args.v);
+      (hi.args.compressedFrom||[]).forEach(n=>hiVals.add(n));
+    }
+    if(hi.type==='union'&&!hi.args.sameSet){
+      hiVals.add(hi.args.v1); hiVals.add(hi.args.v2);
+      if(hi.args.r1!==null) hiVals.add(hi.args.r1);
+      if(hi.args.r2!==null) hiVals.add(hi.args.r2);
+    }
+  }
+
+  // Draw edges (parent → child)
+  values.forEach(v=>{
+    if(parents[v]!==v&&pos[v]&&pos[parents[v]]){
+      const p1=pos[parents[v]], p2=pos[v];
+      const isCompressed=hi?.args?.compressedFrom?.includes(v);
+      ctx.beginPath();
+      ctx.moveTo(p1.x,p1.y+14);
+      ctx.lineTo(p2.x,p2.y-14);
+      ctx.strokeStyle=isCompressed?'rgba(6,214,160,0.7)':'rgba(180,170,155,0.6)';
+      ctx.lineWidth=isCompressed?2.5:1.5;
+      ctx.setLineDash(isCompressed?[5,3]:[]);
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  });
+
+  // Draw nodes
+  values.forEach(v=>{
+    if(!pos[v]) return;
+    const {x,y}=pos[v];
+    const root=uf.find(v);
+    const color=getColorForRoot(root);
+    const isRoot=parents[v]===v;
+    const isHi=hiVals.has(v);
+    const isComp=hi?.args?.compressedFrom?.includes(v);
+
+    // Node circle
+    ctx.beginPath(); ctx.arc(x,y,isRoot?17:13,0,Math.PI*2);
+    ctx.fillStyle=isRoot?color+'33':color+'18';
+    ctx.fill();
+    ctx.strokeStyle=isHi?color:color+'88';
+    ctx.lineWidth=isRoot?2.5:isHi?2:1.5;
+    ctx.stroke();
+
+    if(isRoot){
+      ctx.beginPath(); ctx.arc(x,y,21,0,Math.PI*2);
+      ctx.strokeStyle=color+'44'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+
+    // Label
+    ctx.fillStyle=isRoot?color:'#1a1a2e';
+    ctx.font=`${isRoot?'bold 13':'12'}px Space Mono`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(v,x,y);
+
+    // rank label on root
+    if(isRoot){
+      ctx.fillStyle=color+'99';
+      ctx.font='9px Space Mono';
+      ctx.fillText(`r${uf.ranks[v]}`,x,y+24);
+    }
+
+    // compressed marker
+    if(isComp){
+      ctx.beginPath(); ctx.arc(x,y,20,0,Math.PI*2);
+      ctx.strokeStyle='rgba(6,214,160,0.6)'; ctx.lineWidth=2;
+      ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+  });
+
+  // Legend
+  const setMap=uf.getSets();
+  let lx=8,ly=canvas.height-14;
+  ctx.font='9px Space Mono'; ctx.textAlign='left';
+  Object.entries(setMap).forEach(([root,members])=>{
+    const c=getColorForRoot(+root);
+    ctx.fillStyle=c;
+    ctx.fillRect(lx,ly-7,10,10);
+    ctx.fillStyle='#8a8070';
+    ctx.fillText(`{${members.sort((a,b)=>a-b).join(',')}}`,lx+14,ly);
+    lx+=ctx.measureText(`{${members.join(',')}}`).width+30;
+  });
+}
+
+// ─── UPDATE ARRAYS ────────────────────────────────────────────────────────────
+function updateArrays(){
+  const values=uf.getValues();
+  const parRow=document.getElementById('parRow');
+  const rankRow=document.getElementById('rankRow');
+  const valRow=document.getElementById('valRow');
+  parRow.innerHTML=''; rankRow.innerHTML=''; valRow.innerHTML='';
+
+  if(values.length===0){
+    parRow.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">empty</span>';
+    rankRow.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">empty</span>';
+    valRow.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">empty</span>';
+    return;
+  }
+
+  const hi=lastOp;
+  const hiSet1=new Set(), hiSet2=new Set(), hiComp=new Set(), hiRoot=new Set();
+  if(hi?.type==='union'&&!hi.args.sameSet){
+    [hi.args.v1,hi.args.r1].forEach(v=>v!=null&&hiSet1.add(v));
+    [hi.args.v2,hi.args.r2].forEach(v=>v!=null&&hiSet2.add(v));
+  }
+  if(hi?.type==='find'){
+    (hi.args.compressedFrom||[]).forEach(v=>hiComp.add(v));
+    if(hi.args.root!==null) hiRoot.add(hi.args.root);
+    hiRoot.add(hi.args.v);
+  }
+  if(hi?.type==='createSet') hiSet1.add(hi.args.v);
+
+  values.forEach(v=>{
+    const par=uf.parents[v];
+    const rank=uf.ranks[v];
+    const isRoot=par===v;
+    const cls=isRoot?'acell ac-root':
+      hiComp.has(v)?'acell ac-compressed':
+      hiRoot.has(v)?'acell ac-found':
+      hiSet1.has(v)?'acell ac-union1':
+      hiSet2.has(v)?'acell ac-union2':'acell';
+
+    valRow.innerHTML+=`<div class="${cls}"><span class="av">${v}</span><span class="ak">val</span></div>`;
+    parRow.innerHTML+=`<div class="${cls}"><span class="av">${par}</span><span class="ak">par[${v}]</span></div>`;
+    rankRow.innerHTML+=`<div class="${cls}"><span class="av">${rank}</span><span class="ak">rnk[${v}]</span></div>`;
+  });
+}
+
+// ─── UPDATE RIGHT PANEL ────────────────────────────────────────────────────────
+function updateRightPanel(){
+  const sets=uf.getSets();
+  const nSets=Object.keys(sets).length;
+  document.getElementById('vN').textContent=uf.size();
+  document.getElementById('vSets').textContent=nSets;
+
+  const sc=document.getElementById('setsChips');
+  sc.innerHTML='';
+  if(nSets===0){
+    sc.innerHTML='<div style="font-family:\'Space Mono\',monospace;font-size:.65rem;color:#6b6b8a;">no sets yet</div>';
+    return;
+  }
+  const hi=lastOp;
+  Object.entries(sets).forEach(([root,members])=>{
+    const isHi=hi&&(hi.args?.r1===+root||hi.args?.r2===+root||hi.args?.root===+root||hi.args?.v===+root);
+    sc.innerHTML+=`<div class="set-chip ${isHi?'sc-highlight':''}">
+      <span class="sc-root">root=${root}</span>
+      <span class="sc-members"> · {${members.sort((a,b)=>a-b).join(', ')}}</span>
+    </div>`;
+  });
+}
+
+// ─── UPDATE LOG ────────────────────────────────────────────────────────────────
+function addLog(type, args, result){
+  opLog.unshift({type,args,result});
+  const log=document.getElementById('opLog');
+  const typeClass={createSet:'lo-create',union:'lo-union',find:'lo-find'}[type]||'lo-sys';
+  let opStr='', resStr='';
+  if(type==='createSet'){opStr=`createSet(${args.v})`;resStr='null';}
+  else if(type==='union'){opStr=`union(${args.v1}, ${args.v2})`;resStr=result===false?'same set':'merged';}
+  else if(type==='find'){opStr=`find(${args.v})`;resStr=result===null?'null':String(result);}
+  log.innerHTML=opLog.slice(0,12).map((e,i)=>{
+    const ec={createSet:'lo-create',union:'lo-union',find:'lo-find'}[e.type]||'lo-sys';
+    let eopStr='',eresStr='';
+    if(e.type==='createSet'){eopStr=`createSet(${e.args.v})`;eresStr='null';}
+    else if(e.type==='union'){eopStr=`union(${e.args.v1}, ${e.args.v2})`;eresStr=e.result===false?'same set':'merged';}
+    else if(e.type==='find'){eopStr=`find(${e.args.v})`;eresStr=e.result===null?'null':String(e.result);}
+    return `<div class="log-entry">
+      <span class="le-op ${ec}">${eopStr}</span>
+      <span class="le-result ${e.type==='find'&&e.result!==null?'lr-val':''}">${eresStr}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── EXPLAIN / NARRATIVE ────────────────────────────────────────────────────────
+function updateExplain(type, args){
+  const {why,inv}=getExplain(type,args);
+  const ep=document.getElementById('explainPanel');
+  const cls={createSet:'ep-create',union:'ep-union',find:'ep-find'};
+  ep.className='explain-panel '+(cls[type]||'ep-create');
+
+  let whatText='';
+  if(type==='createSet') whatText=`<strong>createSet(${args.v})</strong> — added ${args.v} as a new isolated set. parent[${args.v}]=${args.v}, rank[${args.v}]=0.`;
+  else if(type==='union') whatText=`<strong>union(${args.v1}, ${args.v2})</strong> — ${args.sameSet?'already in the same set, no change.':'merged two sets using union by rank.'}`;
+  else if(type==='find') whatText=`<strong>find(${args.v})</strong> → <strong>${args.root===null?'null':args.root}</strong>${args.compressedFrom?.length?'. Path compression applied!':'.'}.`;
+
+  document.getElementById('paneWhat').innerHTML=whatText;
+  document.getElementById('paneWhy').innerHTML=why||'';
+  document.getElementById('invBlock').innerHTML=(inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+
+  const narr=getNarrative(type,args);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  document.getElementById('vOp').textContent=type==='createSet'?`createSet(${args.v})`:
+    type==='union'?`union(${args.v1},${args.v2})`:`find(${args.v})`;
+  const res=type==='find'?String(args.root===null?'null':args.root):
+    type==='union'?String(args.sameSet?'no change':'merged'):'null';
+  document.getElementById('vRes').textContent=res;
+  document.getElementById('vRes').style.color=
+    type==='find'&&args.root!==null?'var(--accent3)':
+    type==='find'?'var(--accent)':'var(--muted)';
+
+  if(activeTab!=='what') switchTab(activeTab);
+}
+
+// ─── FULL RENDER ──────────────────────────────────────────────────────────────
+function render(type, args, result){
+  lastOp={type,args,result};
+  addLog(type,args,result);
+  updateArrays();
+  drawForest();
+  updateRightPanel();
+  updateExplain(type,args);
+}
+
+// ─── OPERATIONS ───────────────────────────────────────────────────────────────
+function doCreate(){
+  const v=parseInt(document.getElementById('inCreate').value);
+  if(isNaN(v)){alert('Enter a valid integer value');return;}
+  uf.createSet(v);
+  render('createSet',{v},null);
+}
+
+function doUnion(){
+  const v1=parseInt(document.getElementById('inUnion1').value);
+  const v2=parseInt(document.getElementById('inUnion2').value);
+  if(isNaN(v1)||isNaN(v2)){alert('Enter valid integers');return;}
+  // capture pre-union parents for path tracing
+  const r1=uf.find(v1), r2=uf.find(v2);
+  const rank1=uf.ranks[r1]??0, rank2=uf.ranks[r2]??0;
+  const sameSet=r1===r2||(r1===null||r2===null);
+  let merged=null;
+  if(!sameSet){
+    if(rank1<rank2) merged=[r1,r2];
+    else if(rank1>rank2) merged=[r2,r1];
+    else merged=[r2,r1]; // r2 under r1
+  }
+  const result=uf.union(v1,v2);
+  render('union',{v1,v2,r1,r2,rank1,rank2,sameSet,merged},result);
+}
+
+function doFind(){
+  const v=parseInt(document.getElementById('inFind').value);
+  if(isNaN(v)){alert('Enter a valid integer value');return;}
+  // detect which nodes get path-compressed
+  const before={};
+  const values=uf.getValues();
+  values.forEach(k=>before[k]=uf.parents[k]);
+  const root=uf.find(v);
+  const compressedFrom=values.filter(k=>before[k]!==uf.parents[k]&&k!==root);
+  const compressedTo=root;
+  render('find',{v,root,compressedFrom,compressedTo},root);
+}
+
+function doReset(){
+  uf=new UnionFind();
+  opLog=[]; lastOp=null;
+  document.getElementById('opLog').innerHTML=
+    '<div class="log-entry"><span class="le-op lo-sys">—</span><span class="le-result">reset</span></div>';
+  document.getElementById('narrativeText').textContent='Use the buttons above to create sets, union them, and find representatives.';
+  document.getElementById('vOp').textContent='—';
+  document.getElementById('vRes').textContent='—';
+  updateArrays(); drawForest(); updateRightPanel();
+  document.getElementById('paneWhat').textContent='Use operations above to interact.';
+  document.getElementById('paneWhy').textContent='—';
+  document.getElementById('invBlock').innerHTML='';
+}
+
+function doDemo(){
+  doReset();
+  const ops=[
+    ()=>{document.getElementById('inCreate').value='5';doCreate();},
+    ()=>{document.getElementById('inCreate').value='10';doCreate();},
+    ()=>{document.getElementById('inFind').value='5';doFind();},
+    ()=>{document.getElementById('inFind').value='10';doFind();},
+    ()=>{document.getElementById('inUnion1').value='5';document.getElementById('inUnion2').value='10';doUnion();},
+    ()=>{document.getElementById('inFind').value='5';doFind();},
+    ()=>{document.getElementById('inFind').value='10';doFind();},
+    ()=>{document.getElementById('inCreate').value='20';doCreate();},
+    ()=>{document.getElementById('inFind').value='20';doFind();},
+    ()=>{document.getElementById('inUnion1').value='20';document.getElementById('inUnion2').value='10';doUnion();},
+    ()=>{document.getElementById('inFind').value='5';doFind();},
+    ()=>{document.getElementById('inFind').value='10';doFind();},
+    ()=>{document.getElementById('inFind').value='20';doFind();},
+  ];
+  let i=0;
+  const tick=()=>{ if(i<ops.length){ops[i]();i++;setTimeout(tick,800);} };
+  setTimeout(tick,200);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+}
+
+// ─── BUTTONS ─────────────────────────────────────────────────────────────────
+document.getElementById('btnCreate').addEventListener('click',doCreate);
+document.getElementById('btnUnion').addEventListener('click',doUnion);
+document.getElementById('btnFind').addEventListener('click',doFind);
+document.getElementById('btnReset').addEventListener('click',doReset);
+document.getElementById('btnDemo').addEventListener('click',doDemo);
+
+// Enter key on inputs
+['inCreate','inUnion1','inUnion2','inFind'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    if(id==='inCreate') doCreate();
+    else if(id==='inUnion1'||id==='inUnion2') doUnion();
+    else if(id==='inFind') doFind();
+  });
+});
+
+// Initial render
+updateArrays(); drawForest(); updateRightPanel();
+window.addEventListener('resize',drawForest);
+</script>
+</body>
+</html>

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Square of Zeroes — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.75rem;color:var(--ink);outline:none;resize:vertical;width:280px;min-height:80px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* GRID */
+.grids-row{display:flex;gap:18px;margin-bottom:14px;flex-wrap:wrap;}
+.grid-box{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;flex-shrink:0;}
+.grid-title{font-family:'Space Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;}
+.grid-wrap{position:relative;display:inline-grid;gap:3px;}
+.gcell{
+  width:42px;height:38px;border-radius:5px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+}
+/* value-based heat */
+.gcell.gv-zero{background:rgba(6,214,160,.1);border-color:rgba(6,214,160,.35);color:#024d37;}
+.gcell.gv-one {background:rgba(30,30,50,.07);border-color:var(--border);color:var(--muted);}
+/* state overlays */
+.gcell.gs-cur    {background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;color:#7a4800!important;transform:scale(1.1);box-shadow:0 5px 14px rgba(245,166,35,.45);z-index:4;animation:gp .8s ease infinite alternate;}
+@keyframes gp{from{box-shadow:0 3px 8px rgba(245,166,35,.35);}to{box-shadow:0 7px 20px rgba(245,166,35,.65);}}
+.gcell.gs-border {background:rgba(33,150,243,.15)!important;border-color:var(--accent2)!important;border-width:2px!important;color:#0d47a1!important;transform:scale(1.06);}
+.gcell.gs-bad    {background:rgba(230,57,70,.15)!important;border-color:var(--accent)!important;border-width:2px!important;color:#7a0000!important;}
+.gcell.gs-found  {background:rgba(6,214,160,.22)!important;border-color:var(--accent3)!important;border-width:2.5px!important;color:#024d37!important;box-shadow:0 4px 12px rgba(6,214,160,.35);}
+.gcell.gs-inner  {background:rgba(192,84,252,.07);border-color:rgba(192,84,252,.25);color:var(--pur-dark);}
+
+/* SVG overlay on grid */
+.grid-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;}
+
+/* prefix cell */
+.pcell{
+  width:42px;height:38px;border-radius:5px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:rgba(192,84,252,.04);color:var(--pur-dark);transition:all .25s;
+}
+.pcell.pc-cur{background:rgba(255,209,102,.18);border-color:#ffd166;color:#7a4800;transform:scale(1.08);}
+.pcell.pc-used{background:rgba(192,84,252,.15);border-color:var(--pur);color:var(--pur-dark);}
+
+/* border check panel */
+.check-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;transition:border-color .3s;}
+.check-panel.cp-checking{border-color:var(--accent2);}
+.check-panel.cp-pass   {border-color:var(--accent3);}
+.check-panel.cp-fail   {border-color:var(--accent);}
+.check-panel.cp-found  {border-color:var(--accent4);}
+.check-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.check-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.check-box{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.check-box.cb-ok {border-color:var(--accent3);background:rgba(6,214,160,.06);}
+.check-box.cb-bad{border-color:var(--accent);background:rgba(230,57,70,.05);}
+.check-box.cb-na {opacity:.45;}
+.cb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.cb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.cb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{
+  background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;
+}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-pre{border-color:var(--pur);}
+.explain-panel.ep-chk{border-color:var(--accent2);}
+.explain-panel.ep-found{border-color:var(--accent4);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-pre{border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-chk{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-found{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*12+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-pre {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-chk {background:rgba(33,150,243,.16);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--bg);}
+
+/* prefix sum mini table right panel */
+.ps-section{margin-bottom:12px;}
+.ps-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.ps-grid{display:inline-grid;gap:2px;}
+.ps-cell{width:36px;height:28px;border-radius:4px;border:1px solid #2a2a3e;background:#0d0d18;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;color:#6b7280;transition:all .25s;}
+.ps-cell.psc-cur{border-color:#ffd166;background:rgba(255,209,102,.1);color:var(--accent4);}
+.ps-cell.psc-used{border-color:var(--pur);background:rgba(192,84,252,.1);color:var(--pur);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Square of Zeroes</h1>
+    <div class="sub">DP · Prefix Sums · Border Check O(1)</div>
+  </div>
+  <div class="family-badge">DP · 2D Grid</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Matrix  (rows separated by | values by comma)</label>
+      <textarea id="inMatrix">1,1,1,0,1,0|0,0,0,0,0,1|0,1,1,1,0,1|0,0,0,1,0,1|0,1,1,1,0,1|0,0,0,0,0,1</textarea>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="600">1×</button>
+        <button class="speed-btn" data-ms="280">2×</button>
+        <button class="speed-btn" data-ms="100">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- GRIDS -->
+  <div class="grids-row">
+    <div class="grid-box">
+      <div class="grid-title">Matrix  <span id="matDims" style="color:var(--accent2)"></span></div>
+      <div style="position:relative;display:inline-block;">
+        <div class="grid-wrap" id="matGrid"></div>
+        <svg id="matSvg" style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;z-index:10;" width="1" height="1"></svg>
+      </div>
+    </div>
+    <div class="grid-box">
+      <div class="grid-title">Prefix Sums  <span style="color:var(--pur);font-size:.52rem">p[i][j]=zeros in row 0..i, col j</span></div>
+      <div class="grid-wrap" id="pfGrid"></div>
+    </div>
+  </div>
+
+  <!-- BORDER CHECK PANEL -->
+  <div class="check-panel" id="checkPanel">
+    <div class="check-title" id="checkTitle">Checking each (r1,c1,r2,c2) square candidate</div>
+    <div class="check-body" id="checkBody">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">border checks will appear here</span>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Phase 1 Build</div><div class="cx-val" style="color:var(--pur-dark)">O(n²)</div>
+      <div class="cx-sub">prefix sum table</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Phase 2 Check</div><div class="cx-val" style="color:var(--accent2)">O(n³)</div>
+      <div class="cx-sub">all squares · O(1) border</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#7a5a00">O(n²)</div>
+      <div class="cx-sub">prefix table</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAns" style="color:#028a5b">—</div>
+      <div class="cx-sub">true / false</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-pre" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Full Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">bool</span> <span class="cf">squareOfZeroes</span>(vvi&amp; m){</span>
+<span class="code-line" id="cl-n">  <span class="ck">int</span> n=m.size();</span>
+<span class="code-line" id="cl-p0">  <span class="cc">// p[i][j]=zeros in col j, rows 0..i</span></span>
+<span class="code-line" id="cl-p1">  vvi p(n+<span class="cn">1</span>,vector&lt;<span class="ck">int</span>&gt;(n,<span class="cn">0</span>));</span>
+<span class="code-line" id="cl-p2">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">0</span>;i&lt;n;i++)</span>
+<span class="code-line" id="cl-p3">   <span class="ck">for</span>(<span class="ck">int</span> j=<span class="cn">0</span>;j&lt;n;j++)</span>
+<span class="code-line" id="cl-p4">    p[i+<span class="cn">1</span>][j]=p[i][j]+(<span class="cn">1</span>-m[i][j]);</span>
+<span class="code-line" id="cl-sq">  <span class="cc">// try all squares (r1,c1)→(r2,c2)</span></span>
+<span class="code-line" id="cl-r1">  <span class="ck">for</span>(<span class="ck">int</span> r1=<span class="cn">0</span>;r1&lt;n;r1++)</span>
+<span class="code-line" id="cl-c1">   <span class="ck">for</span>(<span class="ck">int</span> c1=<span class="cn">0</span>;c1&lt;n;c1++)</span>
+<span class="code-line" id="cl-r2">    <span class="ck">for</span>(<span class="ck">int</span> r2=r1+<span class="cn">1</span>;r2&lt;n;r2++){</span>
+<span class="code-line" id="cl-c2">     <span class="ck">int</span> c2=c1+(r2-r1);</span>
+<span class="code-line" id="cl-c2b">     <span class="ck">if</span>(c2&gt;=n) <span class="ck">break</span>;</span>
+<span class="code-line" id="cl-check">     <span class="cc">// check 4 borders using p[]</span></span>
+<span class="code-line" id="cl-top">     <span class="ck">int</span> top=zerosInRow(m,r1,c1,c2);</span>
+<span class="code-line" id="cl-bot">     <span class="ck">int</span> bot=zerosInRow(m,r2,c1,c2);</span>
+<span class="code-line" id="cl-lft">     <span class="ck">int</span> lft=p[r2+<span class="cn">1</span>][c1]-p[r1][c1];</span>
+<span class="code-line" id="cl-rgt">     <span class="ck">int</span> rgt=p[r2+<span class="cn">1</span>][c2]-p[r1][c2];</span>
+<span class="code-line" id="cl-sz">     <span class="ck">int</span> sz=r2-r1+<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-if">     <span class="ck">if</span>(top==sz&amp;&amp;bot==sz&amp;&amp;lft==sz&amp;&amp;rgt==sz)</span>
+<span class="code-line" id="cl-ret">      <span class="ck">return true</span>; }</span>
+<span class="code-line" id="cl-false">  <span class="ck">return false</span>; }</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n³) · prefix O(1)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#c084fc">#pragma GCC target</span><span style="color:#fda4af">("avx2")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; vvi;
+
+<span style="color:#c084fc">bool</span> <span style="color:#67e8f9">solve</span>(vvi&amp; m){
+  <span style="color:#c084fc">int</span> n=m.size();
+  <span style="color:#cc">// col prefix: p[i][j] = zeros in col j rows 0..i-1</span>
+  vvi p(n+<span style="color:#fda4af">1</span>,vector&lt;<span style="color:#c084fc">int</span>&gt;(n,<span style="color:#fda4af">0</span>));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;n;i++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> j=<span style="color:#fda4af">0</span>;j&lt;n;j++)
+      p[i+<span style="color:#fda4af">1</span>][j]=p[i][j]+(<span style="color:#fda4af">1</span>-m[i][j]);  <span style="color:#374151;font-style:italic">// 1→0 zero, 0→1 zero</span>
+  <span style="color:#c084fc">auto</span> rowZ=[&amp;](<span style="color:#c084fc">int</span> r,<span style="color:#c084fc">int</span> c1,<span style="color:#c084fc">int</span> c2){  <span style="color:#374151;font-style:italic">// zeros in row r, cols c1..c2</span>
+    <span style="color:#c084fc">int</span> cnt=<span style="color:#fda4af">0</span>;
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c=c1;c&lt;=c2;c++) cnt+=(<span style="color:#fda4af">1</span>-m[r][c]);
+    <span style="color:#c084fc">return</span> cnt;};
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r1=<span style="color:#fda4af">0</span>;r1&lt;n;r1++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c1=<span style="color:#fda4af">0</span>;c1&lt;n;c1++)
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r2=r1+<span style="color:#fda4af">1</span>;r2&lt;n;r2++){
+        <span style="color:#c084fc">int</span> c2=c1+(r2-r1);
+        <span style="color:#c084fc">if</span>(c2&gt;=n) <span style="color:#c084fc">break</span>;
+        <span style="color:#c084fc">int</span> sz=r2-r1+<span style="color:#fda4af">1</span>;
+        <span style="color:#c084fc">int</span> top=rowZ(r1,c1,c2), bot=rowZ(r2,c1,c2);
+        <span style="color:#c084fc">int</span> lft=p[r2+<span style="color:#fda4af">1</span>][c1]-p[r1][c1];    <span style="color:#374151;font-style:italic">// O(1) col query</span>
+        <span style="color:#c084fc">int</span> rgt=p[r2+<span style="color:#fda4af">1</span>][c2]-p[r1][c2];
+        <span style="color:#c084fc">if</span>(top==sz&amp;&amp;bot==sz&amp;&amp;lft==sz&amp;&amp;rgt==sz) <span style="color:#c084fc">return true</span>;
+      }
+  <span style="color:#c084fc">return false</span>;
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  vvi m(n,vector&lt;<span style="color:#c084fc">int</span>&gt;(n));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; r:m) <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:r) cin&gt;&gt;x;
+  cout&lt;&lt;(<span style="color:#67e8f9">solve</span>(m)?"true":"false")&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">col prefix sums</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">O(1) border check</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">c2=c1+(r2-r1)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">early return true</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcR1"><div class="var-name">r1 (top)</div>   <div class="var-value" id="vR1" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcC1"><div class="var-name">c1 (left)</div>  <div class="var-value" id="vC1" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcR2"><div class="var-name">r2 (bot)</div>   <div class="var-value" id="vR2" style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcC2"><div class="var-name">c2 (right)</div> <div class="var-value" id="vC2" style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcSz"><div class="var-name">size</div>        <div class="var-value" id="vSz" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcRes"><div class="var-name">result</div>     <div class="var-value" id="vRes" style="color:#e2e8f0">—</div></div>
+    </div>
+
+    <div class="ps-section">
+      <div class="ps-title">Column Prefix Sums  p[i][j]</div>
+      <div class="ps-grid" id="psGrid"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Square of Zeroes</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ ANSWER FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {n,r1,c1,r2,c2,sz,top,bot,lft,rgt,pi,pj,pval,found} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Two phases: (1) Build column prefix sum table p[i][j] = zeros in column j, rows 0..i-1. This allows any vertical border check in O(1). (2) Try every possible square (r1,c1)→(r2,c2) and check if all 4 borders are zeros using the prefix table.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>p[i][j]</strong> = count of zeros in column j from row 0 to row i-1. Base: p[0][j]=0. Then p[i+1][j] = p[i][j] + (matrix[i][j]===0 ? 1 : 0).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Border check O(1):</strong> zeros in col j, rows r1..r2 = p[r2+1][j] − p[r1][j]. Top/bottom row checks are O(size) but O(n³) total is acceptable.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Square constraint:</strong> for top-left (r1,c1) and side length s: r2=r1+s-1, c2=c1+s-1. Each border must have exactly s zeros (all-zero).`},
+    ]
+  };
+  if(type==='prefix') return {
+    why:`<div class="ep-why-block why-pre">p[${pi+1}][${pj}] = p[${pi}][${pj}] + (matrix[${pi}][${pj}]===0 ? 1 : 0) = ${pval}. This builds the column running count of zeros top-to-bottom for each column j.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>p[${pi+1}][${pj}]=${pval}</strong> — zeros in column ${pj}, rows 0..${pi}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why column sums?</strong> The left and right borders of a square are vertical — column queries. Row borders are horizontal and require a simple loop.`},
+    ]
+  };
+  if(type==='check') return {
+    why:`<div class="ep-why-block why-chk">Checking square (${r1},${c1})→(${r2},${c2}), size ${sz}×${sz}. Need all 4 borders to be all zeros: top=${top}/${sz}, bot=${bot}/${sz}, left=${lft}/${sz}, right=${rgt}/${sz}. ${top===sz&&bot===sz&&lft===sz&&rgt===sz?'ALL MATCH → FOUND!':'At least one border has a non-zero → skip.'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Border check:</strong> top row (r1, c1→c2), bottom row (r2, c1→c2), left col (r1→r2, c1), right col (r1→r2, c2). All must equal sz.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Early exit:</strong> as soon as any border fails, skip this square. The left/right column checks use O(1) prefix subtraction.`},
+    ]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block why-found">Found! Square at (${r1},${c1})→(${r2},${c2}), size ${sz}×${sz}, has all-zero borders. Return true immediately.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>Square found at (${r1},${c1})→(${r2},${c2})</strong>, size ${sz}. All 4 borders confirmed zero.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Checked all possible squares. ${found?'Found a valid square of zeroes → return true.':'No square of zeroes exists → return false.'} Time O(n³), Space O(n²).</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${found?'true':'false'}</strong>. ${found?'At least one square with all-zero borders exists.':'No 2×2 or larger square has all-zero borders.'}`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n³):</strong> O(n²) candidate squares × O(n) for row border checks. Column border checks are O(1) thanks to prefix sums.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-n','cl-p0','cl-p1','cl-p2','cl-p3','cl-p4'],cls:'hl-pre'},
+  prefix:{ids:['cl-p2','cl-p3','cl-p4'],cls:'hl-pre'},
+  check: {ids:['cl-r1','cl-c1','cl-r2','cl-c2','cl-c2b','cl-check','cl-top','cl-bot','cl-lft','cl-rgt','cl-sz','cl-if'],cls:'hl-chk'},
+  found: {ids:['cl-if','cl-ret'],cls:'hl-found'},
+  done:  {ids:['cl-false'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,r1,c1,r2,c2,sz,top,bot,lft,rgt,pi,pj,pval,found,n} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have a <strong>${n}×${n}</strong> matrix of 0s and 1s. We want to know: is there a square (at least 2×2) whose entire border is made of 0s? First we'll build a helper table, then check every possible square.`};
+  if(type==='prefix') return {color:'var(--pur-dark)',
+    text:`Building the helper table. Column <strong>${pj}</strong>, row <strong>${pi}</strong>: so far there are <strong>${pval}</strong> zero${pval!==1?'s':''} in this column above (including this cell). This lets us answer "how many zeros in a column range?" in one subtraction.`};
+  if(type==='check'){
+    const allOk=top===sz&&bot===sz&&lft===sz&&rgt===sz;
+    if(allOk) return {color:'var(--accent3)',
+      text:`🎉 Square from (${r1},${c1}) to (${r2},${c2}) — size ${sz}×${sz}: top ${top}/${sz} ✓, bottom ${bot}/${sz} ✓, left ${lft}/${sz} ✓, right ${rgt}/${sz} ✓. <strong>All borders are zero!</strong>`};
+    const fail=top<sz?'top':bot<sz?'bottom':lft<sz?'left':'right';
+    return {color:'var(--accent2)',
+      text:`Square (${r1},${c1})→(${r2},${c2}), size ${sz}×${sz}: ${fail} border has a non-zero — skip this square and try the next.`};
+  }
+  if(type==='found') return {color:'var(--accent4)',
+    text:`✅ Found! The square from (${r1},${c1}) to (${r2},${c2}) has all-zero borders. Return <strong>true</strong>.`};
+  if(type==='done') return {color:found?'var(--accent3)':'var(--accent)',
+    text:found
+      ? `✅ Done — the matrix <strong>does</strong> contain a square of zeroes!`
+      : `❌ Done — checked every possible square and none had all-zero borders. Return <strong>false</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(mat){
+  const n=mat.length;
+  const p=Array.from({length:n+1},()=>new Array(n).fill(0));
+  const steps=[];
+  let foundSquare=false, foundR1,foundC1,foundR2,foundC2;
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,mat,
+    pTable:p.map(r=>[...r]),
+    result:null,...extra,
+    explain:makeExplain(type,{n,...extra})
+  });
+
+  snap('init',`🔍 <strong>Start.</strong> ${n}×${n} matrix. Phase 1: build column prefix sum table. Phase 2: check all squares.`,
+    {r1:null,c1:null,r2:null,c2:null,sz:null,top:null,bot:null,lft:null,rgt:null});
+
+  // Phase 1: prefix sums
+  for(let i=0;i<n;i++){
+    for(let j=0;j<n;j++){
+      p[i+1][j]=p[i][j]+(mat[i][j]===0?1:0);
+      snap('prefix',
+        `p[${i+1}][${j}] = p[${i}][${j}](${p[i][j]}) + (mat[${i}][${j}]===0?1:0) = <strong>${p[i+1][j]}</strong>`,
+        {pi:i,pj:j,pval:p[i+1][j],r1:null,c1:null,r2:null,c2:null}
+      );
+    }
+  }
+
+  // Phase 2: check all squares
+  outer:
+  for(let r1=0;r1<n&&!foundSquare;r1++){
+    for(let c1=0;c1<n&&!foundSquare;c1++){
+      for(let r2=r1+1;r2<n&&!foundSquare;r2++){
+        const c2=c1+(r2-r1);
+        if(c2>=n) break;
+        const sz=r2-r1+1;
+        // top row zeros
+        let top=0; for(let c=c1;c<=c2;c++) top+=(mat[r1][c]===0?1:0);
+        // bottom row zeros
+        let bot=0; for(let c=c1;c<=c2;c++) bot+=(mat[r2][c]===0?1:0);
+        // left col zeros
+        const lft=p[r2+1][c1]-p[r1][c1];
+        // right col zeros
+        const rgt=p[r2+1][c2]-p[r1][c2];
+        const isFound=top===sz&&bot===sz&&lft===sz&&rgt===sz;
+
+        snap(isFound?'found':'check',
+          isFound
+            ? `🎉 Square (${r1},${c1})→(${r2},${c2}) sz=${sz}: <strong>ALL BORDERS ZERO!</strong>`
+            : `Square (${r1},${c1})→(${r2},${c2}) sz=${sz}: top=${top},bot=${bot},lft=${lft},rgt=${rgt} ${top<sz?'top fail':bot<sz?'bot fail':lft<sz?'lft fail':'rgt fail'}`,
+          {r1,c1,r2,c2,sz,top,bot,lft,rgt}
+        );
+        if(isFound){foundSquare=true;foundR1=r1;foundC1=c1;foundR2=r2;foundC2=c2;}
+      }
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Answer: <strong>${foundSquare?'true':'false'}</strong>.${foundSquare?` Square at (${foundR1},${foundC1})→(${foundR2},${foundC2}).`:''}`,
+    {r1:foundR1??null,c1:foundC1??null,r2:foundR2??null,c2:foundC2??null,
+     sz:foundSquare?foundR2-foundR1+1:null,found:foundSquare,
+     top:null,bot:null,lft:null,rgt:null,
+     result:{found:foundSquare,r1:foundR1,c1:foundC1,r2:foundR2,c2:foundC2}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=600;
+let mat=[], n=0;
+const CW=45, CH=41; // cell stride
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── SVG OVERLAY: draw square border on the matrix grid ──────────────────────
+function drawSquareOverlay(st){
+  const svg=document.getElementById('matSvg');
+  svg.innerHTML='';
+  if(!st||st.r1==null||st.c1==null||st.r2==null||st.c2==null) return;
+  const {r1,c1,r2,c2,type} = st;
+  const W=n*CW, H=n*CH;
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+
+  const color=type==='found'?'#06d6a0':type==='done'&&st.found?'#06d6a0':'#2196f3';
+  const x=c1*CW+1, y=r1*CH+1;
+  const w=(c2-c1+1)*CW-3, h=(r2-r1+1)*CH-3;
+
+  const rect=svgEl('rect',{x,y,width:w,height:h,rx:6,
+    fill:'none',stroke:color,'stroke-width':'3',
+    'stroke-dasharray':type==='found'||st.found?'none':'6 3'});
+  if(type==='found') rect.style.animation='sqPulse 0.7s ease infinite alternate';
+  svg.appendChild(rect);
+
+  const style=document.createElementNS('http://www.w3.org/2000/svg','style');
+  style.textContent=`@keyframes sqPulse{from{stroke-width:3;opacity:.9}to{stroke-width:4.5;opacity:1}}`;
+  svg.appendChild(style);
+
+  // corner dots
+  [[c1,r1],[c2,r1],[c1,r2],[c2,r2]].forEach(([c,r])=>{
+    svg.appendChild(svgEl('circle',{
+      cx:c*CW+CW/2, cy:r*CH+CH/2, r:5,
+      fill:color, opacity:'0.85'
+    }));
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inMatrix').value.trim();
+  mat=raw.split('|').map(r=>r.trim().split(',').map(Number));
+  n=mat.length;
+  steps=computeSteps(mat);
+  currentStep=0;
+
+  document.getElementById('matDims').textContent=`${n}×${n}`;
+
+  // Matrix grid
+  const mg=document.getElementById('matGrid');
+  mg.style.gridTemplateColumns=`repeat(${n},${CW}px)`;
+  mg.style.gridTemplateRows=`repeat(${n},${CH}px)`;
+  mg.innerHTML='';
+  for(let r=0;r<n;r++)
+    for(let c=0;c<n;c++){
+      const v=mat[r][c];
+      mg.innerHTML+=`<div class="gcell ${v===0?'gv-zero':'gv-one'}" id="gc-${r}-${c}">${v}</div>`;
+    }
+
+  // Prefix grid
+  const pg=document.getElementById('pfGrid');
+  pg.style.gridTemplateColumns=`repeat(${n},42px)`;
+  pg.innerHTML='';
+  for(let i=0;i<=n;i++)
+    for(let j=0;j<n;j++)
+      pg.innerHTML+=`<div class="pcell" id="pc-${i}-${j}">0</div>`;
+
+  // Right panel prefix mini table
+  const psg=document.getElementById('psGrid');
+  psg.style.gridTemplateColumns=`repeat(${Math.min(n,6)},36px)`;
+  psg.innerHTML='';
+  for(let i=0;i<=Math.min(n,5);i++)
+    for(let j=0;j<Math.min(n,6);j++)
+      psg.innerHTML+=`<div class="ps-cell" id="psc-${i}-${j}">0</div>`;
+
+  // SVG
+  const sv=document.getElementById('matSvg');
+  sv.setAttribute('width',n*CW); sv.setAttribute('height',n*CH);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Matrix cells
+  for(let r=0;r<n;r++)
+    for(let c=0;c<n;c++){
+      const el=document.getElementById(`gc-${r}-${c}`);
+      if(!el)continue;
+      const v=mat[r][c];
+      let cls=v===0?'gcell gv-zero':'gcell gv-one';
+      if(st.r1!=null&&st.r2!=null&&st.c1!=null&&st.c2!=null){
+        const onBorder=(r===st.r1||r===st.r2)&&c>=st.c1&&c<=st.c2 ||
+                       (c===st.c1||c===st.c2)&&r>=st.r1&&r<=st.r2;
+        const isInner=r>st.r1&&r<st.r2&&c>st.c1&&c<st.c2;
+        if(onBorder&&(st.type==='found'||isFinal&&st.found)) cls='gcell gs-found';
+        else if(onBorder&&v===0) cls='gcell gs-border';
+        else if(onBorder&&v===1) cls='gcell gs-bad';
+        else if(isInner) cls='gcell gs-inner';
+      }
+      if(st.type==='prefix'&&r===st.pi&&c===st.pj) cls='gcell gs-cur';
+      el.className=cls;
+    }
+
+  // Prefix grid (left)
+  const pt=st.pTable;
+  for(let i=0;i<=n;i++)
+    for(let j=0;j<n;j++){
+      const el=document.getElementById(`pc-${i}-${j}`);
+      if(!el)continue;
+      el.textContent=pt[i][j];
+      const isCur=st.type==='prefix'&&i===st.pi+1&&j===st.pj;
+      const isUsed=st.type==='check'&&
+        ((i===st.r2+1||i===st.r1)&&(j===st.c1||j===st.c2));
+      el.className='pcell'+(isCur?' pc-cur':isUsed?' pc-used':'');
+    }
+
+  // Prefix mini (right panel)
+  for(let i=0;i<=Math.min(n,5);i++)
+    for(let j=0;j<Math.min(n,6);j++){
+      const el=document.getElementById(`psc-${i}-${j}`);
+      if(!el)continue;
+      el.textContent=pt[i][j];
+      const isCur=st.type==='prefix'&&i===st.pi+1&&j===st.pj;
+      const isUsed=st.type==='check'&&
+        ((i===st.r2+1||i===st.r1)&&(j===st.c1||j===st.c2));
+      el.className='ps-cell'+(isCur?' psc-cur':isUsed?' psc-used':'');
+    }
+
+  // Border check panel
+  const cp=document.getElementById('checkPanel');
+  const ct=document.getElementById('checkTitle');
+  const cb=document.getElementById('checkBody');
+  if(st.type==='check'||st.type==='found'){
+    const {r1,c1,r2,c2,sz,top,bot,lft,rgt} = st;
+    const isFound=st.type==='found';
+    cp.className='check-panel'+(isFound?' cp-found':' cp-checking');
+    ct.textContent=`Square (${r1},${c1})→(${r2},${c2}), size ${sz}×${sz} — need all borders = ${sz}`;
+    const mkBox=(label,val,need)=>{
+      const ok=val===need;
+      return `<div class="check-box ${ok?'cb-ok':'cb-bad'}">
+        <div class="cb-lbl">${label}</div>
+        <div class="cb-val">${val}/${need}</div>
+        <div class="cb-sub">${ok?'✓ all zero':'✗ has 1s'}</div>
+      </div>`;
+    };
+    cb.innerHTML=mkBox('Top',top,sz)+mkBox('Bottom',bot,sz)+mkBox('Left',lft,sz)+mkBox('Right',rgt,sz);
+    if(isFound) cb.innerHTML+=`<div style="font-family:'Space Mono',monospace;font-size:.78rem;color:var(--accent3);font-weight:700;align-self:center;">→ TRUE ✓</div>`;
+  } else if(st.type==='prefix'){
+    cp.className='check-panel';
+    ct.textContent=`Phase 1: building column prefix sums`;
+    cb.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">p[${(st.pi??0)+1}][${st.pj??0}] = ${st.pval??0} zeros</span>`;
+  } else {
+    cp.className='check-panel';
+    ct.textContent='Checking each (r1,c1,r2,c2) square candidate';
+    cb.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">border checks will appear here</span>`;
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vR1','vcR1',st.r1!=null?st.r1:'—');
+  setVar('vC1','vcC1',st.c1!=null?st.c1:'—');
+  setVar('vR2','vcR2',st.r2!=null?st.r2:'—');
+  setVar('vC2','vcC2',st.c2!=null?st.c2:'—');
+  setVar('vSz','vcSz',st.sz!=null?st.sz+'×'+st.sz:'—');
+  const resEl=document.getElementById('vRes');
+  if(isFinal){resEl.textContent=st.result.found?'TRUE':'FALSE';resEl.style.color=st.result.found?'var(--accent3)':'var(--accent)';}
+  else resEl.textContent='—';
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type==='found'?'found':st.type==='prefix'?'prefix':st.type==='check'?'check':st.type==='done'?'done':'init');
+
+  // Done
+  if(isFinal){
+    const found=st.result.found;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=found?
+      `★ TRUE — Square at (${st.result.r1},${st.result.c1})→(${st.result.r2},${st.result.c2})`:'★ FALSE — No square of zeroes found';
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=found?'true':'false';
+    document.getElementById('bestMeta').textContent=found?
+      `(${st.result.r1},${st.result.c1})→(${st.result.r2},${st.result.c2}) · ${st.result.r2-st.result.r1+1}×${st.result.r2-st.result.r1+1}`:
+      'No valid square found';
+    document.getElementById('cxAns').textContent=found?'true':'false';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  drawSquareOverlay(st);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-pre',prefix:'ep-pre',check:'ep-chk',found:'ep-found',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-chk');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

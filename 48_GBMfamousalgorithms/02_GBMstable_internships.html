@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stable Internships — Gale-Shapley Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+  --intern:#2196f3;--team:#e63946;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.78rem;color:var(--ink);outline:none;transition:border-color .2s;width:220px;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.65rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ── ARENA (interns left | teams right) ─────────────────── */
+.arena{display:grid;grid-template-columns:1fr 60px 1fr;gap:0;margin-bottom:14px;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:14px;position:relative;}
+
+.arena-col-label{font-family:'Space Mono',monospace;font-size:.58rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;text-align:center;padding:5px 0 10px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.arena-col-label.cl-intern{color:var(--intern);}
+.arena-col-label.cl-team  {color:var(--team);}
+.arena-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 4px;}
+.arena-mid-label{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;writing-mode:vertical-rl;}
+
+/* SVG proposal arrows across the arena */
+.arena-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:10;}
+
+/* intern card */
+.icard{
+  border:1.5px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:6px;
+  background:var(--surface);font-family:'Space Mono',monospace;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.icard-head{display:flex;align-items:center;gap:8px;}
+.icard-avatar{width:28px;height:28px;border-radius:50%;background:rgba(33,150,243,.15);border:1.5px solid rgba(33,150,243,.35);
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--intern);flex-shrink:0;}
+.icard-name{font-size:.7rem;font-weight:700;color:var(--ink);}
+.icard-prefs{font-size:.6rem;color:var(--muted);margin-top:3px;line-height:1.5;}
+.icard-pref-item{display:inline-block;padding:1px 5px;border-radius:3px;margin-right:3px;margin-bottom:2px;background:rgba(33,150,243,.06);border:1px solid rgba(33,150,243,.15);}
+.icard-pref-item.pp-used  {opacity:.3;text-decoration:line-through;}
+.icard-pref-item.pp-cur   {background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;font-weight:700;}
+.icard-pref-item.pp-matched{background:rgba(6,214,160,.15);border-color:var(--accent3);color:#024d37;font-weight:700;}
+.icard-status{font-size:.55rem;margin-top:4px;padding:2px 7px;border-radius:3px;display:inline-block;font-weight:700;letter-spacing:.5px;}
+
+/* icard states */
+.icard.ic-free    {border-color:rgba(33,150,243,.25);}
+.icard.ic-proposing{border-color:var(--accent4);border-width:2px;background:#fffbe8;transform:translateX(3px);}
+.icard.ic-accepted{border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.icard.ic-rejected{border-color:var(--accent);border-width:2px;background:rgba(230,57,70,.04);transform:translateX(-2px);}
+.icard.ic-matched {border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.1);box-shadow:0 3px 10px rgba(6,214,160,.2);}
+.icard.ic-free .icard-status   {background:rgba(33,150,243,.12);color:var(--intern);}
+.icard.ic-proposing .icard-status{background:rgba(255,209,102,.2);color:#7a4800;}
+.icard.ic-accepted .icard-status {background:rgba(6,214,160,.15);color:#028a5b;}
+.icard.ic-rejected .icard-status {background:rgba(230,57,70,.1);color:var(--accent);}
+.icard.ic-matched .icard-status  {background:rgba(6,214,160,.2);color:#024d37;}
+
+/* team card */
+.tcard{
+  border:1.5px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:6px;
+  background:var(--surface);font-family:'Space Mono',monospace;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.tcard-head{display:flex;align-items:center;gap:8px;}
+.tcard-avatar{width:28px;height:28px;border-radius:6px;background:rgba(230,57,70,.12);border:1.5px solid rgba(230,57,70,.3);
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--team);flex-shrink:0;}
+.tcard-name{font-size:.7rem;font-weight:700;color:var(--ink);}
+.tcard-prefs{font-size:.6rem;color:var(--muted);margin-top:3px;line-height:1.5;}
+.tcard-pref-item{display:inline-block;padding:1px 5px;border-radius:3px;margin-right:3px;margin-bottom:2px;background:rgba(230,57,70,.05);border:1px solid rgba(230,57,70,.15);}
+.tcard-pref-item.tp-cur{background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;font-weight:700;}
+.tcard-pref-item.tp-beat{background:rgba(6,214,160,.12);border-color:var(--accent3);color:#024d37;font-weight:700;}
+.tcard-status{font-size:.55rem;margin-top:4px;padding:2px 7px;border-radius:3px;display:inline-block;font-weight:700;letter-spacing:.5px;}
+.tcard-current-intern{font-size:.6rem;color:var(--muted);margin-top:3px;}
+
+/* tcard states */
+.tcard.tc-free    {border-color:rgba(230,57,70,.2);}
+.tcard.tc-proposed{border-color:var(--accent4);border-width:2px;background:#fffbe8;}
+.tcard.tc-accepted{border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.tcard.tc-rejected-other{border-color:var(--accent);border-width:2px;background:rgba(230,57,70,.04);}
+.tcard.tc-matched {border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.1);box-shadow:0 3px 10px rgba(6,214,160,.2);}
+.tcard.tc-free .tcard-status    {background:rgba(230,57,70,.08);color:var(--team);}
+.tcard.tc-proposed .tcard-status {background:rgba(255,209,102,.2);color:#7a4800;}
+.tcard.tc-accepted .tcard-status {background:rgba(6,214,160,.15);color:#028a5b;}
+.tcard.tc-rejected-other .tcard-status{background:rgba(230,57,70,.1);color:var(--accent);}
+.tcard.tc-matched .tcard-status  {background:rgba(6,214,160,.2);color:#024d37;}
+
+/* FREE QUEUE */
+.queue-section{margin-bottom:14px;}
+.queue-chips{display:flex;gap:6px;flex-wrap:wrap;min-height:28px;align-items:center;}
+.q-chip{padding:3px 10px;border-radius:5px;background:rgba(33,150,243,.1);border:1.5px solid rgba(33,150,243,.3);
+  font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--intern);transition:all .25s;}
+.q-chip.qc-active{background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;
+  transform:scale(1.08);box-shadow:0 3px 8px rgba(255,209,102,.3);}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* RESULT TABLE */
+.result-section{margin-bottom:14px;display:none;}
+.result-section.show{display:block;}
+.result-table{width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:.72rem;}
+.result-table th{background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.25);padding:6px 10px;color:#028a5b;text-transform:uppercase;letter-spacing:1px;font-size:.58rem;}
+.result-table td{border:1px solid var(--border);padding:6px 10px;text-align:center;transition:background .3s;}
+.result-table tr:nth-child(even) td{background:rgba(0,0,0,.02);}
+.result-table .rc-match{background:rgba(6,214,160,.08);font-weight:700;color:#024d37;}
+
+/* complexity */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-prop{border-color:var(--accent4);}
+.explain-panel.ep-acc {border-color:var(--accent3);}
+.explain-panel.ep-rej {border-color:var(--accent);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-prop{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-acc {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-rej {border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*13+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-prop{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-acc {background:rgba(6,214,160,.16);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-rej {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+/* matchings mini display right */
+.match-log{margin-bottom:12px;}
+.ml-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.ml-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.ml-rows::-webkit-scrollbar{width:3px;}.ml-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.ml-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;align-items:center;}
+.ml-row.ml-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.ml-row.ml-done{border-color:rgba(6,214,160,.3);background:rgba(6,214,160,.06);}
+.ml-intern{color:#4fc3f7;width:60px;flex-shrink:0;}
+.ml-arrow{color:#6b7280;}
+.ml-team{color:#ff6b6b;font-weight:700;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;color:var(--bg);line-height:1.8;}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Stable Internships</h1>
+    <div class="sub">Gale-Shapley Algorithm · Stable Matching · Intern-Optimal</div>
+  </div>
+  <div class="family-badge">Greedy · Matching</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Interns preferences (rows separated by |, values by comma)</label>
+      <input type="text" id="inInterns" value="0,1,2|1,0,2|1,2,0">
+      <div class="hint">Row i = intern i's ranked team preferences</div>
+    </div>
+    <div class="field">
+      <label>Teams preferences</label>
+      <input type="text" id="inTeams" value="2,1,0|1,2,0|0,2,1">
+      <div class="hint">Row i = team i's ranked intern preferences</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1600">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="380">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- FREE QUEUE -->
+  <div class="queue-section">
+    <div class="section-label">Free Interns Queue — waiting to propose</div>
+    <div class="queue-chips" id="freeQueue">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">all interns start free</span>
+    </div>
+  </div>
+
+  <!-- ARENA -->
+  <div style="margin-bottom:8px;">
+    <div class="section-label">Proposals — interns propose to their next preferred team</div>
+  </div>
+  <div class="arena" id="arena">
+    <div>
+      <div class="arena-col-label cl-intern">👤 Interns</div>
+      <div id="internCards"></div>
+    </div>
+    <div class="arena-mid">
+      <div class="arena-mid-label">proposals</div>
+      <svg class="arena-svg" id="arenaSvg"></svg>
+    </div>
+    <div>
+      <div class="arena-col-label cl-team">🏢 Teams</div>
+      <div id="teamCards"></div>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n²)</div>
+      <div class="cx-sub">n² proposals max</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(n²)</div>
+      <div class="cx-sub">preference lookups</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Guarantee</div><div class="cx-val" style="color:#028a5b">Stable</div>
+      <div class="cx-sub">intern-optimal</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Proposals</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">this run</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-prop" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <!-- RESULT TABLE -->
+  <div class="result-section" id="resultSection">
+    <div class="section-label">Final Stable Matching</div>
+    <table class="result-table" id="resultTable"></table>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Gale-Shapley Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">stableInternships</span>(interns,teams):</span>
+<span class="code-line" id="cl-n">  n=len(interns)</span>
+<span class="code-line" id="cl-rank">  <span class="cc"># rank[t][intern]=preference rank of intern for team t</span></span>
+<span class="code-line" id="cl-rank2">  rank={t:{intern:i <span class="ck">for</span> i,intern</span>
+<span class="code-line" id="cl-rank3">    <span class="ck">in</span> enumerate(teams[t])} <span class="ck">for</span> t <span class="ck">in</span> range(n)}</span>
+<span class="code-line" id="cl-free">  free=[<span class="cn">True</span>]*n; nxt=[<span class="cn">0</span>]*n</span>
+<span class="code-line" id="cl-match">  matched={} <span class="cc"># team→intern</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> <span class="ck">any</span>(free):</span>
+<span class="code-line" id="cl-pick">   intern=free.index(<span class="cn">True</span>)</span>
+<span class="code-line" id="cl-team">   team=interns[intern][nxt[intern]]</span>
+<span class="code-line" id="cl-nxt">   nxt[intern]+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-if">   <span class="ck">if</span> team <span class="ck">not in</span> matched:</span>
+<span class="code-line" id="cl-acc">    matched[team]=intern; free[intern]=<span class="cn">False</span></span>
+<span class="code-line" id="cl-else">   <span class="ck">else</span>:</span>
+<span class="code-line" id="cl-cur">    cur=matched[team]</span>
+<span class="code-line" id="cl-pref">    <span class="ck">if</span> rank[team][intern]&lt;rank[team][cur]:</span>
+<span class="code-line" id="cl-swap">     matched[team]=intern; free[intern]=<span class="cn">False</span></span>
+<span class="code-line" id="cl-kick">     free[cur]=<span class="cn">True</span>  <span class="cc"># old intern freed</span></span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> [[i,t] <span class="ck">for</span> t,i <span class="ck">in</span> matched.items()]</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n²) · Gale-Shapley</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; <span style="color:#67e8f9">stableMatch</span>(
+    vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; interns,
+    vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; teams){
+  <span style="color:#c084fc">int</span> n=interns.size();
+  <span style="color:#cc">// rank[t][intern] = preference of intern for team t</span>
+  vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; rank(n,vector&lt;<span style="color:#c084fc">int</span>&gt;(n));
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> t=<span style="color:#fda4af">0</span>;t&lt;n;t++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> k=<span style="color:#fda4af">0</span>;k&lt;n;k++)
+      rank[t][teams[t][k]]=k;          <span style="color:#374151;font-style:italic">// lower rank = more preferred</span>
+  vector&lt;<span style="color:#c084fc">int</span>&gt; nxt(n,<span style="color:#fda4af">0</span>),matched(n,-<span style="color:#fda4af">1</span>),who(n,-<span style="color:#fda4af">1</span>);
+  queue&lt;<span style="color:#c084fc">int</span>&gt; free;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;n;i++) free.push(i);
+  <span style="color:#c084fc">while</span>(!free.empty()){
+    <span style="color:#c084fc">int</span> intern=free.front(); free.pop();
+    <span style="color:#c084fc">int</span> team=interns[intern][nxt[intern]++];
+    <span style="color:#c084fc">if</span>(who[team]==-<span style="color:#fda4af">1</span>){             <span style="color:#374151;font-style:italic">// team is free → accept</span>
+      who[team]=intern; matched[intern]=team;
+    } <span style="color:#c084fc">else</span> {
+      <span style="color:#c084fc">int</span> cur=who[team];
+      <span style="color:#c084fc">if</span>(rank[team][intern]&lt;rank[team][cur]){ <span style="color:#374151;font-style:italic">// team prefers new intern</span>
+        who[team]=intern; matched[intern]=team;
+        matched[cur]=-<span style="color:#fda4af">1</span>; free.push(cur); <span style="color:#374151;font-style:italic">// old intern freed</span>
+      } <span style="color:#c084fc">else</span> free.push(intern);            <span style="color:#374151;font-style:italic">// team rejects new intern</span>
+    }
+  }
+  vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; res;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;n;i++) res.push_back({i,matched[i]});
+  <span style="color:#c084fc">return</span> res;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">rank precomputed</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">queue for free</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">O(n²) worst</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">intern-optimal</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcIntern"><div class="var-name">proposing intern</div><div class="var-value" id="vIntern" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcTeam">  <div class="var-name">target team</div>   <div class="var-value" id="vTeam"   style="color:#ff6b6b">—</div></div>
+      <div class="var-card" id="vcAction"><div class="var-name">action</div>         <div class="var-value" id="vAction" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcFreeN"> <div class="var-name"># free interns</div><div class="var-value" id="vFreeN"  style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcProps"> <div class="var-name">total proposals</div><div class="var-value" id="vProps"  style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcRound"> <div class="var-name">round</div>          <div class="var-value" id="vRound"  style="color:var(--accent4)">—</div></div>
+    </div>
+
+    <div class="match-log">
+      <div class="ml-title">Current Matchings</div>
+      <div class="ml-rows" id="mlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Stable Matching (Final)</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ STABLE MATCHING FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {intern,team,cur,rankCur,rankNew,n,accepted,kicked} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Gale-Shapley (intern-proposing variant): free interns propose to their next most preferred team. Teams always accept if free, or upgrade if the new intern is preferred. An intern's current match can never get worse — a team's match can only get better. This guarantees stability and intern-optimality.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>At all times:</strong> every intern is either free (not yet matched) or engaged (provisionally matched). Every team is either free (unmatched) or tentatively matched.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Progress:</strong> each proposal crosses off one team from an intern's preference list permanently. At most n² proposals total → O(n²) time.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why stable?</strong> If intern A would rather be with team T than their match, team T must have rejected A for a better intern. So team T is at least as happy — no instability possible.`},
+    ]
+  };
+  if(type==='propose') return {
+    why:`<div class="ep-why-block why-prop">Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong> — their next highest-ranked choice. Team ${team} is currently <strong>free</strong> → immediately accept! No comparison needed.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> a team that is free ALWAYS accepts any proposal. There's no reason to wait — any match is better than none.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Order matters:</strong> interns propose in order of their preference list. Each intern's next pointer nxt[i] advances after every proposal, never going back.`},
+    ]
+  };
+  if(type==='accept') return {
+    why:`<div class="ep-why-block why-acc">Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong>. Team ${team} currently has intern <strong>${cur}</strong>. Team ranks: intern ${intern} at position ${rankNew} vs intern ${cur} at position ${rankCur}. <strong>${rankNew} &lt; ${rankCur} → prefers ${intern} → UPGRADE!</strong> Intern ${cur} is freed.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Upgrade rule:</strong> a team upgrades only when the new intern is strictly preferred (lower rank index = more preferred).`},
+      {icon:'🔑',cls:'inv-key',text:`<strong>Freed intern ${cur}</strong> goes back to the queue and will propose to their next preferred team. Their preference list pointer does NOT reset.`},
+    ]
+  };
+  if(type==='reject') return {
+    why:`<div class="ep-why-block why-rej">Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong>. Team ${team} already has intern <strong>${cur}</strong>. Team ranks: intern ${intern} at position ${rankNew} vs intern ${cur} at position ${rankCur}. <strong>${rankNew} &gt; ${rankCur} → prefers current → REJECT!</strong> Intern ${intern} stays free.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Rejected intern ${intern}</strong> stays free and will propose to the next team on their list. This team is now crossed off permanently.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Key insight:</strong> intern ${intern} will never re-propose to team ${team}. Each failed proposal permanently advances the pointer.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All interns are matched. The matching is stable — no pair (intern i, team t) exists where both would prefer each other over their current matches. It is also intern-optimal: no intern can do better in any stable matching.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Stability:</strong> proven by Gale-Shapley. Every intern gets their best possible partner in any stable matching.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n²) time:</strong> each intern proposes to each team at most once, giving n² proposals maximum. Each proposal is O(1) using precomputed rank table.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Team-optimal stable matching:</strong> run the algorithm with teams proposing instead. Gale-Shapley always favours the proposing side.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:   {ids:['cl-sig','cl-n','cl-rank','cl-rank2','cl-rank3','cl-free','cl-match','cl-loop'],cls:'hl-prop'},
+  propose:{ids:['cl-pick','cl-team','cl-nxt','cl-if','cl-acc'],cls:'hl-acc'},
+  accept: {ids:['cl-else','cl-cur','cl-pref','cl-swap','cl-kick'],cls:'hl-acc'},
+  reject: {ids:['cl-else','cl-cur','cl-pref'],cls:'hl-rej'},
+  done:   {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,intern,team,cur,rankCur,rankNew,n,matched} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have <strong>${n}</strong> interns and <strong>${n}</strong> teams. Each intern proposes to teams in order of preference. Teams can upgrade to better interns but can never be left empty once matched. We keep going until every intern has a team.`};
+  if(type==='propose') return {color:'var(--accent3)',
+    text:`Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong> (their next pick). Team ${team} is <strong>free</strong> — happily accepts! Intern ${intern} is now tentatively matched.`};
+  if(type==='accept') return {color:'var(--accent3)',
+    text:`Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong>. Team ${team} had intern ${cur}, but prefers intern ${intern} (rank ${rankNew} vs ${rankCur}). <strong>Upgrade!</strong> Intern ${cur} is freed and goes back to the queue.`};
+  if(type==='reject') return {color:'var(--accent)',
+    text:`Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong>. Team ${team} already has intern ${cur} and prefers them (rank ${rankCur} vs ${rankNew} for new). <strong>Rejected.</strong> Intern ${intern} must try their next choice.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ All interns matched! This is the <strong>intern-optimal stable matching</strong> — every intern got the best team they could possibly get in any stable matching. ${st.totalProposals} total proposals made.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(internsPrefs, teamsPrefs){
+  const n=internsPrefs.length;
+  // rank[t][intern] = how much team t prefers intern (lower=better)
+  const rank=Array.from({length:n},(_,t)=>{
+    const r={}; teamsPrefs[t].forEach((intern,k)=>r[intern]=k); return r;
+  });
+  const nxt=new Array(n).fill(0);
+  const freeArr=new Array(n).fill(true);
+  const matchedTeam=new Array(n).fill(-1); // intern→team
+  const who=new Array(n).fill(-1);         // team→intern
+  const steps=[];
+  let totalProposals=0, round=0;
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,internsPrefs,teamsPrefs,
+    freeArr:[...freeArr],
+    matchedTeam:[...matchedTeam],
+    who:[...who],
+    nxt:[...nxt],
+    totalProposals,round,
+    result:null,...extra,
+    explain:makeExplain(type,{n,...extra})
+  });
+
+  snap('init',`🤝 <strong>Start.</strong> ${n} interns, ${n} teams. All interns free. They'll each propose to teams in preference order.`,
+    {intern:null,team:null});
+
+  while(freeArr.some(f=>f)){
+    round++;
+    const intern=freeArr.indexOf(true);
+    const team=internsPrefs[intern][nxt[intern]];
+    nxt[intern]++; totalProposals++;
+
+    if(who[team]===-1){
+      // team is free → accept
+      who[team]=intern; matchedTeam[intern]=team; freeArr[intern]=false;
+      snap('propose',
+        `🤝 Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong> (free) → <span style="color:var(--accent3);font-weight:700">ACCEPTED</span>`,
+        {intern,team,cur:null,rankCur:null,rankNew:null,accepted:true,kicked:null}
+      );
+    } else {
+      const cur=who[team];
+      const rankCur=rank[team][cur], rankNew=rank[team][intern];
+      if(rankNew<rankCur){
+        // team prefers new intern → upgrade
+        who[team]=intern; matchedTeam[intern]=team; freeArr[intern]=false;
+        matchedTeam[cur]=-1; freeArr[cur]=true;
+        snap('accept',
+          `⬆️ Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong> (had ${cur}): rank[${intern}]=${rankNew} &lt; rank[${cur}]=${rankCur} → <span style="color:var(--accent3);font-weight:700">UPGRADE</span>, intern ${cur} freed`,
+          {intern,team,cur,rankCur,rankNew,accepted:true,kicked:cur}
+        );
+      } else {
+        // team rejects new intern
+        snap('reject',
+          `❌ Intern <strong>${intern}</strong> proposes to Team <strong>${team}</strong> (has ${cur}): rank[${intern}]=${rankNew} &gt; rank[${cur}]=${rankCur} → <span style="color:var(--accent);font-weight:700">REJECTED</span>`,
+          {intern,team,cur,rankCur,rankNew,accepted:false,kicked:null}
+        );
+      }
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> Stable matching found in ${totalProposals} proposals.`,
+    {intern:null,team:null,result:{who:[...who],matchedTeam:[...matchedTeam],totalProposals}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let internsPrefs=[], teamsPrefs=[], N=0;
+
+// card pixel positions (populated after build)
+const internPositions={}, teamPositions={};
+
+// ─── SVG PROPOSAL ARROW ──────────────────────────────────────────────────────
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+function drawProposalArrow(st){
+  const svg=document.getElementById('arenaSvg');
+  svg.innerHTML='';
+  if(!st||st.intern==null||st.team==null) return;
+
+  const arena=document.getElementById('arena');
+  const aRect=arena.getBoundingClientRect();
+  const iCard=document.getElementById(`ic-${st.intern}`);
+  const tCard=document.getElementById(`tc-${st.team}`);
+  if(!iCard||!tCard) return;
+
+  const iR=iCard.getBoundingClientRect();
+  const tR=tCard.getBoundingClientRect();
+
+  const x1=iR.right-aRect.left;
+  const y1=(iR.top+iR.bottom)/2-aRect.top;
+  const x2=tR.left-aRect.left;
+  const y2=(tR.top+tR.bottom)/2-aRect.top;
+
+  const isAccept=st.type==='propose'||st.type==='accept';
+  const color=isAccept?'rgba(6,214,160,0.7)':'rgba(230,57,70,0.6)';
+  const headC=isAccept?'rgba(6,214,160,0.9)':'rgba(230,57,70,0.8)';
+
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+  const mid='mk_prop';
+  const mk=svgEl('marker',{id:mid,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+  mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:headC})); defs.appendChild(mk);
+
+  // curved arc
+  const mx=(x1+x2)/2, my=Math.min(y1,y2)-18;
+  svg.appendChild(svgEl('path',{
+    d:`M${x1},${y1} Q${mx},${my} ${x2},${y2}`,
+    fill:'none',stroke:color,'stroke-width':'2.5',
+    'stroke-dasharray':isAccept?'none':'6 3',
+    'marker-end':`url(#${mid})`
+  }));
+
+  // badge at midpoint
+  const lbl=isAccept?'✓ accepted':'✗ rejected';
+  const bx=(x1+x2)/2, by=(y1+y2)/2-8;
+  const lw=lbl.length*6+10;
+  svg.appendChild(svgEl('rect',{x:bx-lw/2,y:by-8,width:lw,height:14,rx:4,
+    fill:isAccept?'rgba(6,214,160,.82)':'rgba(230,57,70,.7)'}));
+  const t=svgEl('text',{x:bx,y:by+0,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:'white','font-family':'Space Mono,monospace','font-size':'8','font-weight':'700'});
+  t.textContent=lbl; svg.appendChild(t);
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  internsPrefs=document.getElementById('inInterns').value.trim()
+    .split('|').map(r=>r.split(',').map(Number));
+  teamsPrefs=document.getElementById('inTeams').value.trim()
+    .split('|').map(r=>r.split(',').map(Number));
+  N=internsPrefs.length;
+  steps=computeSteps(internsPrefs,teamsPrefs);
+  currentStep=0;
+
+  // Intern cards
+  const ic=document.getElementById('internCards');
+  ic.innerHTML='';
+  for(let i=0;i<N;i++){
+    const prefHtml=internsPrefs[i].map((t,k)=>
+      `<span class="icard-pref-item" id="ip-${i}-${k}">T${t}</span>`).join('');
+    ic.innerHTML+=`<div class="icard ic-free" id="ic-${i}">
+      <div class="icard-head">
+        <div class="icard-avatar">I${i}</div>
+        <div>
+          <div class="icard-name">Intern ${i}</div>
+          <div class="icard-prefs">${prefHtml}</div>
+        </div>
+      </div>
+      <div class="icard-status" id="is-${i}">FREE</div>
+    </div>`;
+  }
+
+  // Team cards
+  const tc=document.getElementById('teamCards');
+  tc.innerHTML='';
+  for(let t=0;t<N;t++){
+    const prefHtml=teamsPrefs[t].map((intern,k)=>
+      `<span class="tcard-pref-item" id="tp-${t}-${k}">I${intern}</span>`).join('');
+    tc.innerHTML+=`<div class="tcard tc-free" id="tc-${t}">
+      <div class="tcard-head">
+        <div class="tcard-avatar">T${t}</div>
+        <div>
+          <div class="tcard-name">Team ${t}</div>
+          <div class="tcard-prefs">${prefHtml}</div>
+        </div>
+      </div>
+      <div class="tcard-status" id="ts-${t}">FREE</div>
+      <div class="tcard-current-intern" id="tci-${t}"></div>
+    </div>`;
+  }
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('resultSection').classList.remove('show');
+  document.getElementById('mlRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('arenaSvg').innerHTML='';
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Intern cards
+  for(let i=0;i<N;i++){
+    const el=document.getElementById(`ic-${i}`);
+    const sel=document.getElementById(`is-${i}`);
+    if(!el||!sel)continue;
+    const isFree=st.freeArr[i];
+    const isCur=st.intern===i;
+    const isMatched=!isFree;
+    if(isFinal)                el.className='icard ic-matched';
+    else if(isCur&&st.type==='propose') {el.className='icard ic-proposing';sel.textContent='PROPOSING';}
+    else if(isCur&&st.type==='accept')  {el.className='icard ic-accepted';sel.textContent='ACCEPTED ✓';}
+    else if(isCur&&st.type==='reject')  {el.className='icard ic-rejected';sel.textContent='REJECTED ✗';}
+    else if(isCur&&st.type==='reject'&&isFree) {el.className='icard ic-free';sel.textContent='FREE';}
+    else if(isMatched)         {el.className='icard ic-accepted';sel.textContent=`↔ T${st.matchedTeam[i]}`;}
+    else                       {el.className='icard ic-free';sel.textContent='FREE';}
+    if(isFinal){sel.textContent=`↔ Team ${st.matchedTeam[i]}`;}
+
+    // pref items
+    for(let k=0;k<N;k++){
+      const pe=document.getElementById(`ip-${i}-${k}`);
+      if(!pe)continue;
+      const team=internsPrefs[i][k];
+      if(k<st.nxt[i]-1) pe.className='icard-pref-item pp-used';
+      else if(k===st.nxt[i]-1&&isCur) pe.className='icard-pref-item pp-cur';
+      else if(st.matchedTeam[i]===team&&!isFree) pe.className='icard-pref-item pp-matched';
+      else pe.className='icard-pref-item';
+    }
+  }
+
+  // Team cards
+  for(let t=0;t<N;t++){
+    const el=document.getElementById(`tc-${t}`);
+    const sel=document.getElementById(`ts-${t}`);
+    const tci=document.getElementById(`tci-${t}`);
+    if(!el||!sel)continue;
+    const hasCur=st.who[t]!==-1;
+    const isTarget=st.team===t;
+    if(isFinal)                  el.className='tcard tc-matched';
+    else if(isTarget&&(st.type==='propose'||st.type==='accept')) {el.className='tcard tc-accepted';}
+    else if(isTarget&&st.type==='reject') {el.className='tcard tc-proposed';}
+    else if(hasCur)              el.className='tcard tc-accepted';
+    else                         el.className='tcard tc-free';
+
+    if(hasCur){sel.textContent=`↔ Intern ${st.who[t]}`;}
+    else {sel.textContent='FREE';}
+    if(isFinal){sel.textContent=`↔ Intern ${st.who[t]}`;}
+
+    // Show rank of current intern vs new proposer in team prefs
+    if(isTarget&&st.cur!=null&&tci){
+      const rnew=st.rankNew, rcur=st.rankCur;
+      tci.innerHTML=`<span style="color:var(--accent4)">I${st.intern}(rank ${rnew})</span> vs <span style="color:var(--muted)">I${st.cur}(rank ${rcur})</span>`;
+    } else if(tci){ tci.innerHTML=''; }
+
+    // team pref items highlight
+    for(let k=0;k<N;k++){
+      const pe=document.getElementById(`tp-${t}-${k}`);
+      if(!pe)continue;
+      const intern=teamsPrefs[t][k];
+      if(isTarget&&intern===st.intern) pe.className='tcard-pref-item tp-cur';
+      else if(isTarget&&intern===st.cur&&st.type==='accept') pe.className='tcard-pref-item';
+      else pe.className='tcard-pref-item';
+    }
+  }
+
+  // Free queue
+  const fq=document.getElementById('freeQueue');
+  const freeInterns=st.freeArr.map((f,i)=>f?i:-1).filter(i=>i>=0);
+  if(freeInterns.length===0){
+    fq.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--accent3)">all matched ✓</span>';
+  } else {
+    fq.innerHTML=freeInterns.map(i=>
+      `<div class="q-chip ${i===st.intern?'qc-active':''}">Intern ${i}</div>`
+    ).join('');
+  }
+
+  // Matchings log right panel
+  const ml=document.getElementById('mlRows');
+  ml.innerHTML='';
+  const matchPairs=st.who.map((intern,t)=>({intern,t})).filter(x=>x.intern>=0);
+  matchPairs.forEach(({intern,t})=>{
+    const isCurPair=st.intern===intern&&st.team===t;
+    ml.innerHTML+=`<div class="ml-row ${isFinal?'ml-done':isCurPair?'ml-cur':''}">
+      <span class="ml-intern">Intern ${intern}</span>
+      <span class="ml-arrow">↔</span>
+      <span class="ml-team">Team ${t}</span>
+    </div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vIntern','vcIntern',st.intern!=null?`Intern ${st.intern}`:'—');
+  setVar('vTeam','vcTeam',st.team!=null?`Team ${st.team}`:'—');
+  const actionMap={propose:'accepted (free)',accept:'UPGRADE',reject:'rejected',init:'init',done:'complete'};
+  setVar('vAction','vcAction',actionMap[st.type]||'—');
+  setVar('vFreeN','vcFreeN',st.freeArr.filter(f=>f).length);
+  setVar('vProps','vcProps',st.totalProposals);
+  setVar('vRound','vcRound',st.round||0);
+
+  // 3-tab
+  updateExplain(st); highlightCode(st.type);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ STABLE MATCHING — ${st.result.totalProposals} PROPOSALS`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    const pairsStr=st.result.who.map((intern,t)=>`[I${intern}→T${t}]`).join('  ');
+    document.getElementById('bestVal').textContent=pairsStr;
+    document.getElementById('bestMeta').textContent=`intern-optimal · ${N}×${N} · Gale-Shapley`;
+    document.getElementById('cxAns').textContent=st.result.totalProposals;
+
+    // Result table
+    const rs=document.getElementById('resultSection');
+    const rt=document.getElementById('resultTable');
+    rs.classList.add('show');
+    rt.innerHTML=`<tr><th>Intern</th><th>Assigned Team</th><th>Intern Pref Rank</th><th>Team Pref Rank</th></tr>`;
+    st.result.who.forEach((intern,t)=>{
+      const internPrefRank=internsPrefs[intern].indexOf(t)+1;
+      const teamPrefRank=teamsPrefs[t].indexOf(intern)+1;
+      rt.innerHTML+=`<tr>
+        <td>Intern ${intern}</td>
+        <td class="rc-match">Team ${t}</td>
+        <td>${internPrefRank} of ${N}</td>
+        <td>${teamPrefRank} of ${N}</td>
+      </tr>`;
+    });
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  // Draw proposal arrow (after DOM update)
+  setTimeout(()=>drawProposalArrow(st),30);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-prop',propose:'ep-acc',accept:'ep-acc',reject:'ep-rej',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-prop');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,300);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
