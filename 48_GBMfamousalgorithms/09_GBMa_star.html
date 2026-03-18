@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A* Algorithm — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.25rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:vertical;min-height:72px;width:220px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:60px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* GRID */
+.grid-section{margin-bottom:14px;}
+.grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px;overflow:auto;}
+.grid-table{border-collapse:separate;border-spacing:3px;margin:0 auto;}
+.gcell{
+  width:58px;height:52px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.52rem;font-weight:700;
+  text-align:center;vertical-align:middle;transition:all .3s;
+  position:relative;cursor:default;
+}
+.gcell .gf{font-size:.72rem;color:var(--ink);}
+.gcell .ggh{font-size:.46rem;color:var(--muted);line-height:1.4;}
+
+/* cell states */
+.gcell.cs-wall    {background:#1a1a2e;border-color:#1a1a2e;color:var(--bg);}
+.gcell.cs-free    {background:var(--surface);border-color:var(--border);}
+.gcell.cs-start   {background:rgba(33,150,243,.25);border-color:var(--accent2);border-width:2.5px;}
+.gcell.cs-end     {background:rgba(230,57,70,.2);border-color:var(--accent);border-width:2.5px;}
+.gcell.cs-open    {background:rgba(255,209,102,.18);border-color:var(--accent4);border-width:1.5px;animation:openPulse 1.2s ease infinite alternate;}
+@keyframes openPulse{from{box-shadow:none;}to{box-shadow:0 2px 8px rgba(255,209,102,.4);}}
+.gcell.cs-closed  {background:rgba(33,150,243,.1);border-color:rgba(33,150,243,.3);}
+.gcell.cs-cur     {background:#fff8c5;border-color:#f5a623;border-width:2.5px;
+  box-shadow:0 4px 14px rgba(245,166,35,.5);animation:curPulse .8s ease infinite alternate;z-index:2;}
+@keyframes curPulse{from{box-shadow:0 3px 8px rgba(245,166,35,.4);}to{box-shadow:0 7px 18px rgba(245,166,35,.65);}}
+.gcell.cs-path    {background:rgba(6,214,160,.3);border-color:var(--accent3);border-width:2.5px;
+  box-shadow:0 3px 10px rgba(6,214,160,.3);animation:pathPop .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes pathPop{from{transform:scale(.7);opacity:.4;}to{transform:none;opacity:1;}}
+.gcell.cs-neighbour{background:rgba(192,84,252,.1);border-color:rgba(192,84,252,.4);}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.legend-dot{width:14px;height:14px;border-radius:3px;border:1.5px solid;flex-shrink:0;}
+
+/* SCORE PANEL */
+.score-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.score-panel.sp-open   {border-color:var(--accent4);}
+.score-panel.sp-closed {border-color:var(--accent2);}
+.score-panel.sp-path   {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:75px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-f{border-color:var(--accent4);background:rgba(255,209,102,.08);}
+.spbox.sb-g{border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.spbox.sb-h{border-color:var(--accent);background:rgba(230,57,70,.05);}
+.spbox.sb-eq{border-color:var(--accent3);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* OPEN SET */
+.open-set-section{margin-bottom:14px;}
+.open-set-row{display:flex;gap:5px;flex-wrap:wrap;min-height:36px;align-items:center;}
+.oc-chip{padding:3px 10px;border-radius:5px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;flex-shrink:0;}
+.oc-chip.occ-head{background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a5a00;transform:scale(1.06);}
+.oc-chip.occ-open{background:rgba(255,209,102,.1);border-color:rgba(255,209,102,.4);color:#7a5a00;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-open  {border-color:var(--accent4);}
+.explain-panel.ep-closed{border-color:var(--accent2);}
+.explain-panel.ep-path  {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-open{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-nb  {border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-path{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-none{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-pop {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-nb  {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-path{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-none{background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.path-log{margin-bottom:12px;}
+.pl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.pl-chips{display:flex;flex-wrap:wrap;gap:3px;}
+.pl-chip{padding:2px 7px;border-radius:4px;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.3);font-family:'Space Mono',monospace;font-size:.62rem;color:var(--accent3);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>A* Algorithm</h1>
+    <div class="sub">Heuristic Search · f=g+h · Manhattan Distance · O(E log V)</div>
+  </div>
+  <div class="family-badge">Graph · Pathfinding</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Grid (rows separated by newline, 0=free 1=wall)</label>
+      <textarea id="inGrid">0,0,0,0,0
+0,1,1,1,0
+0,0,0,0,0
+1,0,1,1,1
+0,0,0,0,0</textarea>
+      <div class="hint">Comma-separated. 0=free, 1=wall.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <div class="field"><label>startRow</label><input type="number" id="inSR" value="0" min="0"></div>
+        <div class="field"><label>startCol</label><input type="number" id="inSC" value="1" min="0"></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div class="field"><label>endRow</label><input type="number" id="inER" value="4" min="0"></div>
+        <div class="field"><label>endCol</label><input type="number" id="inEC" value="3" min="0"></div>
+      </div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="650">1×</button>
+        <button class="speed-btn" data-ms="300">2×</button>
+        <button class="speed-btn" data-ms="110">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#1a1a2e;border-color:#1a1a2e;"></div> Wall</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(33,150,243,.25);border-color:#2196f3;"></div> Start (S)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(230,57,70,.2);border-color:#e63946;"></div> End (E)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fff8c5;border-color:#f5a623;"></div> Current (min f)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(255,209,102,.18);border-color:#ffd166;"></div> Open set</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(33,150,243,.1);border-color:#2196f3;"></div> Closed set</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(6,214,160,.3);border-color:#06d6a0;"></div> Path ✓</div>
+  </div>
+
+  <!-- GRID -->
+  <div class="grid-section">
+    <div class="section-label">Grid — each cell shows f / g·h scores</div>
+    <div class="grid-outer">
+      <table class="grid-table" id="gridTable"></table>
+    </div>
+  </div>
+
+  <!-- OPEN SET -->
+  <div class="open-set-section">
+    <div class="section-label">Open set — sorted by f score · gold = next to expand</div>
+    <div class="open-set-row" id="openSetRow"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will fill on start</span></div>
+  </div>
+
+  <!-- SCORE PANEL -->
+  <div class="score-panel" id="scorePanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">f=g+h scores appear here</span></div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:#7a5a00">O(E log V)</div>
+      <div class="cx-sub">with binary heap</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Heuristic</div><div class="cx-val" style="color:var(--pur-dark)">Manhattan</div>
+      <div class="cx-sub">h = |Δr|+|Δc|</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Path length</div>
+      <div class="cx-val" id="cxAns" style="color:#028a5b">—</div>
+      <div class="cx-sub">nodes in path</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Expanded</div>
+      <div class="cx-val" id="cxExp" style="color:var(--accent2)">—</div>
+      <div class="cx-sub">nodes visited</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-open" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — A* Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">import</span> heapq</span>
+<span class="code-line" id="cl-sg2"><span class="ck">def</span> <span class="cf">aStarAlgorithm</span>(sr,sc,er,ec,graph):</span>
+<span class="code-line" id="cl-h">  <span class="ck">def</span> <span class="cf">h</span>(r,c): <span class="cc"># Manhattan distance</span></span>
+<span class="code-line" id="cl-h2">   <span class="ck">return</span> abs(r-er)+abs(c-ec)</span>
+<span class="code-line" id="cl-init">  g=<span class="cn">{}</span>; came=<span class="cn">{}</span></span>
+<span class="code-line" id="cl-init2">  g[(sr,sc)]=<span class="cn">0</span>; f0=h(sr,sc)</span>
+<span class="code-line" id="cl-heap">  heap=[(f0,sr,sc)]</span>
+<span class="code-line" id="cl-open">  openSet={(sr,sc)}</span>
+<span class="code-line" id="cl-closed">  closed=set()</span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> heap:</span>
+<span class="code-line" id="cl-pop">   _,r,c=heapq.heappop(heap)</span>
+<span class="code-line" id="cl-skip">   <span class="ck">if</span> (r,c) <span class="ck">in</span> closed: <span class="ck">continue</span></span>
+<span class="code-line" id="cl-add-closed">   closed.add((r,c))</span>
+<span class="code-line" id="cl-found">   <span class="ck">if</span> r==er <span class="ck">and</span> c==ec:</span>
+<span class="code-line" id="cl-found2">    <span class="ck">return</span> reconstruct(came,r,c)</span>
+<span class="code-line" id="cl-nb">   <span class="ck">for</span> dr,dc <span class="ck">in</span> [(-<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">0</span>,-<span class="cn">1</span>),(<span class="cn">0</span>,<span class="cn">1</span>)]:</span>
+<span class="code-line" id="cl-nb2">    nr,nc=r+dr,c+dc</span>
+<span class="code-line" id="cl-nb3">    <span class="ck">if</span> 0&lt;=nr&lt;rows <span class="ck">and</span> 0&lt;=nc&lt;cols \</span>
+<span class="code-line" id="cl-nb4">       <span class="ck">and</span> graph[nr][nc]==<span class="cn">0</span> \</span>
+<span class="code-line" id="cl-nb5">       <span class="ck">and</span> (nr,nc) <span class="ck">not in</span> closed:</span>
+<span class="code-line" id="cl-ng">     ng=g[(r,c)]+<span class="cn">1</span></span>
+<span class="code-line" id="cl-better">     <span class="ck">if</span> ng&lt;g.get((nr,nc),<span class="cn">1e9</span>):</span>
+<span class="code-line" id="cl-upd">      g[(nr,nc)]=ng; came[(nr,nc)]=(r,c)</span>
+<span class="code-line" id="cl-push">      heapq.heappush(heap,(ng+h(nr,nc),nr,nc))</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> []  <span class="cc"># no path</span></span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(E log V)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:280px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> tuple&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt; tiii;
+
+vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; <span style="color:#67e8f9">aStar</span>(
+    vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; g,
+    <span style="color:#c084fc">int</span> sr,<span style="color:#c084fc">int</span> sc,<span style="color:#c084fc">int</span> er,<span style="color:#c084fc">int</span> ec){
+  <span style="color:#c084fc">int</span> R=g.size(),C=g[<span style="color:#fda4af">0</span>].size();
+  <span style="color:#c084fc">auto</span> h=[&amp;](<span style="color:#c084fc">int</span> r,<span style="color:#c084fc">int</span> c){
+    <span style="color:#c084fc">return</span> abs(r-er)+abs(c-ec);};  <span style="color:#374151;font-style:italic">// Manhattan</span>
+  vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt; gScore(R,vector&lt;<span style="color:#c084fc">int</span>&gt;(C,INT_MAX));
+  vector&lt;vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt;&gt; came(R,vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt;(C,{-<span style="color:#fda4af">1</span>,-<span style="color:#fda4af">1</span>}));
+  priority_queue&lt;tiii,vector&lt;tiii&gt;,greater&lt;tiii&gt;&gt; pq;
+  gScore[sr][sc]=<span style="color:#fda4af">0</span>;
+  pq.push({h(sr,sc),sr,sc});
+  <span style="color:#c084fc">int</span> dx[]={-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>},dy[]={<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>,-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>};
+  <span style="color:#c084fc">while</span>(!pq.empty()){
+    <span style="color:#c084fc">auto</span> [f,r,c]=pq.top(); pq.pop();
+    <span style="color:#c084fc">if</span>(f&gt;gScore[r][c]+h(r,c)) <span style="color:#c084fc">continue</span>; <span style="color:#374151;font-style:italic">// stale</span>
+    <span style="color:#c084fc">if</span>(r==er&amp;&amp;c==ec){
+      vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; path;
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span> [pr,pc]=make_pair(r,c);
+          pr!=-<span style="color:#fda4af">1</span>;tie(pr,pc)=came[pr][pc])
+        path.push_back({pr,pc});
+      reverse(path.begin(),path.end());
+      <span style="color:#c084fc">return</span> path;
+    }
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> d=<span style="color:#fda4af">0</span>;d&lt;<span style="color:#fda4af">4</span>;d++){
+      <span style="color:#c084fc">int</span> nr=r+dx[d],nc=c+dy[d];
+      <span style="color:#c084fc">if</span>(nr&lt;<span style="color:#fda4af">0</span>||nr&gt;=R||nc&lt;<span style="color:#fda4af">0</span>||nc&gt;=C||g[nr][nc]) <span style="color:#c084fc">continue</span>;
+      <span style="color:#c084fc">int</span> ng=gScore[r][c]+<span style="color:#fda4af">1</span>;
+      <span style="color:#c084fc">if</span>(ng&lt;gScore[nr][nc]){
+        gScore[nr][nc]=ng; came[nr][nc]={r,c};
+        pq.push({ng+h(nr,nc),nr,nc});
+      }
+    }
+  }
+  <span style="color:#c084fc">return</span> {};
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">Manhattan h()</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">stale-skip f</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">came backtrack</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">g+h priority</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcCur"> <div class="var-name">current node</div><div class="var-value" id="vCur"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcF">   <div class="var-name">f = g+h</div>    <div class="var-value" id="vF"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcG">   <div class="var-name">g (cost)</div>   <div class="var-value" id="vG"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcH">   <div class="var-name">h (heuristic)</div><div class="var-value" id="vH"  style="color:var(--accent)">—</div></div>
+      <div class="var-card" id="vcOpen"><div class="var-name">|open set|</div>  <div class="var-value" id="vOpen" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcExp"> <div class="var-name">expanded</div>    <div class="var-value" id="vExp"  style="color:#4fc3f7">—</div></div>
+    </div>
+
+    <div class="path-log">
+      <div class="pl-title">Path nodes (will appear on completion)</div>
+      <div class="pl-chips" id="plChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Shortest Path</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ PATH FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {r,c,g,h,f,nr,nc,ng,nh,nf,er,ec,expanded} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">A* combines Dijkstra's guaranteed shortest path with greedy best-first's speed. The f=g+h score guides which cell to expand next. g=cost-so-far, h=Manhattan-distance-to-goal (heuristic). By always expanding the lowest-f node, A* is guaranteed optimal when the heuristic is admissible (never overestimates).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>f(n) = g(n) + h(n).</strong> g = exact cost from start to n. h = estimated cost from n to goal (Manhattan). f = estimated total cost through n.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Admissible heuristic:</strong> Manhattan distance never overestimates (moves ≥ |Δr|+|Δc|). This guarantees A* finds the optimal path.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>vs Dijkstra:</strong> Dijkstra uses only g — no directional bias. A* uses g+h — steers toward the goal. A* expands fewer nodes on average.`},
+    ]
+  };
+  if(type==='expand') return {
+    why:`<div class="ep-why-block why-open">Expand node (${r},${c}): g=${g}, h=${h}, f=${f}. This has the lowest f in the open set — it's the most promising node to explore next. Move to closed set and examine all 4 neighbours.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Once a node is expanded (added to closed), its g-score is final</strong> — because h is admissible, no future path can be cheaper.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why expand min-f?</strong> f is an estimate of total path cost through this node. Expanding min-f = "trying the most promising route first."`},
+    ]
+  };
+  if(type==='neighbour') return {
+    why:`<div class="ep-why-block why-nb">Neighbour (${nr},${nc}): g=${ng} (${g}+1), h=${nh}, f=${nf}. ${ng<10000?`Better than current — update! Add/update in open set.`:'Already has better or equal g — skip.'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>g(${nr},${nc})=${ng}</strong>. h(${nr},${nc})=${nh} (Manhattan to goal). f=${nf}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Only update if ng < current g.</strong> Multiple paths may reach the same cell — we keep only the best.`},
+    ]
+  };
+  if(type==='path') return {
+    why:`<div class="ep-why-block why-path">Goal reached! Trace back through came[] to reconstruct the path. Each node stores its predecessor — following the chain from goal to start gives the shortest path (reversed). Total expanded: ${expanded} nodes.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Path is optimal.</strong> A* with admissible heuristic always finds the shortest path.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Efficiency:</strong> expanded ${expanded} nodes vs all-nodes Dijkstra would expand. The heuristic pruned the search space.`},
+    ]
+  };
+  if(type==='none') return {
+    why:`<div class="ep-why-block why-none">Open set is empty and goal was never reached — no path exists between start and goal. All reachable cells have been explored.</div>`,
+    inv:[{icon:'❌',cls:'inv-key',text:`No path from start to goal. Return empty array.`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:      {ids:['cl-sig','cl-sg2','cl-h','cl-h2','cl-init','cl-init2','cl-heap','cl-open','cl-closed'],cls:'hl-init'},
+  expand:    {ids:['cl-loop','cl-pop','cl-skip','cl-add-closed','cl-found','cl-found2'],cls:'hl-pop'},
+  neighbour: {ids:['cl-nb','cl-nb2','cl-nb3','cl-nb4','cl-nb5','cl-ng','cl-better','cl-upd','cl-push'],cls:'hl-nb'},
+  path:      {ids:['cl-found','cl-found2'],cls:'hl-path'},
+  none:      {ids:['cl-ret'],cls:'hl-none'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,r,c,g,h,f,nr,nc,ng,nh,nf,er,ec,path,expanded} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Finding the shortest path from <strong>(${st.sr},${st.sc})</strong> to <strong>(${er},${ec})</strong>. A* uses two scores per cell: <strong>g</strong> (steps taken so far) and <strong>h</strong> (estimated steps remaining). Always expand the cell with the lowest <strong>f = g + h</strong>.`};
+  if(type==='expand') return {color:'var(--accent4)',
+    text:`📍 Expanding <strong>(${r},${c})</strong>: g=${g} steps from start, h=${h} estimated to goal, f=${f} total. This is the most promising cell — checking its 4 neighbours now.`};
+  if(type==='neighbour') return {color:'var(--pur-dark)',
+    text:ng<1e8
+      ? `Neighbour <strong>(${nr},${nc})</strong>: going there costs g=${ng}, estimate h=${nh}, f=${nf}. ${ng<1e8?'Updating — better path found!':'Already knew a better route.'}`
+      : `Neighbour (${nr},${nc}) is a wall or already closed — skip.`};
+  if(type==='path') return {color:'var(--accent3)',
+    text:`🎉 Reached the goal! Following the trail of "came from" pointers back to the start gives the <strong>shortest path</strong> with <strong>${path?.length}</strong> cells. Explored only <strong>${expanded}</strong> cells total.`};
+  if(type==='none') return {color:'var(--accent)',
+    text:`❌ The open set is empty and we never reached the goal. No path exists — the goal is completely surrounded by walls.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(grid, sr, sc, er, ec){
+  const R=grid.length, C=grid[0].length;
+  const h=(r,c)=>Math.abs(r-er)+Math.abs(c-ec);
+  const key=(r,c)=>`${r},${c}`;
+
+  const gScore={}, came={}, closed=new Set();
+  gScore[key(sr,sc)]=0;
+  let heap=[[h(sr,sc),sr,sc]];
+  const openSet=new Set([key(sr,sc)]);
+
+  const steps=[];
+  let expanded=0;
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,sr,sc,er,ec,grid,R,C,
+    gScore:{...gScore},
+    came:{...came},
+    closed:new Set(closed),
+    openSet:new Set(openSet),
+    heap:[...heap],
+    expanded,
+    path:[],
+    result:null,...extra,
+    explain:makeExplain(type,{er,ec,expanded,...extra})
+  });
+
+  snap('init',`🎯 <strong>Start.</strong> Grid ${R}×${C}. Start=(${sr},${sc}), Goal=(${er},${ec}). h(start)=${h(sr,sc)}.`,
+    {r:sr,c:sc,g:0,h:h(sr,sc),f:h(sr,sc)});
+
+  const DIRS=[[-1,0],[1,0],[0,-1],[0,1]];
+
+  while(heap.length>0){
+    heap.sort((a,b)=>a[0]-b[0]);
+    const [,r,c]=heap.shift();
+    const k=key(r,c);
+    if(closed.has(k)) continue;
+    openSet.delete(k);
+    closed.add(k);
+    expanded++;
+
+    const g=gScore[k]??0;
+    const hv=h(r,c);
+    const f=g+hv;
+
+    snap('expand',
+      `📍 Expand <strong>(${r},${c})</strong>: g=${g}, h=${hv}, f=${f}. Closed so far: ${expanded}.`,
+      {r,c,g,h:hv,f,nr:null,nc:null}
+    );
+
+    if(r===er&&c===ec){
+      // reconstruct path
+      const path=[];
+      let cur=[r,c];
+      while(cur){
+        path.unshift([...cur]);
+        const prev=came[key(cur[0],cur[1])];
+        cur=prev||null;
+      }
+      snap('path',`🎉 <strong>Path found!</strong> Length ${path.length}. Backtracking via came[].`,
+        {r,c,g,h:hv,f,path,result:{path,expanded}});
+      return steps;
+    }
+
+    for(const [dr,dc] of DIRS){
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nr>=R||nc<0||nc>=C||grid[nr][nc]===1||closed.has(key(nr,nc))) continue;
+      const ng=g+1;
+      const nk=key(nr,nc);
+      if(ng<(gScore[nk]??Infinity)){
+        gScore[nk]=ng;
+        came[nk]=[r,c];
+        const nh=h(nr,nc);
+        heap.push([ng+nh,nr,nc]);
+        openSet.add(nk);
+        snap('neighbour',
+          `  Neighbour (${nr},${nc}): g=${ng}, h=${nh}, f=${ng+nh} → update open set`,
+          {r,c,g,h:hv,f,nr,nc,ng,nh,nf:ng+nh}
+        );
+      }
+    }
+  }
+
+  snap('none','❌ <strong>No path exists.</strong> Open set exhausted.',
+    {r:null,c:null,g:null,h:null,f:null,result:{path:[],expanded}});
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=650;
+let grid=[], SR=0,SC=0,ER=0,EC=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inGrid').value.trim();
+  grid=raw.split('\n').map(r=>r.split(',').map(Number));
+  SR=parseInt(document.getElementById('inSR').value)||0;
+  SC=parseInt(document.getElementById('inSC').value)||0;
+  ER=parseInt(document.getElementById('inER').value)||0;
+  EC=parseInt(document.getElementById('inEC').value)||0;
+
+  steps=computeSteps(grid,SR,SC,ER,EC);
+  currentStep=0;
+
+  // Build grid table
+  const gt=document.getElementById('gridTable');
+  gt.innerHTML='';
+  grid.forEach((row,r)=>{
+    const tr=document.createElement('tr');
+    row.forEach((v,c)=>{
+      const td=document.createElement('td');
+      td.id=`gc-${r}-${c}`;
+      td.className='gcell '+(v===1?'cs-wall':r===SR&&c===SC?'cs-start':r===ER&&c===EC?'cs-end':'cs-free');
+      td.innerHTML=v===1?'<span class="gf">■</span>':
+        `<div class="gf" id="gf-${r}-${c}">${r===SR&&c===SC?'S':r===ER&&c===EC?'E':''}</div>
+         <div class="ggh" id="gg-${r}-${c}"></div>`;
+      tr.appendChild(td);
+    });
+    gt.appendChild(tr);
+  });
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('cxExp').textContent='—';
+  document.getElementById('plChips').innerHTML='';
+  document.getElementById('openSetRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill on start</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Grid cells
+  grid.forEach((row,r)=>{
+    row.forEach((v,c)=>{
+      const td=document.getElementById(`gc-${r}-${c}`);
+      const gfEl=document.getElementById(`gf-${r}-${c}`);
+      const ggEl=document.getElementById(`gg-${r}-${c}`);
+      if(!td||v===1) return;
+      const k=`${r},${c}`;
+      const isPath=isFinal&&(st.result?.path||[]).some(([pr,pc])=>pr===r&&pc===c);
+      const isCur=st.r===r&&st.c===c&&st.type==='expand';
+      const isNb=st.nr===r&&st.nc===c&&st.type==='neighbour';
+      const isClosed=st.closed.has(k);
+      const isOpen=st.openSet.has(k);
+      const isStart=r===SR&&c===SC;
+      const isEnd=r===ER&&c===EC;
+
+      if(isPath)         td.className='gcell cs-path';
+      else if(isCur)     td.className='gcell cs-cur';
+      else if(isNb)      td.className='gcell cs-neighbour';
+      else if(isStart)   td.className='gcell cs-start';
+      else if(isEnd)     td.className='gcell cs-end';
+      else if(isClosed)  td.className='gcell cs-closed';
+      else if(isOpen)    td.className='gcell cs-open';
+      else               td.className='gcell cs-free';
+
+      // Score labels
+      const gv=st.gScore[k];
+      const hv=gv!=null?Math.abs(r-ER)+Math.abs(c-EC):null;
+      const fv=gv!=null?gv+hv:null;
+      if(isStart) {if(gfEl)gfEl.textContent='S';}
+      else if(isEnd) {if(gfEl)gfEl.textContent='E';}
+      else if(gfEl) gfEl.textContent=fv!=null?fv:'';
+      if(ggEl) ggEl.textContent=fv!=null?`g${gv}·h${hv}`:'';
+    });
+  });
+
+  // Open set strip
+  const osr=document.getElementById('openSetRow');
+  const heapSorted=[...st.heap].sort((a,b)=>a[0]-b[0]).slice(0,10);
+  if(heapSorted.length===0){
+    osr.innerHTML='<span class="oc-chip" style="color:var(--muted)">empty</span>';
+  } else {
+    osr.innerHTML=heapSorted.map(([f,r,c],k)=>
+      `<div class="oc-chip ${k===0?'occ-head':'occ-open'}">(${r},${c})<br>f=${f}</div>`
+    ).join('');
+  }
+
+  // Score panel
+  const sp=document.getElementById('scorePanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='expand'){
+    sp.className='score-panel sp-open';
+    spt.textContent=`Expanding (${st.r},${st.c}) — lowest f in open set`;
+    spb.innerHTML=mkBox('g',st.g,'steps from start','spbox sb-g')+
+      mkBox('h',st.h,'Manhattan to goal','spbox sb-h')+
+      mkBox('f = g+h',st.f,'total estimate','spbox sb-f');
+  } else if(st.type==='neighbour'&&st.ng!=null){
+    sp.className='score-panel sp-open';
+    spt.textContent=`Neighbour (${st.nr},${st.nc})`;
+    spb.innerHTML=mkBox('g',st.ng,`${st.g}+1 steps`,'spbox sb-g')+
+      mkBox('h',st.nh,'Manhattan to goal','spbox sb-h')+
+      mkBox('f',st.nf,'g+h','spbox sb-f')+
+      mkBox('→',st.nf<1e8?'update!':'skip','verdict','spbox sb-eq');
+  } else if(st.type==='path'){
+    sp.className='score-panel sp-path';
+    spt.textContent='Path found! Backtracking via came[]';
+    spb.innerHTML=mkBox('path length',st.path?.length||0,'nodes','spbox sb-eq')+
+      mkBox('expanded',st.expanded,'cells','spbox');
+  } else if(st.type==='none'){
+    sp.className='score-panel';
+    spt.textContent='No path exists — open set empty';
+    spb.innerHTML='';
+  } else {
+    sp.className='score-panel';
+    spt.textContent='Initialising A* from start node';
+    spb.innerHTML='';
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vCur','vcCur',st.r!=null?`(${st.r},${st.c})`:'—');
+  setVar('vF','vcF',st.f!=null?st.f:'—');
+  setVar('vG','vcG',st.g!=null?st.g:'—');
+  setVar('vH','vcH',st.h!=null?st.h:'—');
+  setVar('vOpen','vcOpen',st.openSet?.size??'—');
+  setVar('vExp','vcExp',st.expanded);
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Path log
+  const pc=document.getElementById('plChips');
+  if(isFinal&&st.result?.path?.length>0){
+    pc.innerHTML=st.result.path.map(([r,c])=>
+      `<div class="pl-chip">(${r},${c})</div>`).join('');
+  }
+
+  // Done
+  if(isFinal){
+    const found=st.result?.path?.length>0;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=found?
+      `★ PATH FOUND — LENGTH ${st.result.path.length} — EXPANDED ${st.result.expanded} CELLS`:
+      '★ NO PATH EXISTS — EMPTY ARRAY RETURNED';
+    if(found) document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=found?
+      `${st.result.path.map(([r,c])=>`[${r},${c}]`).join(' → ')}`:'[] (no path)';
+    document.getElementById('bestMeta').textContent=found?
+      `${st.result.path.length} nodes · ${st.result.expanded} expanded · O(E log V)`:'unreachable goal';
+    document.getElementById('cxAns').textContent=found?st.result.path.length:'N/A';
+    document.getElementById('cxExp').textContent=st.result.expanded;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-open',expand:'ep-open',neighbour:'ep-open',path:'ep-path',none:'ep-closed'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-open');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

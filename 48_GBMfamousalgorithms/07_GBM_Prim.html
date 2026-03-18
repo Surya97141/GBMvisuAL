@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prim's Algorithm — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:300px;min-height:72px;resize:vertical;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:70px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* GRAPH CANVAS */
+.graph-section{margin-bottom:14px;}
+.graph-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;}
+
+/* HEAP DISPLAY */
+.heap-section{margin-bottom:14px;}
+.heap-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;min-height:50px;}
+.heap-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.hchip{
+  padding:5px 11px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;flex-shrink:0;text-align:center;
+}
+.hchip.hc-head{background:rgba(255,209,102,.18);border-color:var(--accent4);color:#7a4800;
+  transform:scale(1.06);box-shadow:0 4px 10px rgba(255,209,102,.3);}
+.hchip.hc-frontier{background:rgba(33,150,243,.1);border-color:rgba(33,150,243,.3);color:var(--accent2);}
+.hchip.hc-empty{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);}
+
+/* VISITED CHIPS */
+.visited-section{margin-bottom:14px;}
+.visited-row{display:flex;gap:5px;flex-wrap:wrap;}
+.vchip{
+  width:40px;height:40px;border-radius:7px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;
+}
+.vchip.vc-visited{background:rgba(6,214,160,.15);border-color:var(--accent3);color:#024d37;}
+.vchip.vc-cur    {background:#fff8c5;border-color:#f5a623;border-width:2.5px;color:#7a4800;
+  transform:scale(1.1);box-shadow:0 5px 14px rgba(245,166,35,.4);animation:vcp .8s ease infinite alternate;}
+@keyframes vcp{from{box-shadow:0 3px 8px rgba(245,166,35,.35);}to{box-shadow:0 7px 18px rgba(245,166,35,.6);}}
+.vchip.vc-inq   {background:rgba(33,150,243,.1);border-color:rgba(33,150,243,.3);color:var(--accent2);}
+
+/* MST RESULT */
+.mst-section{margin-bottom:14px;}
+.mst-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.mchip{padding:4px 12px;border-radius:6px;border:2px solid var(--accent3);
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:rgba(6,214,160,.1);color:#024d37;transition:all .3s;}
+.mchip.mc-new{animation:mcnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes mcnew{from{transform:scale(1.4) translateY(-6px);opacity:0;}to{transform:none;opacity:1;}}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-add {border-color:var(--accent3);}
+.step-panel.sp-skip{border-color:var(--muted);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.spbox.sb-add{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.spbox.sb-skip{border-color:var(--muted);background:rgba(138,128,112,.04);opacity:.7;}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-add {border-color:var(--accent3);}
+.explain-panel.ep-skip{border-color:var(--muted);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-add {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-skip{border-left-color:var(--muted);background:rgba(138,128,112,.04);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-pop {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-add {background:rgba(6,214,160,.16);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-skip{background:rgba(138,128,112,.12);border-left-color:var(--muted);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.step-log{margin-bottom:12px;}
+.sl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.sl-rows{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;}
+.sl-rows::-webkit-scrollbar{width:3px;}.sl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.sl-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;}
+.sl-row.sl-add {border-color:rgba(6,214,160,.4);background:rgba(6,214,160,.06);}
+.sl-row.sl-skip{border-color:rgba(138,128,112,.3);}
+.sl-edge{color:#ffd166;flex:1;}.sl-act{font-weight:700;}
+.sl-act.sa-add{color:var(--accent3);}.sl-act.sa-skip{color:var(--muted);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);line-height:1.8;}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Prim's Algorithm</h1>
+    <div class="sub">Minimum Spanning Tree · Frontier Expansion · Min-Heap · O((V+E) log V)</div>
+  </div>
+  <div class="family-badge">Graph · MST · Greedy</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Adjacency list (row i = vertex i's edges, dest,weight per edge sep by ;)</label>
+      <textarea id="inEdges">1,3;2,5
+0,3;2,10;3,12
+0,5;1,10
+1,12</textarea>
+      <div class="hint">Same format as Kruskal's. Undirected — only list each edge once per vertex.</div>
+    </div>
+    <div class="field">
+      <label>Start vertex</label>
+      <input type="number" id="inStart" value="0" min="0">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1600">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="360">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- GRAPH CANVAS -->
+  <div class="graph-section">
+    <div class="section-label">Graph — green nodes/edges = MST · gold = current · blue = in heap · white = unvisited</div>
+    <div class="graph-outer">
+      <canvas id="graphCanvas" height="230"></canvas>
+    </div>
+  </div>
+
+  <!-- MIN-HEAP -->
+  <div class="heap-section">
+    <div class="section-label">Min-Heap — frontier edges sorted by weight · gold = next to process</div>
+    <div class="heap-outer"><div class="heap-row" id="heapRow"><span class="hchip hc-empty">will fill on start</span></div></div>
+  </div>
+
+  <!-- VISITED ROW -->
+  <div class="visited-section">
+    <div class="section-label">Visited set — vertices in MST so far</div>
+    <div class="visited-row" id="visitedRow"></div>
+  </div>
+
+  <!-- MST EDGES -->
+  <div class="mst-section">
+    <div class="section-label">MST edges  <span id="mstSub" style="color:var(--accent3)"></span></div>
+    <div class="mst-chips" id="mstChips">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will build as edges are added</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin Prim's algorithm</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O((V+E)logV)</div>
+      <div class="cx-sub">with binary heap</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">MST weight</div>
+      <div class="cx-val" id="cxAns" style="color:#028a5b">—</div>
+      <div class="cx-sub">minimum total</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">vs Kruskal</div>
+      <div class="cx-val" style="color:#7a5a00">O(E log E)</div>
+      <div class="cx-sub">sort-based</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">MST edges</div>
+      <div class="cx-val" id="cxEdges" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">= V-1</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-add" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Prim's MST</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">import</span> heapq</span>
+<span class="code-line" id="cl-sg2"><span class="ck">def</span> <span class="cf">primsAlgorithm</span>(edges):</span>
+<span class="code-line" id="cl-n">  n=len(edges)</span>
+<span class="code-line" id="cl-init">  visited=[<span class="ck">False</span>]*n</span>
+<span class="code-line" id="cl-mst">  mst=[[] <span class="ck">for</span> _ <span class="ck">in</span> range(n)]</span>
+<span class="code-line" id="cl-heap">  heap=[(w,<span class="cn">0</span>,v) <span class="ck">for</span> v,w <span class="ck">in</span> edges[<span class="cn">0</span>]]</span>
+<span class="code-line" id="cl-hpsh">  heapq.heapify(heap); visited[<span class="cn">0</span>]=<span class="ck">True</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> heap:</span>
+<span class="code-line" id="cl-pop">   w,src,dst=heapq.heappop(heap)</span>
+<span class="code-line" id="cl-skip">   <span class="ck">if</span> visited[dst]: <span class="ck">continue</span></span>
+<span class="code-line" id="cl-vis">   visited[dst]=<span class="ck">True</span></span>
+<span class="code-line" id="cl-add">   mst[src].append([dst,w])</span>
+<span class="code-line" id="cl-add2">   mst[dst].append([src,w])</span>
+<span class="code-line" id="cl-nbr">   <span class="ck">for</span> nb,nw <span class="ck">in</span> edges[dst]:</span>
+<span class="code-line" id="cl-push">    <span class="ck">if not</span> visited[nb]:</span>
+<span class="code-line" id="cl-push2">     heapq.heappush(heap,(nw,dst,nb))</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> mst</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O((V+E)logV)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+<span style="color:#c084fc">typedef</span> pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt; pii;
+<span style="color:#c084fc">typedef</span> vector&lt;vector&lt;pii&gt;&gt; vvii;
+
+<span style="color:#c084fc">long long</span> <span style="color:#67e8f9">prim</span>(vvii&amp; g){
+  <span style="color:#c084fc">int</span> n=g.size();
+  vector&lt;<span style="color:#c084fc">bool</span>&gt; vis(n,<span style="color:#fda4af">false</span>);
+  <span style="color:#cc">// {weight, vertex} min-heap</span>
+  priority_queue&lt;pii,vector&lt;pii&gt;,greater&lt;pii&gt;&gt; pq;
+  pq.push({<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>});                <span style="color:#374151;font-style:italic">// start from vertex 0</span>
+  <span style="color:#c084fc">long long</span> total=<span style="color:#fda4af">0</span>; <span style="color:#c084fc">int</span> cnt=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">while</span>(!pq.empty()&amp;&amp;cnt&lt;n){
+    <span style="color:#c084fc">auto</span> [w,u]=pq.top(); pq.pop();
+    <span style="color:#c084fc">if</span>(vis[u]) <span style="color:#c084fc">continue</span>;      <span style="color:#374151;font-style:italic">// stale</span>
+    vis[u]=<span style="color:#fda4af">true</span>; total+=w; cnt++;
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span> [v,wv]:g[u])
+      <span style="color:#c084fc">if</span>(!vis[v]) pq.push({wv,v}); <span style="color:#374151;font-style:italic">// add frontier edges</span>
+  }
+  <span style="color:#c084fc">return</span> total;
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n,m; cin&gt;&gt;n&gt;&gt;m;
+  vvii g(n);
+  <span style="color:#c084fc">int</span> u,v,w;
+  <span style="color:#c084fc">while</span>(cin&gt;&gt;u&gt;&gt;v&gt;&gt;w)
+    g[u].push_back({v,w}), g[v].push_back({u,w});
+  cout&lt;&lt;<span style="color:#67e8f9">prim</span>(g)&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">stale-skip trick</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">{w,v} min-heap</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">frontier push</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">start w=0</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcSrc"> <div class="var-name">src (from)</div> <div class="var-value" id="vSrc"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcDst"> <div class="var-name">dst (to)</div>   <div class="var-value" id="vDst"  style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcW">   <div class="var-name">weight</div>      <div class="var-value" id="vW"    style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcVis"> <div class="var-name">visited</div>     <div class="var-value" id="vVis"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcMstW"><div class="var-name">MST weight</div>  <div class="var-value" id="vMstW" style="color:var(--accent3)">0</div></div>
+      <div class="var-card" id="vcHSz"> <div class="var-name">heap size</div>   <div class="var-value" id="vHSz"  style="color:var(--accent2)">—</div></div>
+    </div>
+
+    <div class="step-log">
+      <div class="sl-title">Step Log</div>
+      <div class="sl-rows" id="slRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Minimum Spanning Tree</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MST FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {src,dst,w,mstW,mstCnt,n,alreadyVisited} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Prim's greedy insight: grow the MST one vertex at a time. Start from any vertex. Always pick the cheapest edge that crosses from the visited set to the unvisited set (the "frontier"). Use a min-heap to efficiently find that cheapest edge.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> at all times, the selected edges form a spanning tree over the visited vertices. The heap contains all crossing edges (visited → unvisited).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Stale entries:</strong> when we add a vertex, we push ALL its edges to unvisited neighbours. Some may become stale later. We detect stale entries with the visited check at pop time.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Cut Property (why it works):</strong> the minimum weight edge crossing ANY cut of the graph is in some MST. Prim's always picks the minimum crossing edge — guaranteed safe.`},
+    ]
+  };
+  if(type==='add') return {
+    why:`<div class="ep-why-block why-add">Pop edge (${src}→${dst}, w=${w}). Vertex ${dst} is NOT yet visited → this is the cheapest frontier edge to reach ${dst}. <strong>Add to MST!</strong> Mark ${dst} visited. Push all unvisited neighbours of ${dst} to heap. MST weight: ${mstW}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>${mstCnt}/${n-1} MST edges.</strong> Visited = ${mstCnt+1} vertices. Heap expands with ${dst}'s frontier edges.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why this edge is safe:</strong> it crosses the cut (visited vs unvisited) and is the minimum weight crossing edge currently available — guaranteed to be in some MST.`},
+    ]
+  };
+  if(type==='skip') return {
+    why:`<div class="ep-why-block why-skip">Pop edge (${src}→${dst}, w=${w}). Vertex ${dst} is already visited — this is a <strong>stale entry</strong>. A cheaper path to ${dst} was already found. Skip and continue.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Stale-skip trick:</strong> instead of updating heap entries (complex), we allow duplicates and check visited at pop time. O(E log E) total work — practical and simple.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${n} vertices visited. MST complete with ${mstCnt} edges, total weight <strong>${mstW}</strong>. Time O((V+E) log V) with binary heap, O(E + V log V) with Fibonacci heap.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>MST complete.</strong> ${mstCnt} edges, total weight ${mstW}.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>Prim's vs Kruskal's:</strong> Prim's grows a single tree from a seed. Better for dense graphs. Kruskal's sorts all edges — better for sparse graphs.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Start vertex doesn't matter:</strong> Prim's produces the same MST weight regardless of starting vertex (though edge selection order may differ).`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-sg2','cl-n','cl-init','cl-mst','cl-heap','cl-hpsh'],cls:'hl-init'},
+  pop:  {ids:['cl-loop','cl-pop'],cls:'hl-pop'},
+  add:  {ids:['cl-skip','cl-vis','cl-add','cl-add2','cl-nbr','cl-push','cl-push2'],cls:'hl-add'},
+  skip: {ids:['cl-skip'],cls:'hl-skip'},
+  done: {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,src,dst,w,mstW,mstCnt,n,visited} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Starting from vertex <strong>${st.startV}</strong>. We push all its neighbours into a "to-do" heap sorted by edge weight. Each step we pick the cheapest edge that reaches a new vertex.`};
+  if(type==='add') return {color:'var(--accent3)',
+    text:`✅ Edge <strong>(${src}→${dst})</strong> costs <strong>${w}</strong>. Vertex ${dst} is new — it's the cheapest way to reach it from our current tree. Add this edge! MST total now <strong>${mstW}</strong>. Pushing ${dst}'s frontier edges to heap.`};
+  if(type==='skip') return {color:'var(--muted)',
+    text:`Edge (${src}→${dst}, weight ${w}) popped from heap, but vertex ${dst} is already in our tree. This is a <strong>stale entry</strong> — a cheaper path was found earlier. Skip and try the next edge.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ All ${n} vertices in the tree! Minimum Spanning Tree found with ${mstCnt} edges and total weight <strong>${mstW}</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(adjList, startV){
+  const n=adjList.length;
+  const visited=new Array(n).fill(false);
+  visited[startV]=true;
+  let heap=[...adjList[startV].map(([v,w])=>[w,startV,v])];
+  heap.sort((a,b)=>a[0]-b[0]);
+
+  const mstEdges=[]; // {src, dst, w}
+  let mstW=0, mstCnt=0;
+  const steps=[];
+  const decLog=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,startV,adjList,
+    visited:[...visited],
+    heap:[...heap.map(x=>[...x])],
+    mstEdges:[...mstEdges],
+    mstW,mstCnt,
+    decLog:[...decLog],
+    result:null,...extra,
+    explain:makeExplain(type,{n,mstW,mstCnt,...extra})
+  });
+
+  snap('init',
+    `🌳 <strong>Start.</strong> Seed = vertex ${startV}. Push its ${adjList[startV].length} edges to heap: [${adjList[startV].map(([v,w])=>`(${startV}→${v},${w})`).join(', ')}].`,
+    {src:null,dst:null,w:null,startV}
+  );
+
+  while(heap.length>0){
+    // pop min
+    const [w,src,dst]=heap.shift();
+
+    if(visited[dst]){
+      decLog.push({src,dst,w,action:'skip'});
+      snap('skip',
+        `⏭ Pop (${src}→${dst}, w=${w}): vertex ${dst} already visited → <span style="color:var(--muted);font-weight:700">STALE, skip</span>`,
+        {src,dst,w,alreadyVisited:true}
+      );
+      continue;
+    }
+
+    visited[dst]=true;
+    mstW+=w; mstCnt++;
+    mstEdges.push({src,dst,w});
+    decLog.push({src,dst,w,action:'add'});
+
+    // Push unvisited neighbours
+    const newEdges=adjList[dst].filter(([v])=>!visited[v]);
+    newEdges.forEach(([v,nw])=>heap.push([nw,dst,v]));
+    heap.sort((a,b)=>a[0]-b[0]);
+
+    snap('add',
+      `✅ Pop (${src}→${dst}, w=${w}): new vertex! <span style="color:var(--accent3);font-weight:700">ADD</span>. Pushed ${newEdges.length} new edges from ${dst}. MST weight=${mstW}`,
+      {src,dst,w,newEdges}
+    );
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> MST: ${mstCnt} edges, weight <strong>${mstW}</strong>.`,
+    {src:null,dst:null,w:null,result:{mstW,mstCnt,mstEdges:[...mstEdges]}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let adjList=[], N=0, startV=0, nodePos=[];
+const NRAD=20;
+
+// ─── LAYOUT ───────────────────────────────────────────────────────────────────
+function layoutNodes(W,H){
+  const cx=W/2, cy=H/2, r=Math.min(W,H)*0.36;
+  nodePos=[];
+  for(let i=0;i<N;i++){
+    const a=(2*Math.PI*i/N)-Math.PI/2;
+    nodePos.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});
+  }
+}
+
+// ─── GRAPH CANVAS ─────────────────────────────────────────────────────────────
+function drawGraph(st){
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=230;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,230);
+  layoutNodes(W,230);
+
+  const visitedSet=new Set(st.visited.map((v,i)=>v?i:-1).filter(i=>i>=0));
+  const mstEdgeSet=new Set((st.mstEdges||[]).map(e=>`${Math.min(e.src,e.dst)}-${Math.max(e.src,e.dst)}`));
+  const isFinal=!!st.result;
+
+  // Draw all edges (grey background)
+  for(let u=0;u<N;u++){
+    for(const [v,w] of adjList[u]){
+      if(u>=v) continue;
+      const p1=nodePos[u],p2=nodePos[v];
+      if(!p1||!p2) continue;
+      const key=`${u}-${v}`;
+      const isMST=mstEdgeSet.has(key);
+      const isCurEdge=st.src!==null&&((st.src===u&&st.dst===v)||(st.src===v&&st.dst===u));
+
+      const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+      const ox=dx/len,oy=dy/len;
+
+      ctx.beginPath();
+      ctx.moveTo(p1.x+ox*NRAD,p1.y+oy*NRAD);
+      ctx.lineTo(p2.x-ox*NRAD,p2.y-oy*NRAD);
+      ctx.strokeStyle=isCurEdge&&st.type==='add'?'rgba(6,214,160,0.9)':
+        isCurEdge&&st.type==='skip'?'rgba(138,128,112,0.6)':
+        isMST?'rgba(6,214,160,0.65)':'rgba(200,195,185,0.5)';
+      ctx.lineWidth=isCurEdge?3:isMST?2.5:1.5;
+      ctx.setLineDash([]);
+      ctx.stroke();
+
+      // weight label
+      const mx=(p1.x+p2.x)/2+(-oy)*13, my=(p1.y+p2.y)/2+(ox)*13;
+      ctx.fillStyle=isCurEdge?'#028a5b':isMST?'rgba(6,214,160,0.7)':'#8a8070';
+      ctx.font=`${isMST||isCurEdge?'bold ':''} 11px Space Mono`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(w,mx,my);
+    }
+  }
+
+  // Draw frontier edges (light blue)
+  const heapEdgeSet=new Set((st.heap||[]).map(([w,s,d])=>`${Math.min(s,d)}-${Math.max(s,d)}`));
+  for(let u=0;u<N;u++){
+    for(const [v,w] of adjList[u]){
+      if(u>=v) continue;
+      const key=`${u}-${v}`;
+      if(heapEdgeSet.has(key)&&!mstEdgeSet.has(key)){
+        const p1=nodePos[u],p2=nodePos[v];
+        if(!p1||!p2) continue;
+        const dx=p2.x-p1.x,dy=p2.y-p1.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+        const ox=dx/len,oy=dy/len;
+        ctx.beginPath();
+        ctx.moveTo(p1.x+ox*NRAD,p1.y+oy*NRAD);
+        ctx.lineTo(p2.x-ox*NRAD,p2.y-oy*NRAD);
+        ctx.strokeStyle='rgba(33,150,243,0.3)';
+        ctx.lineWidth=1.5;ctx.setLineDash([4,3]);ctx.stroke();ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // Draw nodes
+  for(let i=0;i<N;i++){
+    const {x,y}=nodePos[i];
+    const isVisited=visitedSet.has(i);
+    const isCurDst=st.dst===i&&st.type==='add';
+    const isCurSrc=st.src===i;
+    const inHeap=(st.heap||[]).some(([,s,d])=>d===i);
+
+    let fill='#fdfaf4',stroke='#d4ccb8',lw=1.5;
+    if(isFinal&&isVisited){fill='rgba(6,214,160,.2)';stroke='#06d6a0';lw=2.5;}
+    else if(isCurDst)  {fill='rgba(255,209,102,.4)';stroke='#f5a623';lw=3;}
+    else if(isCurSrc)  {fill='rgba(6,214,160,.25)';stroke='#06d6a0';lw=2;}
+    else if(isVisited)  {fill='rgba(6,214,160,.15)';stroke='#06d6a0';lw=2;}
+    else if(inHeap)     {fill='rgba(33,150,243,.1)';stroke='#2196f3';lw=1.5;}
+
+    ctx.beginPath();ctx.arc(x,y,NRAD,0,Math.PI*2);
+    ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();
+
+    if(i===startV){
+      ctx.beginPath();ctx.arc(x,y,NRAD+4,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,209,102,0.4)';ctx.lineWidth=1.5;ctx.stroke();
+    }
+
+    ctx.fillStyle='#1a1a2e';
+    ctx.font='bold 13px Space Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(i,x,y);
+  }
+
+  // Legend
+  ctx.font='9px Space Mono';ctx.textAlign='left';
+  const items=[
+    {c:'rgba(6,214,160,0.7)',l:'MST',lw:2.5},
+    {c:'rgba(33,150,243,0.35)',l:'frontier',lw:1.5,dash:true},
+    {c:'rgba(200,195,185,0.5)',l:'unused',lw:1.5},
+  ];
+  let lx=10, ly=230-10;
+  items.forEach(it=>{
+    ctx.beginPath();ctx.setLineDash(it.dash?[4,3]:[]);
+    ctx.moveTo(lx,ly);ctx.lineTo(lx+20,ly);
+    ctx.strokeStyle=it.c;ctx.lineWidth=it.lw;ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#8a8070';ctx.fillText(it.l,lx+24,ly+3);lx+=65;
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inEdges').value.trim();
+  adjList=raw.split('\n').map(row=>{
+    const r=row.trim();if(!r) return [];
+    return r.split(';').map(e=>{const p=e.trim().split(',');return[parseInt(p[0]),parseInt(p[1])];}).filter(([d,w])=>!isNaN(d)&&!isNaN(w));
+  });
+  N=adjList.length;
+  startV=Math.max(0,Math.min(N-1,parseInt(document.getElementById('inStart').value)||0));
+
+  steps=computeSteps(adjList,startV);
+  currentStep=0;
+
+  // Visited row
+  const vr=document.getElementById('visitedRow');
+  vr.innerHTML='';
+  for(let i=0;i<N;i++)
+    vr.innerHTML+=`<div class="vchip ${i===startV?'vc-visited':''}" id="vc-${i}">${i}</div>`;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('cxEdges').textContent='—';
+  document.getElementById('slRows').innerHTML='';
+  document.getElementById('mstChips').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build as edges are added</span>';
+  document.getElementById('heapRow').innerHTML='<span class="hchip hc-empty">will fill on start</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Visited chips
+  for(let i=0;i<N;i++){
+    const el=document.getElementById(`vc-${i}`);
+    if(!el)continue;
+    const isV=st.visited[i];
+    const isCur=st.dst===i&&st.type==='add';
+    const inQ=(st.heap||[]).some(([,s,d])=>d===i)&&!isV;
+    if(isCur)       el.className='vchip vc-cur';
+    else if(isV)    el.className='vchip vc-visited';
+    else if(inQ)    el.className='vchip vc-inq';
+    else            el.className='vchip';
+  }
+
+  // Heap chips
+  const hr=document.getElementById('heapRow');
+  if(!st.heap||st.heap.length===0){
+    hr.innerHTML='<span class="hchip hc-empty">empty</span>';
+  } else {
+    hr.innerHTML=st.heap.slice(0,8).map(([w,s,d],k)=>
+      `<div class="hchip ${k===0?'hc-head':'hc-frontier'}">${s}→${d}<br><span style="font-size:.6rem">w=${w}</span></div>`
+    ).join('')+(st.heap.length>8?`<span class="hchip hc-empty">+${st.heap.length-8}</span>`:'');
+  }
+
+  // MST chips
+  const mc=document.getElementById('mstChips');
+  const ms=document.getElementById('mstSub');
+  if(st.mstEdges&&st.mstEdges.length>0){
+    mc.innerHTML=st.mstEdges.map((e,k)=>{
+      const isNew=k===st.mstEdges.length-1&&st.type==='add';
+      return `<div class="mchip ${isNew?'mc-new':''}">${e.src}–${e.dst}(${e.w})</div>`;
+    }).join('');
+    if(ms) ms.textContent=`${st.mstEdges.length} edges, weight=${st.mstW}`;
+  } else {
+    mc.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build as edges are added</span>';
+    if(ms) ms.textContent='';
+  }
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  if(st.type==='add'){
+    sp.className='step-panel sp-add';
+    spt.textContent=`Add vertex ${st.dst} via edge (${st.src}→${st.dst}, w=${st.w})`;
+    spb.innerHTML=mkBox('edge',`${st.src}→${st.dst}`,'cheapest frontier','spbox sb-add')+
+      mkBox('weight',st.w,'min heap top','spbox sb-add')+
+      mkBox('MST weight',st.mstW,'running total','spbox');
+  } else if(st.type==='skip'){
+    sp.className='step-panel sp-skip';
+    spt.textContent=`Skip stale entry (${st.src}→${st.dst}, w=${st.w})`;
+    spb.innerHTML=mkBox('edge',`${st.src}→${st.dst}`,'popped from heap','spbox sb-skip')+
+      mkBox('vertex '+st.dst,'visited','stale entry','spbox sb-skip')+
+      mkBox('action','skip','try next','spbox sb-skip');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=`MST complete — ${st.mstCnt} edges, weight ${st.mstW}`;
+    spb.innerHTML=mkBox('weight',st.mstW,'total','spbox sb-add')+
+      mkBox('edges',st.mstCnt,`of ${N-1} needed`,'spbox sb-add');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Seeding from start vertex...';
+    spb.innerHTML='';
+  }
+
+  // Step log
+  const sl=document.getElementById('slRows');
+  sl.innerHTML='';
+  [...(st.decLog||[])].reverse().slice(0,8).forEach((e,k)=>{
+    sl.innerHTML+=`<div class="sl-row ${e.action==='add'?'sl-add':'sl-skip'}">
+      <span class="sl-edge">(${e.src}→${e.dst}, w=${e.w})</span>
+      <span class="sl-act ${e.action==='add'?'sa-add':'sa-skip'}">${e.action==='add'?'✓ ADDED':'↷ skip'}</span>
+    </div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Vars
+  setVar('vSrc','vcSrc',st.src!=null?st.src:'—');
+  setVar('vDst','vcDst',st.dst!=null?st.dst:'—');
+  setVar('vW','vcW',st.w!=null?st.w:'—');
+  const alreadyV=st.type==='skip'?'YES (stale)':st.type==='add'?'NO (new)':'—';
+  setVar('vVis','vcVis',alreadyV);
+  document.getElementById('vVis').style.color=st.type==='skip'?'var(--muted)':st.type==='add'?'var(--accent3)':'#e2e8f0';
+  setVar('vMstW','vcMstW',st.mstW);
+  setVar('vHSz','vcHSz',st.heap?.length??'—');
+
+  // 3-tab
+  updateExplain(st);
+  const codeType=st.type==='add'?'add':st.type==='skip'?'skip':st.type==='done'?'done':'init';
+  highlightCode(codeType);
+
+  // Graph
+  drawGraph(st);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MST WEIGHT = ${st.result.mstW} · ${st.result.mstCnt} EDGES`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`Weight: ${st.result.mstW}\nEdges: ${st.result.mstEdges.map(e=>`${e.src}–${e.dst}(${e.w})`).join(', ')}`;
+    document.getElementById('bestMeta').textContent=`${st.result.mstCnt} of ${N-1} edges · O((V+E)logV)`;
+    document.getElementById('cxAns').textContent=st.result.mstW;
+    document.getElementById('cxEdges').textContent=st.result.mstCnt;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-add',add:'ep-add',skip:'ep-skip',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-add');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

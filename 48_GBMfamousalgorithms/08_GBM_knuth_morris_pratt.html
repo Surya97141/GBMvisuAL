@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KMP Algorithm — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.15rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;width:240px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.phase-badge{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;padding:3px 8px;border-radius:4px;margin-left:8px;}
+.pb-build{background:rgba(192,84,252,.15);color:var(--pur-dark);}
+.pb-search{background:rgba(33,150,243,.12);color:var(--accent2);}
+.pb-found{background:rgba(6,214,160,.15);color:#024d37;}
+
+/* ── TILE ROWS ─────────────────────────────────────────── */
+.str-section{margin-bottom:14px;}
+.str-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;}
+.str-wrap{position:relative;display:inline-flex;flex-direction:column;gap:6px;}
+.str-svg{display:block;overflow:visible;pointer-events:none;}
+.str-row{display:flex;gap:3px;}
+
+.ch{
+  width:38px;height:42px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);transition:all .25s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.ch .cv{font-size:.88rem;color:var(--ink);}
+.ch .ci{font-size:.48rem;color:var(--muted);margin-top:1px;}
+
+/* text tiles */
+.ch.ct-match  {background:rgba(6,214,160,.15);border-color:var(--accent3);border-width:2px;}
+.ch.ct-match .cv{color:#024d37;}
+.ch.ct-cur-t  {background:#fff8c5;border-color:#f5a623;border-width:2.5px;
+  transform:scale(1.1) translateY(-4px);box-shadow:0 5px 14px rgba(245,166,35,.4);z-index:4;
+  animation:chpulse .8s ease infinite alternate;}
+@keyframes chpulse{from{box-shadow:0 3px 8px rgba(245,166,35,.35);}to{box-shadow:0 7px 18px rgba(245,166,35,.6);}}
+.ch.ct-cur-t .cv{color:#7a4800;}
+.ch.ct-mismatch{background:rgba(230,57,70,.1);border-color:var(--accent);border-width:2px;animation:cshake .4s ease;}
+@keyframes cshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.ch.ct-mismatch .cv{color:#7a0000;}
+.ch.ct-found   {background:rgba(6,214,160,.22);border-color:var(--accent3);border-width:2.5px;
+  box-shadow:0 4px 12px rgba(6,214,160,.3);}
+.ch.ct-found .cv{color:#024d37;}
+
+/* pattern tiles */
+.ch.cp-match   {background:rgba(6,214,160,.15);border-color:var(--accent3);border-width:2px;}
+.ch.cp-match .cv{color:#024d37;}
+.ch.cp-cur-p   {background:rgba(192,84,252,.15);border-color:var(--pur);border-width:2.5px;
+  transform:scale(1.1) translateY(-4px);box-shadow:0 5px 14px rgba(192,84,252,.35);z-index:4;}
+.ch.cp-cur-p .cv{color:var(--pur-dark);}
+.ch.cp-mismatch{background:rgba(230,57,70,.1);border-color:var(--accent);border-width:2px;}
+.ch.cp-mismatch .cv{color:#7a0000;}
+.ch.cp-found   {background:rgba(6,214,160,.22);border-color:var(--accent3);border-width:2.5px;}
+.ch.cp-found .cv{color:#024d37;}
+
+/* failure table tiles */
+.ch.cf-cur  {background:rgba(192,84,252,.18);border-color:var(--pur);border-width:2.5px;
+  transform:scale(1.08) translateY(-3px);box-shadow:0 4px 10px rgba(192,84,252,.3);}
+.ch.cf-cur .cv{color:var(--pur-dark);}
+.ch.cf-filled{background:rgba(192,84,252,.08);border-color:rgba(192,84,252,.3);}
+.ch.cf-filled .cv{color:var(--pur-dark);}
+.ch.cf-match{background:rgba(6,214,160,.12);border-color:var(--accent3);}
+.ch.cf-match .cv{color:#028a5b;}
+
+/* ── FAILURE TABLE ────────────────────────────────────── */
+.fail-section{margin-bottom:14px;}
+.fail-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;}
+.fail-rows{display:flex;flex-direction:column;gap:4px;}
+.fail-row{display:flex;align-items:center;gap:4px;}
+.fail-label{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;width:70px;flex-shrink:0;letter-spacing:1px;}
+.fail-label.fl-pat{color:var(--pur-dark);}
+.fail-label.fl-lps{color:var(--accent2);}
+.fail-cells{display:flex;gap:3px;}
+
+/* ── JUMP INDICATOR ──────────────────────────────────── */
+.jump-section{margin-bottom:14px;}
+.jump-box{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;transition:border-color .3s;}
+.jump-box.jb-match   {border-color:var(--accent3);}
+.jump-box.jb-mismatch{border-color:var(--accent);}
+.jump-box.jb-jump    {border-color:var(--pur);}
+.jump-box.jb-found   {border-color:var(--accent4);}
+.jb-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.jb-body {display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.jbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.jbox.jb-hi{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.jbox.jb-red{border-color:var(--accent);border-width:2px;background:rgba(230,57,70,.04);}
+.jbox.jb-pur{border-color:var(--pur);border-width:2.5px;background:rgba(192,84,252,.06);}
+.jb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.jb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.jb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;
+  padding:12px 16px;margin-bottom:14px;font-family:'DM Sans',sans-serif;
+  font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-build {border-color:var(--pur);}
+.explain-panel.ep-search{border-color:var(--accent2);}
+.explain-panel.ep-found {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-build{border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-match{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-mismatch{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-found{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-build{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-match{background:rgba(6,214,160,.16);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-mismatch{background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.lps-display{margin-bottom:12px;}
+.lps-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.lps-cells{display:flex;gap:3px;flex-wrap:wrap;}
+.lps-cell{width:34px;height:30px;border-radius:5px;border:1px solid #2a2a3e;background:#0d0d18;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;color:#6b7280;transition:all .25s;}
+.lps-cell.lc-cur{border-color:var(--pur);background:rgba(192,84,252,.12);color:var(--pur);}
+.lps-cell.lc-set{border-color:rgba(33,150,243,.4);background:rgba(33,150,243,.08);color:#4fc3f7;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Knuth–Morris–Pratt Algorithm</h1>
+    <div class="sub">String Search · Failure Function · No Backtracking · O(n+m)</div>
+  </div>
+  <div class="family-badge">Strings · KMP</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Text (string)</label>
+      <input type="text" id="inText" value="aefoaefcdaefcdaed">
+    </div>
+    <div class="field">
+      <label>Pattern (substring)</label>
+      <input type="text" id="inPat" value="aefcdaed">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="650">1×</button>
+        <button class="speed-btn" data-ms="300">2×</button>
+        <button class="speed-btn" data-ms="110">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- TEXT ROW -->
+  <div class="str-section">
+    <div class="section-label">
+      Text<span class="phase-badge" id="phaseBadge">Phase 1: Build failure function</span>
+    </div>
+    <div class="str-outer">
+      <div class="str-wrap" id="strWrap">
+        <svg class="str-svg" id="strSvg" width="1" height="40"></svg>
+        <div class="str-row" id="textRow"></div>
+        <div class="str-row" id="patRow"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAILURE FUNCTION TABLE -->
+  <div class="fail-section">
+    <div class="section-label">Failure function (LPS table) — built from pattern</div>
+    <div class="fail-outer">
+      <div class="fail-rows">
+        <div class="fail-row">
+          <div class="fail-label fl-pat">pattern</div>
+          <div class="fail-cells" id="failPatRow"></div>
+        </div>
+        <div class="fail-row">
+          <div class="fail-label fl-lps">lps[]</div>
+          <div class="fail-cells" id="failLpsRow"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JUMP INDICATOR -->
+  <div class="jump-section">
+    <div class="jump-box" id="jumpBox">
+      <div class="jb-title" id="jbTitle">Press RUN to begin</div>
+      <div class="jb-body" id="jbBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">comparison details appear here</span></div>
+    </div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Build LPS</div><div class="cx-val" style="color:var(--pur-dark)">O(m)</div>
+      <div class="cx-sub">pattern length</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Search</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">text length</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Total</div><div class="cx-val" style="color:#028a5b">O(n+m)</div>
+      <div class="cx-sub">vs O(nm) naive</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Found?</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">true / false</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-build" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — KMP Implementation</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">kmpSearch</span>(string, sub):</span>
+<span class="code-line" id="cl-n">  n,m=len(string),len(sub)</span>
+<span class="code-line" id="cl-bl">  <span class="cc"># Phase 1: build lps (failure function)</span></span>
+<span class="code-line" id="cl-b0">  lps=[<span class="cn">0</span>]*m; i=<span class="cn">1</span>; j=<span class="cn">0</span></span>
+<span class="code-line" id="cl-b1">  <span class="ck">while</span> i&lt;m:</span>
+<span class="code-line" id="cl-bm">   <span class="ck">if</span> sub[i]==sub[j]:</span>
+<span class="code-line" id="cl-bm2">    lps[i]=j+<span class="cn">1</span>; i+=<span class="cn">1</span>; j+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-be">   <span class="ck">elif</span> j&gt;<span class="cn">0</span>: j=lps[j-<span class="cn">1</span>]</span>
+<span class="code-line" id="cl-be2">   <span class="ck">else</span>: lps[i]=<span class="cn">0</span>; i+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-sl">  <span class="cc"># Phase 2: search</span></span>
+<span class="code-line" id="cl-s0">  i=<span class="cn">0</span>; j=<span class="cn">0</span></span>
+<span class="code-line" id="cl-s1">  <span class="ck">while</span> i&lt;n:</span>
+<span class="code-line" id="cl-sm">   <span class="ck">if</span> string[i]==sub[j]:</span>
+<span class="code-line" id="cl-sm2">    i+=<span class="cn">1</span>; j+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-sf">   <span class="ck">if</span> j==m: <span class="ck">return True</span></span>
+<span class="code-line" id="cl-se">   <span class="ck">elif</span> i&lt;n <span class="ck">and</span> string[i]!=sub[j]:</span>
+<span class="code-line" id="cl-se2">    <span class="ck">if</span> j&gt;<span class="cn">0</span>: j=lps[j-<span class="cn">1</span>]</span>
+<span class="code-line" id="cl-se3">    <span class="ck">else</span>: i+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-ret">  <span class="ck">return False</span></span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n+m)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:280px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3,unroll-loops")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#cc">// Returns all start indices of pat in txt</span>
+vector&lt;<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">kmp</span>(string txt, string pat){
+  <span style="color:#c084fc">int</span> n=txt.size(), m=pat.size();
+  vector&lt;<span style="color:#c084fc">int</span>&gt; lps(m,<span style="color:#fda4af">0</span>), res;
+  <span style="color:#cc">// Build LPS</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">1</span>,j=<span style="color:#fda4af">0</span>;i&lt;m;){
+    <span style="color:#c084fc">if</span>(pat[i]==pat[j]) lps[i++]=++j;
+    <span style="color:#c084fc">else if</span>(j) j=lps[j-<span style="color:#fda4af">1</span>];
+    <span style="color:#c084fc">else</span> lps[i++]=<span style="color:#fda4af">0</span>;
+  }
+  <span style="color:#cc">// Search</span>
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>,j=<span style="color:#fda4af">0</span>;i&lt;n;){
+    <span style="color:#c084fc">if</span>(txt[i]==pat[j]){i++;j++;}
+    <span style="color:#c084fc">if</span>(j==m){
+      res.push_back(i-m);  <span style="color:#374151;font-style:italic">// found at index i-m</span>
+      j=lps[j-<span style="color:#fda4af">1</span>];           <span style="color:#374151;font-style:italic">// continue for more occurrences</span>
+    } <span style="color:#c084fc">else if</span>(i&lt;n&amp;&amp;txt[i]!=pat[j]){
+      <span style="color:#c084fc">if</span>(j) j=lps[j-<span style="color:#fda4af">1</span>];    <span style="color:#374151;font-style:italic">// smart jump, no backtrack on i</span>
+      <span style="color:#c084fc">else</span> i++;
+    }
+  }
+  <span style="color:#c084fc">return</span> res;                <span style="color:#374151;font-style:italic">// empty = not found</span>
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  string txt,pat; cin&gt;&gt;txt&gt;&gt;pat;
+  <span style="color:#c084fc">auto</span> v=<span style="color:#67e8f9">kmp</span>(txt,pat);
+  cout&lt;&lt;(!v.empty()?"true":"false")&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">LPS failure fn</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">no i backtrack</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">all occurrences</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">j=lps&#91;j-1&#93;</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcPhase"><div class="var-name">phase</div>     <div class="var-value" id="vPhase" style="color:var(--pur)">Build</div></div>
+      <div class="var-card" id="vcI">   <div class="var-name">i (text/pat)</div><div class="var-value" id="vI"     style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcJ">   <div class="var-name">j (pattern)</div><div class="var-value" id="vJ"     style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcCmp"> <div class="var-name">comparing</div>  <div class="var-value" id="vCmp"   style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcJump" style="grid-column:1/3"><div class="var-name">jump (on mismatch j goes to)</div><div class="var-value" id="vJump" style="color:var(--pur);font-size:.8rem">lps[j-1]</div></div>
+    </div>
+
+    <div class="lps-display">
+      <div class="lps-title">LPS table — built so far</div>
+      <div class="lps-cells" id="lpsCells"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ SEARCH COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {i,j,ti,tj,lps,txt,pat,prevJ,newJ,matched} = args||{};
+  const m=pat?.length;
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">KMP avoids backtracking by precomputing a failure function (LPS table) from the pattern. When a mismatch occurs during search, instead of sliding the pattern by 1 and restarting, KMP jumps j to lps[j-1] — preserving the already-matched prefix.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>lps[i]</strong> = length of the longest proper prefix of pattern[0..i] that is also a suffix. Tells us: "if we mismatch at i+1, how far back can j jump without missing a match?"`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Key property:</strong> text pointer i NEVER moves backward. Every character is compared at most twice total (once in build + once in search). Hence O(n+m).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>lps[j-1]</strong> = the safe fallback. When pattern[j] mismatches text[i], the prefix pattern[0..lps[j-1]-1] still matches text ending at i-1. Resume from there.`},
+    ]
+  };
+  if(type==='build-match') return {
+    why:`<div class="ep-why-block why-build">Pattern build: pat[${i}]='${pat?.[i]}' == pat[${j}]='${pat?.[j]}' ✓. Match! lps[${i}]=${j+1}. Both pointers advance: i→${i+1}, j→${j+1}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'inv-pur',text:`<strong>lps[${i}]=${j+1}</strong>: the longest prefix of pattern[0..${i}] that is also a suffix has length ${j+1}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Building on previous work:</strong> j points to the length of the current prefix-suffix match. A match extends it by 1.`},
+    ]
+  };
+  if(type==='build-mismatch-jump') return {
+    why:`<div class="ep-why-block why-mismatch">Pattern build: pat[${i}]='${pat?.[i]}' ≠ pat[${j}]='${pat?.[j]}'. j>0, so fall back: j=lps[${j-1}]=${newJ}. Try again from this shorter prefix.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Fallback in build phase:</strong> when pat[i]≠pat[j] and j>0, we can't extend the current prefix-suffix. But a shorter one might still work — jump j to lps[j-1].`},
+    ]
+  };
+  if(type==='build-mismatch-zero') return {
+    why:`<div class="ep-why-block why-mismatch">Pattern build: pat[${i}]='${pat?.[i]}' ≠ pat[${j}]='${pat?.[j]}'. j=0, no shorter prefix to try. lps[${i}]=0. Advance i.</div>`,
+    inv:[
+      {icon:'🔒',cls:'inv-pur',text:`<strong>lps[${i}]=0</strong>: no proper prefix of pattern[0..${i}] is also a suffix.`},
+    ]
+  };
+  if(type==='search-match') return {
+    why:`<div class="ep-why-block why-match">Search: text[${i}]='${txt?.[i]}' == pat[${j}]='${pat?.[j]}' ✓. Both advance. ${j+1===m?`j reaches ${m} = pattern length → <strong>FOUND!</strong>`:`j=${j+1}, continuing...`}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Matched ${j+1} characters</strong> of pattern so far. i=${i+1}, j=${j+1}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>i never goes back.</strong> This is the key insight — i only moves forward, guaranteeing O(n) search.`},
+    ]
+  };
+  if(type==='search-found') return {
+    why:`<div class="ep-why-block why-found">j reached ${m} — all ${m} pattern characters matched! Pattern found ending at text position ${i-1}. Starting position: ${i-m}.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>FOUND!</strong> Pattern occurs starting at index ${i-m} in the text.`},
+    ]
+  };
+  if(type==='search-mismatch-jump') return {
+    why:`<div class="ep-why-block why-mismatch">Search: text[${i}]='${txt?.[i]}' ≠ pat[${j}]='${pat?.[j]}'. j=${j}>0, smart jump: j=lps[${j-1}]=${newJ}. The prefix of length ${newJ} still matches — continue from there without moving i!</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Smart jump!</strong> We had matched ${j} characters. lps[${j-1}]=${newJ} tells us ${newJ} characters of that match are also a valid starting prefix — reuse them!`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>i stays put.</strong> j jumps to lps[j-1]. We compare text[i] with pat[lps[j-1]] next.`},
+    ]
+  };
+  if(type==='search-mismatch-zero') return {
+    why:`<div class="ep-why-block why-mismatch">Search: text[${i}]='${txt?.[i]}' ≠ pat[${j}]='${pat?.[j]}'. j=0, can't jump further. Simply advance i. No partial match to reuse.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`j=0 means no prefix of the pattern matches the current text window. Advance i and start fresh.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-found">Search complete. ${matched?`Pattern found — returns <strong>true</strong>.`:'Pattern not found — returns <strong>false</strong>.'} Total comparisons ≤ 2(n+m). Never revisits a text character.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>${matched?'true':'false'}</strong>. KMP completed in O(n+m) — n=${txt?.length}, m=${pat?.length}.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>vs naive O(nm):</strong> naive algorithm backtracks i on every mismatch. KMP keeps i moving forward, reusing partial matches via lps[].`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:               {ids:['cl-sig','cl-n','cl-bl','cl-b0','cl-b1'],cls:'hl-build'},
+  'build-match':      {ids:['cl-bm','cl-bm2'],cls:'hl-build'},
+  'build-mismatch-jump':{ids:['cl-be'],cls:'hl-mismatch'},
+  'build-mismatch-zero':{ids:['cl-be2'],cls:'hl-mismatch'},
+  'search-match':     {ids:['cl-sm','cl-sm2'],cls:'hl-match'},
+  'search-found':     {ids:['cl-sf'],cls:'hl-found'},
+  'search-mismatch-jump':{ids:['cl-se','cl-se2'],cls:'hl-mismatch'},
+  'search-mismatch-zero':{ids:['cl-se','cl-se3'],cls:'hl-mismatch'},
+  done:               {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,i,j,ti,tj,newJ,txt,pat,matched} = st;
+  const n=txt?.length, m=pat?.length;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Searching for "<strong>${pat}</strong>" inside "<strong>${txt}</strong>". First, we'll build a table from the pattern that lets us skip characters smartly when a mismatch happens. Then we'll scan the text exactly once.`};
+  if(type==='build-match') return {color:'var(--pur-dark)',
+    text:`Building LPS table: pattern[${i}]='<strong>${pat?.[i]}</strong>' matches pattern[${j}]='${pat?.[j]}'. This prefix is also a suffix! lps[${i}] = <strong>${j+1}</strong>.`};
+  if(type==='build-mismatch-jump') return {color:'var(--accent)',
+    text:`Building LPS: '${pat?.[i]}' ≠ '${pat?.[j]}'. Falling back to a shorter prefix — j jumps from ${j} to <strong>${newJ}</strong> and tries again. No characters wasted.`};
+  if(type==='build-mismatch-zero') return {color:'var(--muted)',
+    text:`Building LPS: '${pat?.[i]}' ≠ '${pat?.[j]}' and j=0. No prefix-suffix overlap possible. lps[${i}] = 0.`};
+  if(type==='search-match') return {color:'var(--accent3)',
+    text:`Searching: text[${ti}]='<strong>${txt?.[ti]}</strong>' matches pattern[${j}]='${pat?.[j]}' ✓. Matched ${j+1} of ${m} characters. Both pointers advance.`};
+  if(type==='search-found') return {color:'var(--accent4)',
+    text:`🎉 Pattern fully matched! All ${m} characters found starting at text position <strong>${ti-m+1}</strong>. Returning <strong>true</strong>!`};
+  if(type==='search-mismatch-jump') return {color:'var(--accent)',
+    text:`Mismatch: text[${ti}]='<strong>${txt?.[ti]}</strong>' ≠ pattern[${j}]='${pat?.[j]}'. Smart jump: j goes from ${j} to <strong>${newJ}</strong>. Text pointer stays at ${ti} — no backtracking!`};
+  if(type==='search-mismatch-zero') return {color:'var(--muted)',
+    text:`Mismatch at text[${ti}]='${txt?.[ti]}' with pattern[0]='${pat?.[0]}'. j=0, nothing to reuse. Text pointer moves to ${ti+1}.`};
+  if(type==='done') return {color:matched?'var(--accent3)':'var(--accent)',
+    text:matched?`✅ "<strong>${pat}</strong>" was found inside the text! Returned <strong>true</strong>. The text pointer never moved backward.`:
+      `❌ "<strong>${pat}</strong>" is not in the text. Returned <strong>false</strong>. KMP scanned O(n+m) characters total.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(txt, pat){
+  const n=txt.length, m=pat.length;
+  const lps=new Array(m).fill(0);
+  const steps=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,txt,pat,n,m,
+    lps:[...lps],
+    result:null,...extra,
+    explain:makeExplain(type,{txt,pat,...extra})
+  });
+
+  snap('init',`🔍 <strong>Start.</strong> Text="${txt}" (n=${n}), Pattern="${pat}" (m=${m}). Phase 1: build LPS table from pattern.`,
+    {i:0,j:0,ti:0,tj:0,phase:'build'});
+
+  // Phase 1: build LPS
+  let i=1, j=0;
+  while(i<m){
+    if(pat[i]===pat[j]){
+      lps[i]=j+1;
+      snap('build-match',
+        `✓ pat[${i}]='${pat[i]}'==pat[${j}]='${pat[j]}' → lps[${i}]=${lps[i]}. i→${i+1}, j→${j+1}`,
+        {i,j,phase:'build',lpsI:lps[i]}
+      );
+      i++; j++;
+    } else if(j>0){
+      const prevJ=j; j=lps[j-1];
+      snap('build-mismatch-jump',
+        `✗ pat[${i}]='${pat[i]}'≠pat[${prevJ}]='${pat[prevJ]}'. j>0 → j=lps[${prevJ-1}]=${j}`,
+        {i,j:prevJ,newJ:j,phase:'build'}
+      );
+    } else {
+      lps[i]=0;
+      snap('build-mismatch-zero',
+        `✗ pat[${i}]='${pat[i]}'≠pat[0]='${pat[0]}'. j=0 → lps[${i}]=0. i→${i+1}`,
+        {i,j,phase:'build',lpsI:0}
+      );
+      i++;
+    }
+  }
+
+  // Phase 2: search
+  i=0; j=0;
+  let found=false, foundAt=-1;
+
+  while(i<n){
+    if(txt[i]===pat[j]){
+      snap('search-match',
+        `✓ text[${i}]='${txt[i]}'==pat[${j}]='${pat[j]}'. i→${i+1}, j→${j+1}`,
+        {i,j,ti:i,phase:'search'}
+      );
+      i++; j++;
+    }
+    if(j===m){
+      found=true; foundAt=i-m;
+      snap('search-found',
+        `🎉 <strong>FOUND!</strong> Pattern matches at text[${i-m}..${i-1}]`,
+        {i,j,ti:i,phase:'found',matched:true}
+      );
+      break;
+    } else if(i<n&&txt[i]!==pat[j]){
+      if(j>0){
+        const prevJ=j; j=lps[j-1];
+        snap('search-mismatch-jump',
+          `✗ text[${i}]='${txt[i]}'≠pat[${prevJ}]='${pat[prevJ]}'. j=lps[${prevJ-1}]=${j}`,
+          {i,j:prevJ,ti:i,newJ:j,phase:'search'}
+        );
+      } else {
+        snap('search-mismatch-zero',
+          `✗ text[${i}]='${txt[i]}'≠pat[0]='${pat[0]}'. j=0 → i→${i+1}`,
+          {i,j,ti:i,phase:'search'}
+        );
+        i++;
+      }
+    }
+  }
+
+  snap('done',
+    `${found?`🎉 <strong>true</strong> — pattern found at index ${foundAt}.`:'❌ <strong>false</strong> — pattern not in text.'}`,
+    {i,j,ti:i,phase:'done',matched:found,result:{found,foundAt}}
+  );
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=650;
+let txt='', pat='';
+const CW=41; // cell width+gap
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── SVG ARC: jump arrow above pattern row ─────────────────────────────────────
+function drawJumpArc(st){
+  const svg=document.getElementById('strSvg');
+  svg.innerHTML='';
+  if(st.phase!=='search') return;
+  if(st.type!=='search-mismatch-jump') return;
+
+  const {j:prevJ, newJ} = st;
+  const W=(Math.max(txt.length,pat.length)+2)*CW;
+  svg.setAttribute('width',W); svg.setAttribute('height',40);
+
+  const defs=svgEl('defs',{}); svg.appendChild(defs);
+  const cx=k=>k*CW+CW/2;
+  const Y=36;
+  const x1=cx(prevJ), x2=cx(newJ??0);
+  const mx=(x1+x2)/2, my=Y-Math.min(30,Math.abs(x1-x2)*0.4+12);
+
+  const mid='mk_jump';
+  const mk=svgEl('marker',{id:mid,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+  mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:'rgba(192,84,252,0.8)'}));
+  defs.appendChild(mk);
+
+  svg.appendChild(svgEl('path',{
+    d:`M${x1},${Y} Q${mx},${my} ${x2},${Y}`,
+    fill:'none',stroke:'rgba(192,84,252,0.6)','stroke-width':'2',
+    'stroke-dasharray':'5 3','marker-end':`url(#${mid})`
+  }));
+
+  const lbl=`j=${newJ??0} (lps[${prevJ-1}]=${st.lps[prevJ-1]??0})`;
+  const lw=lbl.length*5.0+10;
+  svg.appendChild(svgEl('rect',{x:mx-lw/2,y:my-16,width:lw,height:13,rx:3,fill:'rgba(192,84,252,0.78)'}));
+  const t=svgEl('text',{x:mx,y:my-9,'text-anchor':'middle','dominant-baseline':'middle',
+    fill:'white','font-family':'Space Mono,monospace','font-size':'7.5','font-weight':'700'});
+  t.textContent=lbl; svg.appendChild(t);
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  txt=document.getElementById('inText').value;
+  pat=document.getElementById('inPat').value;
+  if(!txt||!pat){alert('Enter both strings');return;}
+  steps=computeSteps(txt,pat);
+  currentStep=0;
+
+  // Text row
+  const tr=document.getElementById('textRow');
+  tr.innerHTML='';
+  for(let k=0;k<txt.length;k++)
+    tr.innerHTML+=`<div class="ch" id="tc-${k}"><span class="cv">${txt[k]}</span><span class="ci">${k}</span></div>`;
+
+  // Pattern row (hidden during build, shown during search)
+  const pr=document.getElementById('patRow');
+  pr.innerHTML='';
+  for(let k=0;k<pat.length;k++)
+    pr.innerHTML+=`<div class="ch" id="pc-${k}" style="border-color:rgba(192,84,252,.3);background:rgba(192,84,252,.04)">
+      <span class="cv" style="color:var(--pur-dark)">${pat[k]}</span>
+      <span class="ci">${k}</span>
+    </div>`;
+
+  // Failure pattern row
+  const fpr=document.getElementById('failPatRow');
+  fpr.innerHTML='';
+  for(let k=0;k<pat.length;k++)
+    fpr.innerHTML+=`<div class="ch" id="fp-${k}" style="width:38px;height:36px;border-color:rgba(192,84,252,.2)">
+      <span class="cv" style="color:var(--pur-dark)">${pat[k]}</span></div>`;
+
+  // Failure LPS row
+  const flr=document.getElementById('failLpsRow');
+  flr.innerHTML='';
+  for(let k=0;k<pat.length;k++)
+    flr.innerHTML+=`<div class="ch cf-cur" id="fl-${k}" style="width:38px;height:36px;">
+      <span class="cv" id="flv-${k}">?</span></div>`;
+
+  // LPS cells right panel
+  const lc=document.getElementById('lpsCells');
+  lc.innerHTML='';
+  for(let k=0;k<pat.length;k++)
+    lc.innerHTML+=`<div class="lps-cell" id="lc-${k}">?</div>`;
+
+  document.getElementById('strSvg').setAttribute('width',(Math.max(txt.length,pat.length)+2)*CW);
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=txt.length, m=pat.length;
+  const phase=st.phase||'build';
+
+  // Phase badge
+  const pb=document.getElementById('phaseBadge');
+  pb.className='phase-badge '+(phase==='build'?'pb-build':phase==='found'||isFinal&&st.result?.found?'pb-found':'pb-search');
+  pb.textContent=phase==='build'?'Phase 1: Build failure function':
+    phase==='found'?'✓ FOUND!':'Phase 2: Search';
+
+  // Text row (only coloured during search phase)
+  for(let k=0;k<n;k++){
+    const el=document.getElementById(`tc-${k}`);
+    if(!el)continue;
+    if(phase==='search'||phase==='found'){
+      const ti=st.ti??st.i;
+      const isMatchRange=phase==='found'&&k>=ti-m&&k<ti;
+      const isCur=k===ti&&(st.type==='search-match'||st.type==='search-mismatch-zero'||st.type==='search-mismatch-jump');
+      const isMismatch=isCur&&(st.type==='search-mismatch-zero'||st.type==='search-mismatch-jump');
+      if(isMatchRange)     el.className='ch ct-found';
+      else if(isCur&&!isMismatch) el.className='ch ct-cur-t';
+      else if(isMismatch)  el.className='ch ct-mismatch';
+      else if(k<(ti??0)&&!isMatchRange) el.className='ch ct-match';
+      else                 el.className='ch';
+    } else {
+      el.className='ch';
+    }
+  }
+
+  // Pattern row (show only in search phase, align with text)
+  const pr=document.getElementById('patRow');
+  if(phase==='build'){
+    pr.style.visibility='hidden';
+  } else {
+    pr.style.visibility='visible';
+    const ti=st.ti??st.i;
+    const offset=phase==='found'?ti-m:Math.max(0,ti-st.j);
+    pr.style.marginLeft=(offset*CW)+'px';
+    for(let k=0;k<m;k++){
+      const el=document.getElementById(`pc-${k}`);
+      if(!el)continue;
+      const isCurP=k===st.j&&(st.type==='search-match'||st.type==='search-mismatch-zero'||st.type==='search-mismatch-jump');
+      const isMatched=k<(st.j??0);
+      const isMismatch=isCurP&&(st.type==='search-mismatch-zero'||st.type==='search-mismatch-jump');
+      if(phase==='found') el.className='ch cp-found';
+      else if(isCurP&&!isMismatch) el.className='ch cp-cur-p';
+      else if(isMismatch) el.className='ch cp-mismatch';
+      else if(isMatched)  el.className='ch cp-match';
+      else                el.className='ch';
+    }
+  }
+
+  // Failure function table
+  for(let k=0;k<m;k++){
+    const el=document.getElementById(`fl-${k}`);
+    const vEl=document.getElementById(`flv-${k}`);
+    const lcEl=document.getElementById(`lc-${k}`);
+    if(!el||!vEl)continue;
+    const val=st.lps[k];
+    const isCurBuild=phase==='build'&&st.i===k;
+    const isSet=val>=0&&(phase!=='build'||k<st.i);
+    vEl.textContent=isSet?val:'?';
+    el.className='ch '+(isCurBuild?'cf-cur':isSet?'cf-filled':'');
+    if(lcEl){
+      lcEl.textContent=isSet?val:'?';
+      lcEl.className='lps-cell '+(isCurBuild?'lc-cur':isSet?'lc-set':'');
+    }
+  }
+
+  // Jump box
+  const jb=document.getElementById('jumpBox');
+  const jt=document.getElementById('jbTitle');
+  const jbd=document.getElementById('jbBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="jbox ${cls}"><div class="jb-lbl">${lbl}</div><div class="jb-val">${val}</div><div class="jb-sub">${sub}</div></div>`;
+
+  if(st.type==='search-match'){
+    jb.className='jump-box jb-match';
+    jt.textContent=`text[${st.ti}]='${txt[st.ti]}' == pat[${st.j}]='${pat[st.j]}' ✓`;
+    jbd.innerHTML=mkBox('text[i]',txt[st.ti]??'','match','jbox jb-hi')+
+      mkBox('pat[j]',pat[st.j]??'','match','jbox jb-hi')+
+      mkBox('both++',`i=${st.ti+1}, j=${st.j+1}`,'advance','jbox');
+  } else if(st.type==='search-mismatch-jump'){
+    jb.className='jump-box jb-jump';
+    jt.textContent=`SMART JUMP: j ${st.j}→${st.newJ} (lps[${st.j-1}]=${st.lps[st.j-1]})`;
+    jbd.innerHTML=mkBox('text[i]',txt[st.ti]??'','stays','jbox jb-pur')+
+      mkBox('old j',st.j,'mismatch','jbox')+
+      mkBox('new j',st.newJ??0,`lps[${st.j-1}]=${st.lps[st.j-1]}`,'jbox jb-pur');
+  } else if(st.type==='search-mismatch-zero'){
+    jb.className='jump-box jb-mismatch';
+    jt.textContent=`Mismatch at j=0 — slide text pointer`;
+    jbd.innerHTML=mkBox('text[i]',txt[st.ti]??'','mismatch','jbox jb-red')+
+      mkBox('j',0,'already 0','jbox')+
+      mkBox('action','i++','advance text','jbox');
+  } else if(st.type==='search-found'){
+    jb.className='jump-box jb-found';
+    jt.textContent=`🎉 Pattern found at text[${st.ti-m}..${st.ti-1}]!`;
+    jbd.innerHTML=mkBox('start',st.ti-m,'in text','jbox jb-hi')+
+      mkBox('end',st.ti-1,'in text','jbox jb-hi')+
+      mkBox('result','true','FOUND','jbox jb-hi');
+  } else if(phase==='build'){
+    jb.className='jump-box';
+    jt.textContent=`Building LPS — i=${st.i??0}, j=${st.j??0}`;
+    jbd.innerHTML=mkBox('pattern[i]',pat[st.i]??'','checking','jbox')+
+      mkBox('pattern[j]',pat[st.j]??'','prefix','jbox')+
+      mkBox('lps[i]',st.lps[st.i]??'?','result','jbox');
+  } else {
+    jb.className='jump-box';
+    jt.textContent='Press RUN to begin';
+    jbd.innerHTML='';
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Vars
+  const phaseStr=phase==='build'?'Phase 1 (Build)':phase==='found'?'Phase 2 (Found!)':'Phase 2 (Search)';
+  setVar('vPhase','vcPhase',phaseStr);
+  document.getElementById('vPhase').style.color=phase==='build'?'var(--pur)':phase==='found'?'var(--accent3)':'var(--accent2)';
+  setVar('vI','vcI',st.i??0);
+  setVar('vJ','vcJ',st.j??0);
+  const cmpStr=st.ti!=null&&st.j!=null?`'${txt[st.ti]??''}' vs '${pat[st.j]??''}'`:'—';
+  setVar('vCmp','vcCmp',cmpStr);
+  const jumpStr=st.type?.includes('mismatch')&&st.j>0?`lps[${st.j-1}]=${st.lps[st.j-1]??0}`:st.j===0?'none (j=0)':'—';
+  setVar('vJump','vcJump',jumpStr);
+  document.getElementById('vJump').style.color=st.type?.includes('jump')?'var(--pur)':'#6b6b8a';
+
+  // Done
+  if(isFinal){
+    const found=st.result?.found;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=found?`★ TRUE — Pattern found at index ${st.result.foundAt}`:'★ FALSE — Pattern not in text';
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=found?'true':'false';
+    document.getElementById('bestMeta').textContent=`n=${n}, m=${m} · O(n+m)=${n+m} operations`;
+    document.getElementById('cxAns').textContent=found?'true':'false';
+    document.getElementById('cxAns').style.color=found?'var(--accent3)':'var(--accent)';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  drawJumpArc(st);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const phase=st.phase||'build';
+  const cls={build:'ep-build',search:'ep-search',found:'ep-found',done:'ep-found'};
+  ep.className='explain-panel '+(cls[phase]||'ep-build');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
