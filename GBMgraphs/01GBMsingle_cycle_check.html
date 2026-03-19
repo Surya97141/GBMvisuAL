@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Single Cycle Check — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:340px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ── ARRAY + SVG ARROWS ─────────────────────────────────── */
+.arr-section{margin-bottom:8px;}
+.arr-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px 14px;overflow-x:auto;}
+.arr-wrap{position:relative;display:inline-flex;flex-direction:column;gap:0;min-width:100%;}
+.arr-svg-top{display:block;overflow:visible;pointer-events:none;}
+.arr-row{display:flex;gap:4px;margin-top:4px;}
+.arr-svg-bot{display:block;overflow:visible;pointer-events:none;margin-top:2px;}
+
+/* tiles */
+.atile{
+  width:60px;height:58px;border-radius:8px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;flex-shrink:0;
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.atile .av{font-size:1rem;color:var(--ink);}
+.atile .ai{font-size:.46rem;color:var(--muted);margin-top:2px;}
+.atile .vc{font-size:.5rem;color:var(--muted);margin-top:1px;} /* visit count */
+
+/* tile states */
+.atile.at-cur {
+  background:#fff8c5;border-color:#f5a623;border-width:2.5px;
+  transform:scale(1.13) translateY(-6px);
+  box-shadow:0 6px 18px rgba(245,166,35,.5);z-index:5;
+  animation:tap .8s ease infinite alternate;
+}
+@keyframes tap{from{box-shadow:0 4px 10px rgba(245,166,35,.35);}to{box-shadow:0 9px 24px rgba(245,166,35,.65);}}
+.atile.at-cur .av{color:#7a4800;}
+.atile.at-visited{background:rgba(6,214,160,.14);border-color:var(--accent3);border-width:2px;}
+.atile.at-visited .av{color:#024d37;}
+.atile.at-start{background:rgba(33,150,243,.12);border-color:var(--accent2);border-width:2px;}
+.atile.at-start .av{color:#0d47a1;}
+.atile.at-done {background:#ccf5e5;border-color:#06d6a0;border-width:2.5px;box-shadow:0 3px 10px rgba(6,214,160,.25);}
+.atile.at-done .av{color:#024d37;}
+.atile.at-bad  {background:rgba(230,57,70,.12);border-color:var(--accent);border-width:2.5px;
+  animation:badflash .6s ease;}
+@keyframes badflash{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.atile.at-bad .av{color:#7a0000;}
+
+/* visit count badge */
+.vc-badge{
+  position:absolute;top:3px;right:4px;
+  font-family:'Space Mono',monospace;font-size:.46rem;font-weight:700;
+  background:rgba(192,84,252,.15);border:1px solid rgba(192,84,252,.3);
+  color:var(--pur-dark);border-radius:3px;padding:0 3px;
+  transition:all .3s;
+}
+.vc-badge.vc-multi{background:rgba(230,57,70,.2);border-color:rgba(230,57,70,.4);color:#7a0000;}
+
+/* JUMP PANEL */
+.jump-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.jump-panel.jp-fwd {border-color:var(--accent3);}
+.jump-panel.jp-bwd {border-color:var(--pur);}
+.jump-panel.jp-wrap{border-color:var(--accent4);}
+.jump-panel.jp-bad {border-color:var(--accent);}
+.jump-panel.jp-done{border-color:var(--accent3);}
+.jp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.jp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.jpbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.jpbox.jb-hi{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.jpbox.jb-fwd{border-color:var(--accent3);}
+.jpbox.jb-bwd{border-color:var(--pur);}
+.jpbox.jb-bad{border-color:var(--accent);background:rgba(230,57,70,.05);}
+.jb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.jb-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.jb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* PROGRESS CHIPS */
+.prog-section{margin-bottom:14px;}
+.prog-chips{display:flex;gap:5px;flex-wrap:wrap;min-height:32px;align-items:center;}
+.pchip{padding:3px 10px;border-radius:5px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;}
+.pchip.pc-cur{background:rgba(255,209,102,.18);border-color:var(--accent4);color:#7a4800;transform:scale(1.05);}
+.pchip.pc-done{background:rgba(6,214,160,.12);border-color:var(--accent3);color:#028a5b;}
+
+/* PLAIN ENGLISH */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;
+  border-left:4px solid var(--accent4);min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-tab */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-jump {border-color:var(--accent3);}
+.explain-panel.ep-bad  {border-color:var(--accent);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-jump{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-bad {border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*13+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-jump{background:rgba(6,214,160,.14);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-bad {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.jump-log{margin-bottom:12px;}
+.jl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.jl-rows{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;}
+.jl-rows::-webkit-scrollbar{width:3px;}.jl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.jl-row{display:flex;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;}
+.jl-row.jl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.jl-from{color:#ffd166;width:24px;flex-shrink:0;}
+.jl-jump{color:#8a8070;width:36px;flex-shrink:0;}
+.jl-to{color:var(--accent3);font-weight:700;}
+.jl-wrap{color:var(--pur);font-size:.55rem;margin-left:2px;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Single Cycle Check</h1>
+    <div class="sub">Array Jump Graph · O(n) · O(1) Space</div>
+  </div>
+  <div class="family-badge">Arrays · Graphs</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Array (comma separated)</label>
+      <input type="text" id="inArr" value="2,3,1,-4,-4,2">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="650">1×</button>
+        <button class="speed-btn" data-ms="300">2×</button>
+        <button class="speed-btn" data-ms="110">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- ARRAY + ARROWS -->
+  <div class="arr-section">
+    <div class="section-label">Jump array — each cell value is the jump distance · blue=start · gold=current · green=visited</div>
+    <div class="arr-outer">
+      <div class="arr-wrap" id="arrWrap">
+        <svg class="arr-svg-top" id="svgTop" height="50"></svg>
+        <div class="arr-row" id="arrRow"></div>
+        <svg class="arr-svg-bot" id="svgBot" height="50"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISIT PROGRESS -->
+  <div class="prog-section">
+    <div class="section-label">Visit order — sequence of indices visited</div>
+    <div class="prog-chips" id="progChips">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will fill as jumps happen</span>
+    </div>
+  </div>
+
+  <!-- JUMP PANEL -->
+  <div class="jump-panel" id="jumpPanel">
+    <div class="jp-title" id="jpTitle">Press RUN to begin</div>
+    <div class="jp-body" id="jpBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">jump calculation appears here</span></div>
+  </div>
+
+  <!-- PLAIN ENGLISH -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">n jumps max</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">no visited array</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Jumps taken</div>
+      <div class="cx-val" id="cxJumps" style="color:#7a5a00">—</div>
+      <div class="cx-sub">this run</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Result</div>
+      <div class="cx-val" id="cxAns" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">true / false</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-jump" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">JavaScript — Single Cycle Check</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">function</span> <span class="cf">singleCycleCheck</span>(array) {</span>
+<span class="code-line" id="cl-n">  <span class="ck">const</span> n = array.length;</span>
+<span class="code-line" id="cl-cnt">  <span class="ck">let</span> numVisited = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-idx">  <span class="ck">let</span> currentIdx = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> (numVisited &lt; n) {</span>
+<span class="code-line" id="cl-early">   <span class="ck">if</span> (numVisited &gt; <span class="cn">0</span> &amp;&amp; currentIdx === <span class="cn">0</span>)</span>
+<span class="code-line" id="cl-early2">    <span class="ck">return false</span>; <span class="cc">// returned early</span></span>
+<span class="code-line" id="cl-inc">   numVisited++;</span>
+<span class="code-line" id="cl-jump">   currentIdx = getNextIdx(currentIdx);</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> currentIdx === <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-helper">}</span>
+<span class="code-line" id="cl-h2"><span class="ck">function</span> <span class="cf">getNextIdx</span>(idx) {</span>
+<span class="code-line" id="cl-h3">  <span class="ck">const</span> jump = array[idx];</span>
+<span class="code-line" id="cl-h4">  <span class="ck">const</span> nextIdx = (idx + jump) % n;</span>
+<span class="code-line" id="cl-h5">  <span class="ck">return</span> nextIdx &gt;= <span class="cn">0</span></span>
+<span class="code-line" id="cl-h6">   ? nextIdx : nextIdx + n;</span>
+<span class="code-line" id="cl-h7">}</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(n) · O(1)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">bool</span> <span style="color:#67e8f9">singleCycleCheck</span>(vector&lt;<span style="color:#c084fc">int</span>&gt;&amp; a){
+  <span style="color:#c084fc">int</span> n=a.size(), visited=<span style="color:#fda4af">0</span>, idx=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">auto</span> nxt=[&amp;](<span style="color:#c084fc">int</span> i){
+    <span style="color:#c084fc">int</span> j=(i+a[i])%n;
+    <span style="color:#c084fc">return</span> j&lt;<span style="color:#fda4af">0</span>?j+n:j;  <span style="color:#374151;font-style:italic">// handle negative mod</span>
+  };
+  <span style="color:#c084fc">while</span>(visited&lt;n){
+    <span style="color:#c084fc">if</span>(visited&gt;<span style="color:#fda4af">0</span>&amp;&amp;idx==<span style="color:#fda4af">0</span>) <span style="color:#c084fc">return false</span>; <span style="color:#374151;font-style:italic">// early return to 0</span>
+    visited++;
+    idx=<span style="color:#67e8f9">nxt</span>(idx);
+  }
+  <span style="color:#c084fc">return</span> idx==<span style="color:#fda4af">0</span>;  <span style="color:#374151;font-style:italic">// must land exactly on 0</span>
+}
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">main</span>(){
+  ios::sync_with_stdio(<span style="color:#fda4af">false</span>); cin.tie(<span style="color:#c084fc">nullptr</span>);
+  <span style="color:#c084fc">int</span> n; cin&gt;&gt;n;
+  vector&lt;<span style="color:#c084fc">int</span>&gt; a(n);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; x:a) cin&gt;&gt;x;
+  cout&lt;&lt;(<span style="color:#67e8f9">singleCycleCheck</span>(a)?"true":"false")&lt;&lt;<span style="color:#fda4af">'\n'</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">neg mod fix</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">early return 0</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">n jumps exact</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcIdx">   <div class="var-name">currentIdx</div>   <div class="var-value" id="vIdx"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcVis">   <div class="var-name">numVisited</div>   <div class="var-value" id="vVis"    style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcJump">  <div class="var-name">jump value</div>   <div class="var-value" id="vJump"   style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcNext">  <div class="var-name">nextIdx</div>      <div class="var-value" id="vNext"   style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcWrap">  <div class="var-name">wrapped?</div>     <div class="var-value" id="vWrap"   style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcN">     <div class="var-name">n (length)</div>   <div class="var-value" id="vN"      style="color:var(--muted)">—</div></div>
+    </div>
+
+    <div class="jump-log">
+      <div class="jl-title">Jump Log</div>
+      <div class="jl-rows" id="jlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ SINGLE CYCLE CHECK DONE</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {idx,jump,nextIdx,visited,n,wrapped,earlyReturn,result} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Key insight: start at index 0 and follow jumps n times. A single cycle exists if and only if: (1) after n jumps we land back on index 0, AND (2) we never returned to index 0 before completing all n jumps. No visited array needed — O(1) space!</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> after k jumps, we should NOT be at index 0 unless k = n (the very last jump).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Early termination:</strong> if currentIdx==0 and we haven't completed n jumps yet, some elements are in a sub-cycle. Return false immediately.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Final check:</strong> after exactly n jumps, currentIdx must equal 0. If it does, every element was visited exactly once. If not, there are disconnected sub-cycles.`},
+    ]
+  };
+  if(type==='jump') return {
+    why:`<div class="ep-why-block why-jump">At index ${idx}, value=${jump}. Next = (${idx} + ${jump}) % ${n} = ${((idx+jump)%n+n)%n}${wrapped?' ← wrapped around':' ← direct'}. visited=${visited}/${n}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>numVisited=${visited}</strong>. After this jump, will be ${visited+1}. Need all ${n} jumps to complete cycle.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Negative mod fix:</strong> in most languages, (-4) % 6 = -4 (not 2). Always add n and re-mod: (idx+jump) % n + n) % n.`},
+    ]
+  };
+  if(type==='early') return {
+    why:`<div class="ep-why-block why-bad">currentIdx=0 but numVisited=${visited} < n=${n}. We returned to the start TOO EARLY — meaning the jumps form a sub-cycle that doesn't cover all elements. Return <strong>false</strong>.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Early-return check:</strong> idx==0 before n jumps means a sub-cycle. Some elements are in a different cycle, unreachable from the start.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">${result?`After exactly ${n} jumps, currentIdx=${0} ✓. Landed back on 0 after visiting all ${n} elements exactly once. <strong>Single cycle confirmed!</strong>`:
+      `After ${n} jumps, currentIdx=${nextIdx} ≠ 0. The jump pattern creates multiple disconnected sub-cycles, not a single cycle. Return <strong>false</strong>.`}</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>${result?'true':'false'}</strong>. ${result?`Single cycle: every element visited once, returns to 0 after n=${n} jumps.`:'Not a single cycle: either early return to 0, or final position ≠ 0.'}`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-n','cl-cnt','cl-idx','cl-loop'],cls:'hl-jump'},
+  jump:  {ids:['cl-inc','cl-jump','cl-h2','cl-h3','cl-h4','cl-h5','cl-h6'],cls:'hl-jump'},
+  early: {ids:['cl-early','cl-early2'],cls:'hl-bad'},
+  done:  {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,idx,jump,nextIdx,visited,n,wrapped,result} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Starting at index <strong>0</strong>. We'll follow the jumps exactly <strong>${n}</strong> times. A single cycle exists only if we visit every element once AND land back on 0 at the very last step — not before.`};
+  if(type==='jump'){
+    const dir=jump>0?'forward':'backward';
+    const wrapNote=wrapped?` (wraps around from ${idx} to ${nextIdx})`:'';
+    return {color:jump>=0?'var(--accent3)':'var(--pur-dark)',
+      text:`At index <strong>${idx}</strong> (value=${jump}). Jumping <strong>${Math.abs(jump)} step${Math.abs(jump)!==1?'s':''} ${dir}</strong>${wrapNote}. New index: <strong>${nextIdx}</strong>. Visited ${visited+1}/${n}.`};
+  }
+  if(type==='early') return {color:'var(--accent)',
+    text:`❌ We're back at index 0 after only <strong>${visited}</strong> jumps, but need all <strong>${n}</strong>. This means we have a smaller sub-cycle — not a single big cycle. Return <strong>false</strong>.`};
+  if(type==='done') return {color:result?'var(--accent3)':'var(--accent)',
+    text:result
+      ? `✅ After exactly <strong>${n}</strong> jumps we landed back on index <strong>0</strong>! Every element was visited once. This IS a single cycle — return <strong>true</strong>!`
+      : `❌ After ${n} jumps we landed on index <strong>${nextIdx}</strong>, not 0. Multiple sub-cycles exist. Return <strong>false</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const n=arr.length;
+  const nextIdx=(i)=>{const j=(i+arr[i])%n; return j<0?j+n:j;};
+  const steps=[];
+  const jumpLog=[];
+  const visitCount=new Array(n).fill(0);
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,arr,n,
+    visitCount:[...visitCount],
+    jumpLog:[...jumpLog],
+    result:null,...extra,
+    explain:makeExplain(type,{n,...extra})
+  });
+
+  snap('init',`🔄 <strong>Start.</strong> Array length n=${n}. Begin at index 0. Follow exactly ${n} jumps.`,
+    {idx:0,jump:arr[0],nextIdx:null,visited:0,wrapped:false});
+
+  let idx=0, visited=0;
+  while(visited<n){
+    // check early return
+    if(visited>0&&idx===0){
+      snap('early',
+        `❌ <strong>Early return to 0!</strong> Only ${visited}/${n} elements visited → sub-cycle. Return <strong>false</strong>.`,
+        {idx,jump:arr[idx],nextIdx:null,visited,earlyReturn:true,result:false}
+      );
+      snap('done','❌ <strong>false</strong> — early return to index 0.',
+        {idx,jump:arr[idx],nextIdx:idx,visited,result:false,finalResult:{found:false}});
+      // mark final result on last snap
+      steps[steps.length-1].result={answer:false};
+      return steps;
+    }
+    visitCount[idx]++;
+    const ni=nextIdx(idx);
+    const rawNext=(idx+arr[idx])%n;
+    const wrapped=rawNext<0;
+    jumpLog.push({from:idx,jump:arr[idx],to:ni,wrapped});
+    snap('jump',
+      `Jump from <strong>${idx}</strong> (val=${arr[idx]}) → index <strong>${ni}</strong>${wrapped?' (wrapped)':''}. visited=${visited+1}/${n}`,
+      {idx,jump:arr[idx],nextIdx:ni,visited,wrapped}
+    );
+    visited++;
+    idx=ni;
+  }
+
+  const isTrue=idx===0;
+  snap('done',
+    `${isTrue?`🎉 <strong>true</strong> — landed on index 0 after ${n} jumps!`:`❌ <strong>false</strong> — landed on index ${idx} after ${n} jumps, not 0.`}`,
+    {idx,jump:arr[idx-1]??0,nextIdx:idx,visited,result:isTrue,finalResult:{found:isTrue}}
+  );
+  steps[steps.length-1].result={answer:isTrue};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=650;
+let arr=[], n=0;
+const TW=64; // tile width + gap
+
+function svgEl(tag,attrs){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+// ─── DRAW ARROWS ──────────────────────────────────────────────────────────────
+function drawArrows(st){
+  const svgTop=document.getElementById('svgTop');
+  const svgBot=document.getElementById('svgBot');
+  svgTop.innerHTML=''; svgBot.innerHTML='';
+  const W=n*TW; svgTop.setAttribute('width',W); svgBot.setAttribute('width',W);
+
+  const cx=k=>k*TW+TW/2;
+  const defs1=svgEl('defs',{}); svgTop.appendChild(defs1);
+  const defs2=svgEl('defs',{}); svgBot.appendChild(defs2);
+  let midUsed=new Set();
+
+  // Draw the current jump arrow prominently
+  const {idx, nextIdx:ni, type, visited} = st;
+  if(type==='jump'&&ni!=null&&idx!=null){
+    const fwd=ni>idx||(arr[idx]>0&&ni<idx); // wrapped fwd
+    const useTop=arr[idx]>0; // positive = above, negative = below
+    const svg=useTop?svgTop:svgBot;
+    const defs=useTop?defs1:defs2;
+    const Y=useTop?46:6;
+    const x1=cx(idx), x2=cx(ni);
+    const wrapped=Math.abs(ni-idx)*TW<Math.abs(arr[idx])*TW*0.3;
+    const color=arr[idx]>=0?'rgba(6,214,160,0.85)':'rgba(192,84,252,0.8)';
+    const hColor=arr[idx]>=0?'rgba(6,214,160,0.95)':'rgba(192,84,252,0.95)';
+
+    const mid='mk_cur'; if(!defs.querySelector('#'+mid)){
+      const mk=svgEl('marker',{id:mid,markerWidth:'8',markerHeight:'8',refX:'7',refY:'4',orient:'auto'});
+      mk.appendChild(svgEl('path',{d:'M0,0 L8,4 L0,8 Z',fill:hColor}));
+      defs.appendChild(mk);
+    }
+    const mx=(x1+x2)/2, my=useTop?Y-Math.min(36,(Math.abs(x2-x1)*0.4+10)):Y+Math.min(36,(Math.abs(x2-x1)*0.4+10));
+    svg.appendChild(svgEl('path',{
+      d:`M${x1},${Y} Q${mx},${my} ${x2},${Y}`,
+      fill:'none',stroke:color,'stroke-width':'3',
+      'marker-end':`url(#${mid})`
+    }));
+    // badge
+    const lbl=`${arr[idx]>=0?'+':''}${arr[idx]}${wrapped?'(wrap)':''}`;
+    const lw=lbl.length*5.5+10;
+    svg.appendChild(svgEl('rect',{x:mx-lw/2,y:useTop?my-16:my+4,width:lw,height:13,rx:3,fill:hColor}));
+    const t=svgEl('text',{x:mx,y:useTop?my-9:my+11,'text-anchor':'middle','dominant-baseline':'middle',
+      fill:'white','font-family':'Space Mono,monospace','font-size':'8','font-weight':'700'});
+    t.textContent=lbl; svg.appendChild(t);
+  }
+
+  // Draw trail arrows (previous jumps, faint)
+  (st.jumpLog||[]).slice(-5).forEach(({from,to,jump,wrapped},k)=>{
+    const useTop=jump>=0;
+    const svg=useTop?svgTop:svgBot;
+    const defs=useTop?defs1:defs2;
+    const Y=useTop?46:6;
+    const x1=cx(from), x2=cx(to);
+    const alpha=0.1+(k/5)*0.25;
+    const color=jump>=0?`rgba(6,214,160,${alpha})`:`rgba(192,84,252,${alpha})`;
+    const mx=(x1+x2)/2, my=useTop?Y-Math.min(30,(Math.abs(x2-x1)*0.35+8)):Y+Math.min(30,(Math.abs(x2-x1)*0.35+8));
+    svg.appendChild(svgEl('path',{
+      d:`M${x1},${Y} Q${mx},${my} ${x2},${Y}`,
+      fill:'none',stroke:color,'stroke-width':'1.5',
+      'stroke-dasharray':'4 3'
+    }));
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  arr=document.getElementById('inArr').value.split(',').map(Number);
+  n=arr.length;
+  steps=computeSteps(arr);
+  currentStep=0;
+
+  const ar=document.getElementById('arrRow');
+  ar.innerHTML='';
+  arr.forEach((v,k)=>
+    ar.innerHTML+=`<div class="atile ${k===0?'at-start':''}" id="at-${k}">
+      <span class="av">${v>=0?'+'+v:v}</span>
+      <span class="ai">idx ${k}</span>
+      <span class="vc-badge" id="vcb-${k}">0</span>
+    </div>`
+  );
+
+  const svgTop=document.getElementById('svgTop');
+  const svgBot=document.getElementById('svgBot');
+  svgTop.setAttribute('width',n*TW); svgBot.setAttribute('width',n*TW);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('cxJumps').textContent='—';
+  document.getElementById('jlRows').innerHTML='';
+  document.getElementById('progChips').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill as jumps happen</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Array tiles
+  const visitedSet=new Set((st.jumpLog||[]).map(j=>j.from));
+  arr.forEach((_,k)=>{
+    const el=document.getElementById(`at-${k}`);
+    const vc=document.getElementById(`vcb-${k}`);
+    if(!el)return;
+    const cnt=st.visitCount[k];
+    const isCur=st.idx===k&&st.type==='jump';
+    const isEarly=st.type==='early'&&k===0;
+    const isStart=k===0&&st.type!=='jump';
+    if(isFinal&&!st.result?.answer&&k===st.idx) el.className='atile at-bad';
+    else if(isFinal&&st.result?.answer) el.className=`atile at-done`;
+    else if(isCur) el.className='atile at-cur';
+    else if(isEarly) el.className='atile at-bad';
+    else if(cnt>0) el.className=k===0?'atile at-start':'atile at-visited';
+    else if(k===0) el.className='atile at-start';
+    else el.className='atile';
+
+    if(vc){
+      vc.textContent=cnt;
+      vc.className='vc-badge'+(cnt>1?' vc-multi':'');
+      vc.style.display=cnt>0?'block':'none';
+    }
+  });
+
+  // Visit progress chips
+  const pc=document.getElementById('progChips');
+  const jumpSeq=(st.jumpLog||[]).map(j=>j.from);
+  if(jumpSeq.length>0){
+    pc.innerHTML=jumpSeq.map((fromIdx,k)=>{
+      const isLast=k===jumpSeq.length-1;
+      return `<div class="pchip ${isLast?'pc-cur':'pc-done'}">${fromIdx}</div>`;
+    }).join('<span style="font-family:\'Space Mono\',monospace;font-size:.65rem;color:var(--muted)">→</span>');
+  } else {
+    pc.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill as jumps happen</span>';
+  }
+
+  // Jump panel
+  const jp=document.getElementById('jumpPanel');
+  const jt=document.getElementById('jpTitle');
+  const jb=document.getElementById('jpBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="jpbox ${cls}"><div class="jb-lbl">${lbl}</div><div class="jb-val">${val}</div><div class="jb-sub">${sub}</div></div>`;
+  if(st.type==='jump'){
+    const rawMod=((st.idx+st.jump)%n);
+    const wrapNote=rawMod<0?` (neg mod → +${n})`:' ';
+    jp.className=`jump-panel ${st.jump>=0?'jp-fwd':st.nextIdx!=null&&Math.abs(st.idx-st.nextIdx)>Math.abs(st.jump)?'jp-wrap':'jp-bwd'}`;
+    jt.textContent=`Jumping from index ${st.idx} by ${st.jump>=0?'+':''}${st.jump}`;
+    jb.innerHTML=mkBox('idx',st.idx,'current','jpbox')+
+      mkBox('+ jump',`${st.jump>=0?'+':''}${st.jump}`,'value','jpbox'+(st.jump>=0?' jb-fwd':' jb-bwd'))+
+      mkBox('% n',`%${n}${wrapNote}`,st.wrapped?'wrapped!':'','jpbox')+
+      mkBox('nextIdx',st.nextIdx,'land here','jpbox jb-hi');
+  } else if(st.type==='early'){
+    jp.className='jump-panel jp-bad';
+    jt.textContent=`❌ Early return to index 0 after ${st.visited} jumps`;
+    jb.innerHTML=mkBox('currentIdx',0,'back too soon!','jpbox jb-bad')+
+      mkBox('visited',st.visited,'of '+n,'jpbox jb-bad')+
+      mkBox('verdict','false','sub-cycle!','jpbox jb-bad');
+  } else if(st.type==='done'){
+    jp.className=`jump-panel ${st.result?.answer?'jp-done':'jp-bad'}`;
+    jt.textContent=st.result?.answer?'✅ Landed back on 0 after all n jumps!':'❌ Did not land on 0 after n jumps';
+    jb.innerHTML=mkBox('final idx',st.nextIdx,'should be 0','jpbox'+(st.result?.answer?' jb-hi':' jb-bad'))+
+      mkBox('visited',st.visited,'of '+n,'jpbox')+
+      mkBox('result',st.result?.answer?'true':'false','answer','jpbox'+(st.result?.answer?' jb-hi':' jb-bad'));
+  } else {
+    jp.className='jump-panel';
+    jt.textContent='Starting at index 0, following the jumps...';
+    jb.innerHTML='';
+  }
+
+  // Jump log right panel
+  const jlr=document.getElementById('jlRows');
+  jlr.innerHTML='';
+  [...(st.jumpLog||[])].reverse().slice(0,8).forEach((e,k)=>{
+    jlr.innerHTML+=`<div class="jl-row ${k===0?'jl-cur':''}">
+      <span class="jl-from">[${e.from}]</span>
+      <span class="jl-jump">${e.jump>=0?'+':''}${e.jump}</span>
+      <span class="jl-to">→[${e.to}]</span>
+      ${e.wrapped?'<span class="jl-wrap">wrap</span>':''}
+    </div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Vars
+  setVar('vIdx','vcIdx',st.idx!=null?st.idx:'—');
+  setVar('vVis','vcVis',st.visited!=null?`${st.visited}/${n}`:'—');
+  setVar('vJump','vcJump',st.jump!=null?(st.jump>=0?'+'+st.jump:st.jump):'—');
+  setVar('vNext','vcNext',st.nextIdx!=null?st.nextIdx:'—');
+  setVar('vWrap','vcWrap',st.wrapped?'YES':'NO');
+  document.getElementById('vWrap').style.color=st.wrapped?'var(--pur)':'#6b6b8a';
+  setVar('vN','vcN',n);
+
+  // Done
+  if(isFinal){
+    const ans=st.result?.answer;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=ans?
+      `★ TRUE — Single cycle confirmed! ${n} jumps → back to 0`:`★ FALSE — Not a single cycle`;
+    if(ans) document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=ans?'true':'false';
+    document.getElementById('bestMeta').textContent=`${n} jumps · O(n) time · O(1) space`;
+    document.getElementById('cxAns').textContent=ans?'true':'false';
+    document.getElementById('cxAns').style.color=ans?'var(--accent3)':'var(--accent)';
+    document.getElementById('cxJumps').textContent=(st.jumpLog||[]).length;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  drawArrows(st);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-jump',jump:'ep-jump',early:'ep-bad',done:st.result?.answer?'ep-done':'ep-bad'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-jump');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

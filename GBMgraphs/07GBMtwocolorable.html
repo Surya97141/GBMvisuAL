@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Two-Colorable — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+  --col0:#2196f3;--col1:#e63946;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:vertical;width:300px;min-height:80px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:14px;height:14px;border-radius:50%;border:2px solid;flex-shrink:0;}
+
+/* GRAPH CANVAS */
+.graph-section{margin-bottom:14px;}
+.graph-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;transition:border-color .3s;}
+.graph-outer.go-conflict{border-color:var(--accent);}
+.graph-outer.go-ok{border-color:var(--accent3);}
+
+/* COLOR SETS DISPLAY */
+.sets-section{margin-bottom:14px;}
+.sets-row{display:flex;gap:10px;}
+.set-box{flex:1;border:2px solid;border-radius:10px;padding:10px 12px;transition:all .3s;}
+.set-box.sb-0{border-color:rgba(33,150,243,.4);background:rgba(33,150,243,.04);}
+.set-box.sb-1{border-color:rgba(230,57,70,.35);background:rgba(230,57,70,.03);}
+.set-title{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:7px;}
+.set-title.st-0{color:var(--col0);}
+.set-title.st-1{color:var(--col1);}
+.set-nodes{display:flex;gap:5px;flex-wrap:wrap;min-height:28px;align-items:center;}
+.snode{width:32px;height:32px;border-radius:50%;border:2.5px solid;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;transition:all .3s;flex-shrink:0;}
+.snode.sn-0{background:rgba(33,150,243,.18);border-color:var(--col0);color:var(--col0);}
+.snode.sn-1{background:rgba(230,57,70,.15);border-color:var(--col1);color:var(--col1);}
+.snode.sn-new{animation:snnew .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes snnew{from{transform:scale(1.5);opacity:.4;}to{transform:none;opacity:1;}}
+
+/* QUEUE / BFS STRIP */
+.queue-section{margin-bottom:14px;}
+.queue-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;min-height:44px;}
+.queue-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.qchip{padding:4px 11px;border-radius:6px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s;flex-shrink:0;}
+.qchip.qc-head{transform:scale(1.07) translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15);}
+.qchip.qc-0{background:rgba(33,150,243,.15);border-color:rgba(33,150,243,.4);color:#0d47a1;}
+.qchip.qc-1{background:rgba(230,57,70,.12);border-color:rgba(230,57,70,.35);color:#7a0000;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-color  {border-color:var(--accent4);}
+.step-panel.sp-enqueue{border-color:var(--accent2);}
+.step-panel.sp-conflict{border-color:var(--accent);}
+.step-panel.sp-done   {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-0{border-color:rgba(33,150,243,.45);background:rgba(33,150,243,.05);}
+.spbox.sb-1{border-color:rgba(230,57,70,.4);background:rgba(230,57,70,.04);}
+.spbox.sb-conflict{border-color:var(--accent);border-width:2.5px;background:rgba(230,57,70,.08);}
+.spbox.sb-ok{border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-color  {border-color:var(--accent4);}
+.explain-panel.ep-conflict{border-color:var(--accent);}
+.explain-panel.ep-done   {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-color{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-conflict{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.done-banner.db-false{background:var(--accent);color:#fff;}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-color   {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-conflict{background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done    {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.color-log{margin-bottom:12px;}
+.cl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.cl-rows{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;}
+.cl-rows::-webkit-scrollbar{width:3px;}.cl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.cl-row{display:flex;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;align-items:center;}
+.cl-row.cl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.cl-row.cl-bad{border-color:rgba(230,57,70,.4);background:rgba(230,57,70,.06);}
+.cl-node{width:28px;flex-shrink:0;}
+.cl-col{font-weight:700;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-box.bb-false{background:rgba(230,57,70,.06);border-color:rgba(230,57,70,.3);}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-label.bl-false{color:var(--accent);}
+.best-val{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;text-align:center;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+.done-bar.db-true{background:var(--accent3);color:#0a2e22;}
+.done-bar.db-false{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Two-Colorable</h1>
+    <div class="sub">Bipartite Graph Check · BFS Coloring · O(V+E)</div>
+  </div>
+  <div class="family-badge">Graph · BFS · Bipartite</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Adjacency list  (row i = vertex i's neighbours, comma separated)</label>
+      <textarea id="inEdges">1,2
+0,2
+0,1</textarea>
+      <div class="hint">Row i = vertex i's neighbours. Undirected. Empty line = isolated vertex.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.2);border-color:#2196f3;"></div> Color 0 (blue)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;"></div> Color 1 (red)</div>
+    <div class="legend-item"><div class="ldot" style="background:#fff8c5;border-color:#f5a623;"></div> Current (being colored)</div>
+    <div class="legend-item"><div class="ldot" style="background:var(--surface);border-color:var(--border);"></div> Uncolored</div>
+    <div class="legend-item" style="font-family:'Space Mono',monospace;font-size:.58rem;color:var(--accent);">⚡ CONFLICT = same-color edge → false</div>
+  </div>
+
+  <!-- GRAPH CANVAS -->
+  <div class="graph-section">
+    <div class="section-label">Graph — nodes being colored alternately · conflict edge flashes red</div>
+    <div class="graph-outer" id="graphOuter">
+      <canvas id="graphCanvas" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- COLOR SETS -->
+  <div class="sets-section">
+    <div class="section-label">Color sets — bipartite if no edge connects same-color nodes</div>
+    <div class="sets-row">
+      <div class="set-box sb-0">
+        <div class="set-title st-0">Color 0 (blue)</div>
+        <div class="set-nodes" id="set0"></div>
+      </div>
+      <div class="set-box sb-1">
+        <div class="set-title st-1">Color 1 (red)</div>
+        <div class="set-nodes" id="set1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUEUE -->
+  <div class="queue-section">
+    <div class="section-label">BFS queue — (node, color) pairs</div>
+    <div class="queue-outer"><div class="queue-row" id="queueRow"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will fill on start</span></div></div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(V+E)</div>
+      <div class="cx-sub">BFS visits all</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(V)</div>
+      <div class="cx-sub">color array</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Result</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">true / false</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Vertices</div>
+      <div class="cx-val" id="cxV" style="color:#028a5b">—</div>
+      <div class="cx-sub">colored</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-color" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Two-Colorable (Bipartite BFS)</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">twoColorable</span>(edges):</span>
+<span class="code-line" id="cl-n">  n=len(edges)</span>
+<span class="code-line" id="cl-col">  color=[-<span class="cn">1</span>]*n <span class="cc"># -1 = uncolored</span></span>
+<span class="code-line" id="cl-outer">  <span class="ck">for</span> start <span class="ck">in</span> range(n): <span class="cc"># handle disconnected</span></span>
+<span class="code-line" id="cl-vis">   <span class="ck">if</span> color[start]!=-<span class="cn">1</span>: <span class="ck">continue</span></span>
+<span class="code-line" id="cl-seed">   color[start]=<span class="cn">0</span></span>
+<span class="code-line" id="cl-q">   queue=deque([start])</span>
+<span class="code-line" id="cl-loop">   <span class="ck">while</span> queue:</span>
+<span class="code-line" id="cl-pop">    node=queue.popleft()</span>
+<span class="code-line" id="cl-nb">    <span class="ck">for</span> nb <span class="ck">in</span> edges[node]:</span>
+<span class="code-line" id="cl-self">     <span class="ck">if</span> nb==node: <span class="ck">return False</span> <span class="cc"># self-loop</span></span>
+<span class="code-line" id="cl-conf">     <span class="ck">if</span> color[nb]==color[node]:</span>
+<span class="code-line" id="cl-conf2">      <span class="ck">return False</span> <span class="cc"># conflict!</span></span>
+<span class="code-line" id="cl-col2">     <span class="ck">if</span> color[nb]==-<span class="cn">1</span>:</span>
+<span class="code-line" id="cl-col3">      color[nb]=<span class="cn">1</span>-color[node]</span>
+<span class="code-line" id="cl-enq">      queue.append(nb)</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return True</span></span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(V+E)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">bool</span> <span style="color:#67e8f9">twoColorable</span>(
+    vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; adj){
+  <span style="color:#c084fc">int</span> n=adj.size();
+  vector&lt;<span style="color:#c084fc">int</span>&gt; color(n,-<span style="color:#fda4af">1</span>);
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> s=<span style="color:#fda4af">0</span>;s&lt;n;s++){
+    <span style="color:#c084fc">if</span>(color[s]!=-<span style="color:#fda4af">1</span>) <span style="color:#c084fc">continue</span>;
+    color[s]=<span style="color:#fda4af">0</span>;
+    queue&lt;<span style="color:#c084fc">int</span>&gt; q;
+    q.push(s);
+    <span style="color:#c084fc">while</span>(!q.empty()){
+      <span style="color:#c084fc">int</span> u=q.front(); q.pop();
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> v:adj[u]){
+        <span style="color:#c084fc">if</span>(v==u) <span style="color:#c084fc">return false</span>;       <span style="color:#374151;font-style:italic">// self-loop</span>
+        <span style="color:#c084fc">if</span>(color[v]==color[u]) <span style="color:#c084fc">return false</span>; <span style="color:#374151;font-style:italic">// conflict!</span>
+        <span style="color:#c084fc">if</span>(color[v]==-<span style="color:#fda4af">1</span>){
+          color[v]=<span style="color:#fda4af">1</span>-color[u];        <span style="color:#374151;font-style:italic">// flip color</span>
+          q.push(v);
+        }
+      }
+    }
+  }
+  <span style="color:#c084fc">return true</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">1-color[u] flip</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">BFS coloring</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">self-loop check</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">disconnected ok</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcNode">  <div class="var-name">current node</div><div class="var-value" id="vNode"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcCol">   <div class="var-name">its color</div>   <div class="var-value" id="vCol"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcNb">    <div class="var-name">neighbour</div>   <div class="var-value" id="vNb"    style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcNbCol"> <div class="var-name">nb color</div>    <div class="var-value" id="vNbCol" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcQSz" style="grid-column:1/3">
+        <div class="var-name">|queue| · colored so far</div>
+        <div class="var-value" id="vQSz" style="color:var(--accent2)">—</div>
+      </div>
+    </div>
+
+    <div class="color-log">
+      <div class="cl-title">Color assignment log</div>
+      <div class="cl-rows" id="clRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label" id="bestLabel">Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">—</div>
+</div>
+</div>
+
+<script>
+const COLOR_NAMES=['blue','red'];
+const COLOR_HEX=['#2196f3','#e63946'];
+const NRAD=20;
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {node,nodeColor,nb,nbColor,n,colored,conflictEdge,isSelfLoop} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">BFS graph coloring: try to color every vertex with one of two colors so that no two adjacent vertices share the same color. Start a vertex with Color 0. Every neighbour must get Color 1 (the opposite). If any neighbour already has the same color — conflict! Not bipartite.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>color[v]</strong>: -1=uncolored, 0=blue, 1=red. Invariant: all colored edges connect a 0-node to a 1-node.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>1-color[u] trick:</strong> opposite of color 0 = 1, opposite of color 1 = 0. Clean bitwise flip.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Bipartite ↔ no odd cycles:</strong> any odd-length cycle makes two-coloring impossible. BFS detects this as a same-color edge.`},
+    ]
+  };
+  if(type==='color') return {
+    why:`<div class="ep-why-block why-color">Coloring node <strong>${node}</strong> as Color ${nodeColor} (${COLOR_NAMES[nodeColor]}). Then checking all ${n}-neighbor${n!==1?'s':''}: [${args.nbs?.join(', ')||'none'}]. Each uncolored neighbour gets Color ${1-nodeColor} (${COLOR_NAMES[1-nodeColor]}).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>color[${node}]=${nodeColor}.</strong> Every neighbour of ${node} must get color ${1-nodeColor}.`},
+    ]
+  };
+  if(type==='assign') return {
+    why:`<div class="ep-why-block why-color">Neighbour ${nb} is uncolored. Assigning it Color ${nbColor} (${COLOR_NAMES[nbColor]}) — opposite of ${node}'s color ${nodeColor}. Adding ${nb} to queue.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>color[${nb}]=${nbColor}</strong> (was -1). Added to BFS queue. ${colored} nodes colored total.`},
+    ]
+  };
+  if(type==='conflict') return {
+    why:`<div class="ep-why-block why-conflict">${isSelfLoop?`Self-loop detected at node ${node}! A self-loop means the node must be a different color from itself — impossible. Return <strong>false</strong>.`:`CONFLICT! Edge (${node}–${nb}): both have Color ${nodeColor} (${COLOR_NAMES[nodeColor]}). Same-color edge means the graph is NOT bipartite. Return <strong>false</strong>.`}</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Same-color conflict</strong> = graph has an odd cycle. Two-coloring is impossible. Return false immediately.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${colored} vertices colored with no conflicts. Every edge connects a Color 0 node to a Color 1 node. The graph IS bipartite (two-colorable). Return <strong>true</strong>.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>True!</strong> ${colored} nodes in two groups with no same-color edges.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(V+E):</strong> every vertex and every edge visited once by BFS. O(V) space for color array.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:    {ids:['cl-sig','cl-n','cl-col','cl-outer','cl-vis','cl-seed','cl-q'],cls:'hl-color'},
+  color:   {ids:['cl-loop','cl-pop','cl-nb'],cls:'hl-color'},
+  assign:  {ids:['cl-col2','cl-col3','cl-enq'],cls:'hl-color'},
+  conflict:{ids:['cl-self','cl-conf','cl-conf2'],cls:'hl-conflict'},
+  done:    {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,node,nodeColor,nb,nbColor,colored,conflictEdge,isSelfLoop,n} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We'll try to color this graph with just two colors (blue and red) so that no edge connects two nodes of the same color. We use BFS — color a node, then force all its neighbours to the opposite color. Any conflict → return false.`};
+  if(type==='color') return {color:COLOR_HEX[nodeColor],
+    text:`Processing node <strong>${node}</strong> (Color ${nodeColor} = ${COLOR_NAMES[nodeColor]}). Checking its neighbours to assign them Color ${1-nodeColor} (${COLOR_NAMES[1-nodeColor]}).`};
+  if(type==='assign') return {color:COLOR_HEX[nbColor],
+    text:`Node <strong>${nb}</strong> is uncolored. Assigning Color ${nbColor} (<strong>${COLOR_NAMES[nbColor]}</strong>) — opposite of node ${node}'s color. Adding ${nb} to the BFS queue.`};
+  if(type==='skip') return {color:'var(--muted)',
+    text:`Node ${nb} already has Color ${nbColor} (${COLOR_NAMES[nbColor]}) — the correct opposite of ${node}'s color ${nodeColor}. No action needed.`};
+  if(type==='conflict') return {color:'var(--accent)',
+    text:`❌ ${isSelfLoop?`Self-loop at node ${node}! A node can't be a different color from itself.`:`CONFLICT! Edge (${node}–${nb}): both are Color ${nodeColor} (${COLOR_NAMES[nodeColor]}). Two nodes connected by an edge can't share a color. Return <strong>false</strong>!`}`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ All ${colored} nodes colored with no conflicts! Every edge connects a blue node to a red node (or vice versa). This graph IS two-colorable (bipartite). Return <strong>true</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(adjList){
+  const n=adjList.length;
+  const color=new Array(n).fill(-1);
+  const steps=[];
+  const colorLog=[];
+  let colored=0;
+
+  const snap=(type,desc,extra={})=>{
+    steps.push({
+      type,desc,n,adjList,
+      color:[...color],colorLog:[...colorLog],colored,
+      result:null,...extra,
+      explain:makeExplain(type,{n:adjList[extra.node??0]?.length??0,colored,...extra})
+    });
+  };
+
+  snap('init',`🎨 <strong>Start.</strong> ${n} vertices. Try BFS two-coloring.`,{node:0,nodeColor:-1});
+
+  for(let start=0;start<n;start++){
+    if(color[start]!==-1) continue;
+    color[start]=0; colored++;
+    colorLog.push({node:start,color:0,action:'seed'});
+    snap('color',`🌱 Seed vertex ${start} with Color 0.`,
+      {node:start,nodeColor:0,nbs:adjList[start]});
+
+    const queue=[start];
+    let qi=0;
+    while(qi<queue.length){
+      const node=queue[qi++];
+      const nc=color[node];
+
+      snap('color',`📦 Dequeue ${node} (Color ${nc}). Check neighbours: [${adjList[node].join(',')||'none'}]`,
+        {node,nodeColor:nc,nbs:adjList[node],queue:[...queue.slice(qi)]});
+
+      for(const nb of adjList[node]){
+        // self-loop
+        if(nb===node){
+          snap('conflict',`⚡ SELF-LOOP at ${node}! Not two-colorable.`,
+            {node,nodeColor:nc,nb,nbColor:nc,isSelfLoop:true,conflictEdge:[node,nb],result:false});
+          steps[steps.length-1].result={answer:false};
+          return steps;
+        }
+        if(color[nb]===nc){
+          snap('conflict',`⚡ CONFLICT: edge (${node}–${nb}), both Color ${nc}!`,
+            {node,nodeColor:nc,nb,nbColor:nc,isSelfLoop:false,conflictEdge:[node,nb],result:false});
+          steps[steps.length-1].result={answer:false};
+          return steps;
+        }
+        if(color[nb]===-1){
+          color[nb]=1-nc; colored++;
+          queue.push(nb);
+          colorLog.push({node:nb,color:color[nb],action:'assign',from:node});
+          snap('assign',`✓ Color ${nb} = ${color[nb]} (opposite of ${node}).`,
+            {node,nodeColor:nc,nb,nbColor:color[nb],queue:[...queue.slice(qi)]});
+        } else {
+          snap('skip',`  ${nb} already has Color ${color[nb]} ✓ (correct).`,
+            {node,nodeColor:nc,nb,nbColor:color[nb],queue:[...queue.slice(qi)]});
+        }
+      }
+    }
+  }
+
+  snap('done',`🎉 <strong>true</strong> — all ${colored} vertices two-colored with no conflicts!`,
+    {node:null,nodeColor:null,result:{answer:true}});
+  steps[steps.length-1].result={answer:true};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let adjList=[], N=0, nodePos=[];
+
+// ─── LAYOUT + DRAW ────────────────────────────────────────────────────────────
+function layoutNodes(W,H){
+  nodePos=[];
+  const cx=W/2, cy=H/2, r=Math.min(W,H)*0.36;
+  for(let i=0;i<N;i++){
+    const a=(2*Math.PI*i/N)-Math.PI/2;
+    nodePos.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});
+  }
+}
+
+function drawGraph(st){
+  const canvas=document.getElementById('graphCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=240;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,240);
+  layoutNodes(W,240);
+
+  const isFinal=!!st.result;
+  const conflictEdge=st.conflictEdge;
+
+  // Draw edges
+  for(let u=0;u<N;u++){
+    for(const v of (adjList[u]||[])){
+      if(u>=v&&u!==v) continue; // skip duplicates (but keep self-loops)
+      const p1=nodePos[u], p2=v===u?nodePos[u]:nodePos[v];
+      const isConflict=conflictEdge&&((conflictEdge[0]===u&&conflictEdge[1]===v)||(conflictEdge[0]===v&&conflictEdge[1]===u)||(u===v&&conflictEdge[0]===u));
+      const isCurEdge=!isConflict&&st.node===u&&adjList[u].includes(v)&&st.type!=='done';
+
+      if(u===v){
+        // Self-loop — draw a small circle above node
+        ctx.beginPath();
+        ctx.arc(p1.x,p1.y-NRAD-10,10,0,Math.PI*2);
+        ctx.strokeStyle=isConflict?'rgba(230,57,70,0.9)':'rgba(200,195,185,0.6)';
+        ctx.lineWidth=isConflict?3:1.5;
+        ctx.stroke();
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+      if(isConflict){
+        ctx.strokeStyle='rgba(230,57,70,0.9)';ctx.lineWidth=4;
+        ctx.setLineDash([]);
+      } else if(st.color[u]>=0&&st.color[v]>=0&&st.color[u]!==st.color[v]){
+        ctx.strokeStyle='rgba(6,214,160,0.45)';ctx.lineWidth=2;ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle='rgba(200,195,185,0.55)';ctx.lineWidth=1.5;ctx.setLineDash([4,3]);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+
+      if(isConflict){
+        // Conflict flash label
+        const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+        ctx.fillStyle='rgba(230,57,70,0.9)';
+        ctx.font='bold 11px Space Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('CONFLICT!',mx,my-12);
+      }
+    }
+  }
+
+  // Draw nodes
+  for(let i=0;i<N;i++){
+    const p=nodePos[i]; if(!p)continue;
+    const c=st.color[i];
+    const isCur=st.node===i&&(st.type==='color'||st.type==='assign'||st.type==='conflict');
+    const isNb=st.nb===i&&(st.type==='assign'||st.type==='skip'||st.type==='conflict');
+    const isConflictNode=conflictEdge&&(conflictEdge[0]===i||conflictEdge[1]===i);
+
+    let fill='#fdfaf4', stroke='#d4ccb8', lw=1.5;
+    if(isConflictNode)    {fill='rgba(230,57,70,.22)';stroke='#e63946';lw=3;}
+    else if(isCur&&c>=0)  {fill=c===0?'rgba(33,150,243,.28)':'rgba(230,57,70,.22)';stroke=COLOR_HEX[c];lw=3;}
+    else if(isCur)        {fill='#fff8c5';stroke='#f5a623';lw=3;}
+    else if(c===0)        {fill='rgba(33,150,243,.18)';stroke='#2196f3';lw=2;}
+    else if(c===1)        {fill='rgba(230,57,70,.15)';stroke='#e63946';lw=2;}
+    else if(isFinal&&st.result?.answer) {fill='rgba(6,214,160,.12)';stroke='#06d6a0';lw=1.5;}
+
+    ctx.beginPath();ctx.arc(p.x,p.y,NRAD,0,Math.PI*2);
+    ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();
+
+    if(c>=0){
+      const ringColor=c===0?'rgba(33,150,243,0.3)':'rgba(230,57,70,0.3)';
+      ctx.beginPath();ctx.arc(p.x,p.y,NRAD+4,0,Math.PI*2);
+      ctx.strokeStyle=ringColor;ctx.lineWidth=1.5;ctx.stroke();
+    }
+
+    ctx.fillStyle='#1a1a2e';
+    ctx.font='bold 13px Space Mono';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(i,p.x,p.y);
+
+    // color badge
+    if(c>=0){
+      ctx.font='8px Space Mono';
+      ctx.fillStyle=COLOR_HEX[c];
+      ctx.fillText(`C${c}`,p.x,p.y+NRAD+11);
+    }
+  }
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inEdges').value.trim();
+  adjList=raw.split('\n').map(r=>{
+    const t=r.trim();
+    return t?t.split(',').map(Number).filter(v=>!isNaN(v)):[];
+  });
+  N=adjList.length;
+  steps=computeSteps(adjList);
+  currentStep=0;
+
+  document.getElementById('cxV').textContent=N;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('set0').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.62rem;color:var(--muted)">empty</span>';
+  document.getElementById('set1').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.62rem;color:var(--muted)">empty</span>';
+  document.getElementById('queueRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill on start</span>';
+  document.getElementById('clRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const isConflict=st.type==='conflict';
+
+  // Color sets
+  const s0=document.getElementById('set0'), s1=document.getElementById('set1');
+  const nodes0=st.color.map((c,i)=>c===0?i:-1).filter(i=>i>=0);
+  const nodes1=st.color.map((c,i)=>c===1?i:-1).filter(i=>i>=0);
+  const renderSet=(el,nodes,col)=>{
+    if(nodes.length===0){el.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.62rem;color:var(--muted)">empty</span>`;return;}
+    el.innerHTML=nodes.map(i=>{
+      const isNew=i===st.nb&&(st.type==='assign');
+      return `<div class="snode sn-${col} ${isNew?'sn-new':''}">${i}</div>`;
+    }).join('');
+  };
+  renderSet(s0,nodes0,0); renderSet(s1,nodes1,1);
+
+  // Queue
+  const qr=document.getElementById('queueRow');
+  const q=st.queue||[];
+  if(q.length===0){qr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">empty</span>';}
+  else qr.innerHTML=q.map((n,k)=>{
+    const c=st.color[n];
+    return `<div class="qchip ${k===0?'qc-head':''} ${c>=0?'qc-'+c:''}">${n}${c>=0?'(C'+c+')':''}</div>`;
+  }).join('');
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='assign'){
+    sp.className='step-panel sp-enqueue';
+    spt.textContent=`Assigning Color ${st.nbColor} to node ${st.nb}`;
+    spb.innerHTML=mkBox('node',st.node,`Color ${st.nodeColor}`,`spbox sb-${st.nodeColor}`)+
+      mkBox('→ neighbor',st.nb,'uncolored','spbox')+
+      mkBox('assigned',`Color ${st.nbColor}`,COLOR_NAMES[st.nbColor],`spbox sb-${st.nbColor}`);
+  } else if(st.type==='conflict'){
+    sp.className='step-panel sp-conflict';
+    spt.textContent=st.isSelfLoop?`Self-loop at ${st.node}!`:`CONFLICT: (${st.node}–${st.nb}), both Color ${st.nodeColor}`;
+    spb.innerHTML=mkBox('node',st.node,`Color ${st.nodeColor}`,`spbox sb-${st.nodeColor}`)+
+      mkBox(st.isSelfLoop?'self':'neighbor',st.nb,st.isSelfLoop?'same node':`also Color ${st.nodeColor}`,`spbox sb-conflict`)+
+      mkBox('result','false','not bipartite','spbox sb-conflict');
+  } else if(st.type==='color'){
+    sp.className='step-panel sp-color';
+    spt.textContent=`Coloring node ${st.node} (Color ${st.nodeColor})`;
+    spb.innerHTML=mkBox('node',st.node??'—',`Color ${st.nodeColor??'—'}`,`spbox sb-${st.nodeColor}`)+
+      mkBox('opposite',`Color ${1-(st.nodeColor??0)}`,`for its ${st.nbs?.length||0} neighbours`,'spbox');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent='All nodes colored! Graph is bipartite.';
+    spb.innerHTML=mkBox('color 0',nodes0.join(','),'blue set','spbox sb-0')+
+      mkBox('color 1',nodes1.join(','),'red set','spbox sb-1')+
+      mkBox('result','true','bipartite!','spbox sb-ok');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Initialising BFS two-coloring...';
+    spb.innerHTML='';
+  }
+
+  // Color log right panel
+  const cl=document.getElementById('clRows');
+  cl.innerHTML='';
+  [...(st.colorLog||[])].reverse().slice(0,10).forEach((e,k)=>{
+    const isCur=k===0&&(st.type==='assign'||st.type==='color');
+    const isBad=isConflict&&e.node===st.nb;
+    cl.innerHTML+=`<div class="cl-row ${isCur?'cl-cur':''} ${isBad?'cl-bad':''}">
+      <span class="cl-node">v${e.node}</span>
+      <span class="cl-col" style="color:${COLOR_HEX[e.color]}">C${e.color}</span>
+      <span style="font-size:.55rem;color:#6b6b8a">${e.action==='seed'?'seed':e.from!=null?`← v${e.from}`:''}</span>
+    </div>`;
+  });
+
+  // Graph outer border
+  const go=document.getElementById('graphOuter');
+  go.className='graph-outer'+(isConflict?' go-conflict':(isFinal&&st.result?.answer)?' go-ok':'');
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type==='conflict'?'conflict':st.type==='done'?'done':st.type==='assign'||st.type==='color'?'color':'init');
+
+  // Draw graph
+  drawGraph(st);
+
+  // Vars
+  setVar('vNode','vcNode',st.node!=null?`v${st.node}`:'—');
+  setVar('vCol','vcCol',st.nodeColor>=0?`Color ${st.nodeColor} (${COLOR_NAMES[st.nodeColor]??'?'})` :'—');
+  document.getElementById('vCol').style.color=st.nodeColor>=0?COLOR_HEX[st.nodeColor]:'#e2e8f0';
+  setVar('vNb','vcNb',st.nb!=null?`v${st.nb}`:'—');
+  setVar('vNbCol','vcNbCol',st.nbColor>=0?`Color ${st.nbColor}`:'—');
+  document.getElementById('vNbCol').style.color=st.nbColor>=0?COLOR_HEX[st.nbColor]:'#e2e8f0';
+  setVar('vQSz','vcQSz',`${st.queue?.length??'—'} in queue · ${st.colored} colored`);
+
+  // Done
+  if(isFinal){
+    const ans=st.result.answer;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').className='done-banner show'+(ans?'':' db-false');
+    document.getElementById('doneBanner').textContent=ans?
+      `★ TRUE — Graph is two-colorable (bipartite)`:`★ FALSE — Graph is NOT two-colorable`;
+    const db=document.getElementById('doneBar');
+    db.className='done-bar show '+(ans?'db-true':'db-false');
+    db.textContent=ans?'★ BIPARTITE = TRUE':'★ BIPARTITE = FALSE';
+    document.getElementById('bestBox').className='best-box show'+(ans?'':' bb-false');
+    document.getElementById('bestLabel').className='best-label'+(ans?'':' bl-false');
+    document.getElementById('bestLabel').style.color=ans?'var(--accent3)':'var(--accent)';
+    document.getElementById('bestVal').textContent=ans?'true':'false';
+    document.getElementById('bestMeta').textContent=ans?`${N} nodes · 2 color sets · O(V+E)`:
+      `Conflict detected · odd cycle exists`;
+    document.getElementById('cxAns').textContent=ans?'true':'false';
+    document.getElementById('cxAns').style.color=ans?'#028a5b':'var(--accent)';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-color',color:'ep-color',assign:'ep-color',skip:'ep-color',conflict:'ep-conflict',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-color');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)drawGraph(steps[currentStep]);});
+buildUI();
+</script>
+</body>
+</html>

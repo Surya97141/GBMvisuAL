@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimum Passes Of Matrix — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:vertical;width:320px;min-height:72px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:14px;height:14px;border-radius:3px;border:1.5px solid;flex-shrink:0;}
+
+/* PASS COUNTER */
+.pass-header{display:flex;align-items:center;gap:16px;margin-bottom:14px;}
+.pass-badge{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;padding:8px 20px;
+  border-radius:8px;background:rgba(255,209,102,.15);border:2px solid var(--accent4);color:#7a4800;
+  transition:all .3s;}
+.pass-badge.pb-new{animation:pbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes pbnew{from{transform:scale(1.25);background:rgba(255,209,102,.4);}to{transform:none;background:rgba(255,209,102,.15);}}
+.pass-stats{display:flex;gap:10px;flex-wrap:wrap;}
+.pstat{font-family:'Space Mono',monospace;font-size:.62rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:4px 10px;border-radius:5px;}
+.pstat strong{color:var(--ink);}
+
+/* GRIDS */
+.grids-row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+.grid-box{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;flex:1;min-width:0;transition:border-color .3s;}
+.grid-box.gb-active{border-color:var(--accent4);}
+.grid-box.gb-done{border-color:var(--accent3);}
+.grid-title{font-family:'Space Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;}
+.grid-wrap{display:inline-grid;gap:3px;}
+
+/* cells */
+.gcell{
+  width:52px;height:46px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;transition:all .3s;position:relative;
+}
+.gcell .gv{font-size:.88rem;}
+.gcell .gl{font-size:.46rem;color:var(--muted);margin-top:1px;}
+
+/* cell states */
+.gc-zero   {background:var(--surface);color:var(--muted);}
+.gc-pos    {background:rgba(6,214,160,.15);border-color:rgba(6,214,160,.4);color:#024d37;}
+.gc-neg    {background:rgba(230,57,70,.12);border-color:rgba(230,57,70,.35);color:#7a0000;}
+.gc-source {background:rgba(6,214,160,.28);border-color:var(--accent3);border-width:2.5px;color:#024d37;
+  box-shadow:0 3px 10px rgba(6,214,160,.35);}
+.gc-cur    {
+  background:#fff8c5!important;border-color:#f5a623!important;border-width:2.5px!important;
+  color:#7a4800!important;transform:scale(1.12) translateY(-4px);
+  box-shadow:0 5px 14px rgba(245,166,35,.5);z-index:4;
+  animation:gcp .8s ease infinite alternate;
+}
+@keyframes gcp{from{box-shadow:0 3px 8px rgba(245,166,35,.35);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+.gc-converted{
+  background:rgba(6,214,160,.25)!important;border-color:var(--accent3)!important;border-width:2.5px!important;
+  color:#024d37!important;animation:gcconv .5s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes gcconv{from{transform:scale(1.2);opacity:.6;}to{transform:none;opacity:1;}}
+.gc-blocked {background:rgba(230,57,70,.08);border-color:rgba(230,57,70,.2);color:#7a0000;opacity:.55;}
+.gc-unreachable{background:rgba(230,57,70,.15);border-color:var(--accent);border-width:2px;color:#7a0000;
+  animation:unreachpulse 1s ease infinite alternate;}
+@keyframes unreachpulse{from{opacity:.7;}to{opacity:1;box-shadow:0 2px 8px rgba(230,57,70,.4);}}
+
+/* pass count chip inside cell */
+.pass-chip{position:absolute;top:2px;right:3px;font-family:'Space Mono',monospace;font-size:.44rem;font-weight:700;
+  background:rgba(6,214,160,.2);border:1px solid rgba(6,214,160,.4);color:#024d37;border-radius:3px;padding:0 3px;}
+
+/* WAVE STRIP */
+.wave-section{margin-bottom:14px;}
+.wave-row{display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-height:32px;}
+.wchip{padding:3px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;
+  background:var(--surface);border:1.5px solid var(--border);color:var(--muted);transition:all .3s;}
+.wchip.wc-done{background:rgba(6,214,160,.12);border-color:var(--accent3);color:#028a5b;}
+.wchip.wc-cur{background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;transform:scale(1.08);}
+.warrow{color:var(--muted);font-family:'Space Mono',monospace;font-size:.8rem;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-bfs  {border-color:var(--accent2);}
+.step-panel.sp-pass {border-color:var(--accent4);}
+.step-panel.sp-conv {border-color:var(--accent3);}
+.step-panel.sp-done {border-color:var(--accent3);}
+.step-panel.sp-bad  {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-pos{border-color:var(--accent3);background:rgba(6,214,160,.06);}
+.spbox.sb-neg{border-color:var(--accent);background:rgba(230,57,70,.05);}
+.spbox.sb-pass{border-color:var(--accent4);background:rgba(255,209,102,.08);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-bfs {border-color:var(--accent2);}
+.explain-panel.ep-pass{border-color:var(--accent4);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.explain-panel.ep-bad {border-color:var(--accent);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-bfs {border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-pass{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-bad {border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-bfs {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-pass{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-bad {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.pass-log{margin-bottom:12px;}
+.pl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.pl-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.pl-rows::-webkit-scrollbar{width:3px;}.pl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.pl-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;}
+.pl-row.pl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.pl-pass{color:#ffd166;width:52px;flex-shrink:0;font-weight:700;}
+.pl-conv{color:var(--accent3);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+.done-bar.db-bad{background:var(--accent);}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Minimum Passes Of Matrix</h1>
+    <div class="sub">Multi-Source BFS · Wave Propagation · O(w·h)</div>
+  </div>
+  <div class="family-badge">Graph · BFS · Matrix</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Matrix  (rows by | values by comma)</label>
+      <textarea id="inMatrix">0,-1,-3,2,0|1,-2,-5,-1,-3|3,0,0,-4,-1</textarea>
+      <div class="hint">0=zero (neutral), positive=can convert neighbours, negative=needs conversion</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1200">0.5×</button>
+        <button class="speed-btn active" data-ms="550">1×</button>
+        <button class="speed-btn" data-ms="250">2×</button>
+        <button class="speed-btn" data-ms="90">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.28);border-color:#06d6a0;"></div> positive (source)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.12);border-color:#e63946;"></div> negative (to convert)</div>
+    <div class="legend-item"><div class="ldot" style="background:var(--surface);border-color:var(--border);"></div> zero (neutral)</div>
+    <div class="legend-item"><div class="ldot" style="background:#fff8c5;border-color:#f5a623;"></div> current BFS front</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.25);border-color:#06d6a0;"></div> just converted ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;opacity:.55;"></div> unreachable!</div>
+  </div>
+
+  <!-- PASS COUNTER -->
+  <div class="pass-header">
+    <div class="pass-badge" id="passBadge">Pass 0</div>
+    <div class="pass-stats">
+      <div class="pstat">Positives: <strong id="statPos">—</strong></div>
+      <div class="pstat">Negatives: <strong id="statNeg">—</strong></div>
+      <div class="pstat">Queue size: <strong id="statQ">—</strong></div>
+    </div>
+  </div>
+
+  <!-- GRIDS -->
+  <div class="grids-row">
+    <div class="grid-box" id="gridBox">
+      <div class="grid-title">Matrix — converting wave by wave</div>
+      <div class="grid-wrap" id="mainGrid"></div>
+    </div>
+  </div>
+
+  <!-- WAVE STRIP -->
+  <div class="wave-section">
+    <div class="section-label">Pass history — conversions per pass</div>
+    <div class="wave-row" id="waveRow">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will build as passes complete</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(w·h)</div>
+      <div class="cx-sub">each cell once</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(w·h)</div>
+      <div class="cx-sub">BFS queue</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Passes</div>
+      <div class="cx-val" id="cxPasses" style="color:#028a5b">—</div>
+      <div class="cx-sub">answer</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Converted</div>
+      <div class="cx-val" id="cxConv" style="color:#7a5a00">—</div>
+      <div class="cx-sub">cells total</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-bfs" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Minimum Passes</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">minimumPassesOfMatrix</span>(matrix):</span>
+<span class="code-line" id="cl-n">  R,C=len(matrix),len(matrix[<span class="cn">0</span>])</span>
+<span class="code-line" id="cl-init">  <span class="cc"># seed queue with ALL initial positives</span></span>
+<span class="code-line" id="cl-init2">  queue=deque()</span>
+<span class="code-line" id="cl-init3">  <span class="ck">for</span> r <span class="ck">in</span> range(R):</span>
+<span class="code-line" id="cl-init4">   <span class="ck">for</span> c <span class="ck">in</span> range(C):</span>
+<span class="code-line" id="cl-init5">    <span class="ck">if</span> matrix[r][c]&gt;<span class="cn">0</span>: queue.append((r,c))</span>
+<span class="code-line" id="cl-passes">  passes=<span class="cn">0</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">while</span> queue:</span>
+<span class="code-line" id="cl-sz">   sz=len(queue) <span class="cc"># snapshot current level</span></span>
+<span class="code-line" id="cl-neg">   hasConverted=<span class="ck">False</span></span>
+<span class="code-line" id="cl-inner">   <span class="ck">for</span> _ <span class="ck">in</span> range(sz):</span>
+<span class="code-line" id="cl-pop">    r,c=queue.popleft()</span>
+<span class="code-line" id="cl-nb">    <span class="ck">for</span> dr,dc <span class="ck">in</span> [(-<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">0</span>,-<span class="cn">1</span>),(<span class="cn">0</span>,<span class="cn">1</span>)]:</span>
+<span class="code-line" id="cl-nb2">     nr,nc=r+dr,c+dc</span>
+<span class="code-line" id="cl-nb3">     <span class="ck">if</span> <span class="cn">0</span>&lt;=nr&lt;R <span class="ck">and</span> <span class="cn">0</span>&lt;=nc&lt;C \</span>
+<span class="code-line" id="cl-nb4">        <span class="ck">and</span> matrix[nr][nc]&lt;<span class="cn">0</span>:</span>
+<span class="code-line" id="cl-conv">      matrix[nr][nc]*=-<span class="cn">1</span>  <span class="cc"># flip!</span></span>
+<span class="code-line" id="cl-enq">      queue.append((nr,nc))</span>
+<span class="code-line" id="cl-flag">      hasConverted=<span class="ck">True</span></span>
+<span class="code-line" id="cl-incr">   <span class="ck">if</span> hasConverted: passes+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-neg2">  negLeft=<span class="ck">any</span>(matrix[r][c]&lt;<span class="cn">0</span></span>
+<span class="code-line" id="cl-neg3">   <span class="ck">for</span> r <span class="ck">in</span> range(R)</span>
+<span class="code-line" id="cl-neg4">   <span class="ck">for</span> c <span class="ck">in</span> range(C))</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> -<span class="cn">1</span> <span class="ck">if</span> negLeft <span class="ck">else</span> passes</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(w·h)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">minPasses</span>(vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; m){
+  <span style="color:#c084fc">int</span> R=m.size(),C=m[<span style="color:#fda4af">0</span>].size();
+  queue&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; q;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r=<span style="color:#fda4af">0</span>;r&lt;R;r++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c=<span style="color:#fda4af">0</span>;c&lt;C;c++)
+      <span style="color:#c084fc">if</span>(m[r][c]&gt;<span style="color:#fda4af">0</span>) q.push({r,c});
+  <span style="color:#c084fc">int</span> passes=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">int</span> dx[]={-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>},dy[]={<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>,-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>};
+  <span style="color:#c084fc">while</span>(!q.empty()){
+    <span style="color:#c084fc">int</span> sz=q.size();
+    <span style="color:#c084fc">bool</span> converted=<span style="color:#fda4af">false</span>;
+    <span style="color:#c084fc">while</span>(sz--){
+      <span style="color:#c084fc">auto</span> [r,c]=q.front(); q.pop();
+      <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> d=<span style="color:#fda4af">0</span>;d&lt;<span style="color:#fda4af">4</span>;d++){
+        <span style="color:#c084fc">int</span> nr=r+dx[d],nc=c+dy[d];
+        <span style="color:#c084fc">if</span>(nr&lt;<span style="color:#fda4af">0</span>||nr&gt;=R||nc&lt;<span style="color:#fda4af">0</span>||nc&gt;=C) <span style="color:#c084fc">continue</span>;
+        <span style="color:#c084fc">if</span>(m[nr][nc]&lt;<span style="color:#fda4af">0</span>){
+          m[nr][nc]*=-<span style="color:#fda4af">1</span>;          <span style="color:#374151;font-style:italic">// flip</span>
+          q.push({nr,nc});
+          converted=<span style="color:#fda4af">true</span>;
+        }
+      }
+    }
+    <span style="color:#c084fc">if</span>(converted) passes++;
+  }
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">auto</span>&amp; row:m)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> v:row)
+      <span style="color:#c084fc">if</span>(v&lt;<span style="color:#fda4af">0</span>) <span style="color:#c084fc">return</span> -<span style="color:#fda4af">1</span>;
+  <span style="color:#c084fc">return</span> passes;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">multi-source BFS</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">sz snapshot</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">*=-1 in-place</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">-1 if stuck</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcPass"> <div class="var-name">passes</div>         <div class="var-value" id="vPass"  style="color:var(--accent4)">0</div></div>
+      <div class="var-card" id="vcConv"> <div class="var-name">converted</div>      <div class="var-value" id="vConv"  style="color:var(--accent3)">0</div></div>
+      <div class="var-card" id="vcQSz">  <div class="var-name">|queue|</div>        <div class="var-value" id="vQSz"   style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcNeg">  <div class="var-name">negatives left</div><div class="var-value" id="vNeg"   style="color:var(--accent)">—</div></div>
+    </div>
+
+    <div class="pass-log">
+      <div class="pl-title">Pass log</div>
+      <div class="pl-rows" id="plRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Minimum Passes</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MINIMUM PASSES FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {pass,converted,queueSize,negLeft,rows,cols,convThisPass} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Multi-source BFS: seed the queue with ALL initial positive cells simultaneously. Each BFS level = one pass. The sz trick (snapshot queue size at start of each level) separates passes. Only count a pass if at least one conversion happened.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>All positives are sources.</strong> Each one can convert its negative neighbours in the same pass. Multi-source BFS gives the minimum passes because all positives expand simultaneously.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>sz trick:</strong> before processing each BFS level, snapshot queue.size(). Process exactly that many nodes. This cleanly separates "pass N" from "pass N+1".`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Only count passes with conversions.</strong> If a pass produces no new positives, don't increment passes (avoids off-by-one on the final wave).`},
+    ]
+  };
+  if(type==='pass-start') return {
+    why:`<div class="ep-why-block why-bfs">Starting pass ${pass}. Queue has ${queueSize} positive cells ready to expand. We'll process all ${queueSize} of them this pass. Any negatives they touch get converted and join the next pass's queue.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Pass ${pass}:</strong> ${queueSize} cells expanding simultaneously.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>BFS level = pass:</strong> all cells at the same BFS distance from any original positive get converted in the same pass.`},
+    ]
+  };
+  if(type==='convert') return {
+    why:`<div class="ep-why-block why-pass">Positive cell at ${args.src} converts its negative neighbour ${args.dst} (${args.oldVal}→${-args.oldVal}). The new positive is added to the queue for the next wave. Pass ${pass}, total converted: ${converted}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Converted ${args.dst}:</strong> ${args.oldVal} → ${-args.oldVal}. Added to queue.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>In-place:</strong> multiply by -1. The flipped cell becomes a source for the next pass automatically (it's now in the queue).`},
+    ]
+  };
+  if(type==='pass-done') return {
+    why:`<div class="ep-why-block why-pass">Pass ${pass-1} complete. Converted ${convThisPass} cell${convThisPass!==1?'s':''} this pass. ${negLeft} negative${negLeft!==1?'s':''} remaining. ${negLeft>0?'Running another pass...':'All negatives converted!'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>pass ${pass-1} done.</strong> ${convThisPass} converted. Queue now has ${queueSize} new sources.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${converted} negatives converted. Minimum passes needed = <strong>${pass}</strong>. This is optimal — BFS guarantees minimum distance from any positive source to every negative.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${pass} passes.</strong> Every negative was reachable from at least one initial positive.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(w·h):</strong> each cell is enqueued at most once (flipped once) and dequeued once. BFS guarantees minimum passes.`},
+    ]
+  };
+  if(type==='bad') return {
+    why:`<div class="ep-why-block why-bad">Queue exhausted but ${negLeft} negative${negLeft!==1?'s':''} remain. These cells are completely surrounded by zeros and other negatives — no positive can ever reach them. Return <strong>-1</strong>.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Unreachable negatives!</strong> They're isolated from all positives by zeros. Return -1.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:      {ids:['cl-sig','cl-n','cl-init','cl-init2','cl-init3','cl-init4','cl-init5','cl-passes'],cls:'hl-bfs'},
+  'pass-start':{ids:['cl-loop','cl-sz','cl-neg','cl-inner'],cls:'hl-pass'},
+  convert:   {ids:['cl-nb','cl-nb2','cl-nb3','cl-nb4','cl-conv','cl-enq','cl-flag'],cls:'hl-pass'},
+  'pass-done':{ids:['cl-incr'],cls:'hl-pass'},
+  done:      {ids:['cl-neg2','cl-neg3','cl-neg4','cl-ret'],cls:'hl-done'},
+  bad:       {ids:['cl-ret'],cls:'hl-bad'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,pass,converted,queueSize,negLeft,convThisPass,rows,cols} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`We have a ${rows}×${cols} matrix. <strong>Positive cells</strong> can convert their negative neighbours — each conversion costs one pass. We seed the BFS with ALL positives at once (multi-source) to get the minimum number of passes.`};
+  if(type==='pass-start') return {color:'var(--accent4)',
+    text:`Starting <strong>Pass ${pass}</strong>. The BFS queue has <strong>${queueSize}</strong> positive cells expanding simultaneously this round. Any negative neighbours they touch get converted.`};
+  if(type==='convert') return {color:'var(--accent3)',
+    text:`✓ (${st.src}) converts its neighbour (${st.dst}): <strong>${st.oldVal} → ${-st.oldVal}</strong>! Added to queue for the next pass.`};
+  if(type==='pass-done') return {color:'var(--accent4)',
+    text:`Pass ${pass-1} done — converted <strong>${convThisPass}</strong> cell${convThisPass!==1?'s':''} this round. ${negLeft} negative${negLeft!==1?'s':''} remaining. Starting next pass with ${queueSize} new sources.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ All negatives converted! Minimum passes = <strong>${pass}</strong>. BFS guarantees this is optimal — every negative was reached at its shortest possible distance from any initial positive.`};
+  if(type==='bad') return {color:'var(--accent)',
+    text:`❌ BFS exhausted but <strong>${negLeft}</strong> negative${negLeft!==1?'s':''} remain. They're isolated by zeros — no positive can reach them. Return <strong>-1</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(matrix){
+  const R=matrix.length, C=matrix[0].length;
+  const mat=matrix.map(r=>[...r]);
+  const steps=[];
+  let totalConverted=0;
+
+  const snap=(type,desc,extra={})=>{
+    const negLeft=mat.flat().filter(v=>v<0).length;
+    const posCount=mat.flat().filter(v=>v>0).length;
+    steps.push({
+      type,desc,rows:R,cols:C,
+      mat:mat.map(r=>[...r]),
+      negLeft,posCount,
+      totalConverted,
+      ...extra,
+      explain:makeExplain(type,{rows:R,cols:C,negLeft,converted:totalConverted,...extra})
+    });
+  };
+
+  // Seed queue
+  const queue=[];
+  for(let r=0;r<R;r++)
+    for(let c=0;c<C;c++)
+      if(mat[r][c]>0) queue.push([r,c]);
+
+  const initialPos=queue.length;
+  snap('init',`🌊 <strong>Start.</strong> ${R}×${C} matrix. Seeding queue with ${initialPos} initial positive cell${initialPos!==1?'s':''}. BFS will expand pass by pass.`,
+    {pass:0,queueSize:initialPos,converted:0,convThisPass:0,passLog:[]});
+
+  const passLog=[];
+  let passes=0;
+  const DIRS=[[-1,0],[1,0],[0,-1],[0,1]];
+  let qi=0; // queue read index
+
+  while(qi<queue.length){
+    const sz=queue.length-qi;
+    let convThisPass=0;
+    passes++;
+
+    snap('pass-start',`🌊 <strong>Pass ${passes}.</strong> Processing ${sz} cells from queue.`,
+      {pass:passes,queueSize:sz,convThisPass,passLog:[...passLog]});
+
+    const end=queue.length;
+    for(let k=0;k<sz;k++){
+      const [r,c]=queue[qi++];
+      for(const [dr,dc] of DIRS){
+        const nr=r+dr, nc=c+dc;
+        if(nr<0||nr>=R||nc<0||nc>=C||mat[nr][nc]>=0) continue;
+        const oldVal=mat[nr][nc];
+        mat[nr][nc]*=-1;
+        queue.push([nr,nc]);
+        convThisPass++;
+        totalConverted++;
+        snap('convert',
+          `✓ (${r},${c}) converts (${nr},${nc}): ${oldVal}→${-oldVal}`,
+          {pass:passes,src:`${r},${c}`,dst:`${nr},${nc}`,oldVal,queueSize:queue.length-qi,convThisPass,passLog:[...passLog]}
+        );
+      }
+    }
+
+    if(convThisPass>0){
+      passLog.push({pass:passes,conv:convThisPass});
+    } else {
+      passes--;
+    }
+
+    snap('pass-done',
+      `Pass ${passes} done. Converted ${convThisPass} cells. Queue: ${queue.length-qi} remaining.`,
+      {pass:passes+1,queueSize:queue.length-qi,convThisPass,passLog:[...passLog]}
+    );
+  }
+
+  const negLeft=mat.flat().filter(v=>v<0).length;
+  if(negLeft>0){
+    snap('bad',`❌ <strong>-1</strong> — ${negLeft} unreachable negatives.`,
+      {pass:passes,queueSize:0,convThisPass:0,passLog:[...passLog],result:{passes:-1,negLeft}});
+    steps[steps.length-1].result={passes:-1,negLeft};
+  } else {
+    snap('done',`🎉 <strong>Done!</strong> ${passes} passes.`,
+      {pass:passes,queueSize:0,convThisPass:0,passLog:[...passLog],result:{passes,negLeft:0}});
+    steps[steps.length-1].result={passes,negLeft:0};
+  }
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=550;
+let origMat=[], rows=0, cols=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inMatrix').value.trim();
+  origMat=raw.split('|').map(r=>r.trim().split(',').map(Number));
+  rows=origMat.length; cols=origMat[0].length;
+  steps=computeSteps(origMat);
+  currentStep=0;
+
+  const mg=document.getElementById('mainGrid');
+  mg.style.gridTemplateColumns=`repeat(${cols},52px)`;
+  mg.innerHTML='';
+  for(let r=0;r<rows;r++)
+    for(let c=0;c<cols;c++){
+      const v=origMat[r][c];
+      mg.innerHTML+=`<div class="gcell ${v>0?'gc-pos':v<0?'gc-neg':'gc-zero'}" id="gc-${r}-${c}">
+        <span class="gv">${v}</span>
+        <span class="gl">(${r},${c})</span>
+      </div>`;
+    }
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxPasses').textContent='—';
+  document.getElementById('cxConv').textContent='—';
+  document.getElementById('waveRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build as passes complete</span>';
+  document.getElementById('plRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Grid cells
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const el=document.getElementById(`gc-${r}-${c}`);
+      if(!el)continue;
+      const v=st.mat[r][c];
+      const origV=origMat[r][c];
+      const isSrc=st.src===`${r},${c}`&&st.type==='convert';
+      const isDst=st.dst===`${r},${c}`&&st.type==='convert';
+      const wasNeg=origV<0&&v>0;
+      const isUnreachable=isFinal&&st.result?.negLeft>0&&v<0;
+
+      const vEl=el.querySelector('.gv');
+      if(vEl) vEl.textContent=v;
+
+      if(isUnreachable)  el.className='gcell gc-unreachable';
+      else if(isDst)     el.className='gcell gc-converted';
+      else if(isSrc)     el.className='gcell gc-cur';
+      else if(wasNeg)    el.className='gcell gc-pos';
+      else if(v>0)       el.className='gcell gc-pos';
+      else if(v<0)       el.className='gcell gc-neg';
+      else               el.className='gcell gc-zero';
+
+      // pass chip
+      let chip=el.querySelector('.pass-chip');
+      if(wasNeg){
+        if(!chip){chip=document.createElement('div');chip.className='pass-chip';el.appendChild(chip);}
+        chip.textContent=`p${st.pass??'?'}`;
+      } else if(chip){chip.remove();}
+    }
+  }
+
+  // Pass badge
+  const pb=document.getElementById('passBadge');
+  pb.textContent=`Pass ${st.pass??0}`;
+
+  // Wave row
+  const wr=document.getElementById('waveRow');
+  const passLog=st.passLog||[];
+  if(passLog.length>0){
+    wr.innerHTML=passLog.map((p,k)=>{
+      const isCur=k===passLog.length-1;
+      return `${k>0?'<span class="warrow">→</span>':''}<div class="wchip ${isCur?'wc-cur':'wc-done'}">P${p.pass}:+${p.conv}</div>`;
+    }).join('');
+    if(st.type==='pass-start'&&(passLog.length===0||passLog[passLog.length-1].pass<st.pass)){
+      wr.innerHTML+=`<span class="warrow">→</span><div class="wchip wc-cur">P${st.pass}:…</div>`;
+    }
+  } else {
+    wr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will build as passes complete</span>';
+  }
+
+  // Stats
+  document.getElementById('statPos').textContent=st.posCount??'—';
+  document.getElementById('statNeg').textContent=st.negLeft??'—';
+  document.getElementById('statQ').textContent=st.queueSize??'—';
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  if(st.type==='pass-start'){
+    sp.className='step-panel sp-bfs';
+    spt.textContent=`Pass ${st.pass}: processing ${st.queueSize} cells`;
+    spb.innerHTML=mkBox('pass',st.pass,'current','spbox sb-pass')+
+      mkBox('queue',st.queueSize,'cells expanding','spbox sb-pos')+
+      mkBox('negatives',st.negLeft,'remaining','spbox sb-neg');
+  } else if(st.type==='convert'){
+    sp.className='step-panel sp-conv';
+    spt.textContent=`Converting (${st.dst}): ${st.oldVal} → ${-st.oldVal}`;
+    spb.innerHTML=mkBox('source',`(${st.src})`,'positive','spbox sb-pos')+
+      mkBox('target',`(${st.dst})`,`${st.oldVal}→${-st.oldVal}`,'spbox sb-pos')+
+      mkBox('this pass',st.convThisPass,'converted','spbox sb-pass');
+  } else if(st.type==='pass-done'){
+    sp.className='step-panel sp-pass';
+    spt.textContent=`Pass ${st.pass-1} complete — ${st.convThisPass} converted`;
+    spb.innerHTML=mkBox('pass',st.pass-1,'done','spbox sb-pass')+
+      mkBox('converted',st.convThisPass,'this pass','spbox sb-pos')+
+      mkBox('negatives',st.negLeft,'remaining','spbox sb-neg');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=`All negatives converted! Minimum passes = ${st.pass}`;
+    spb.innerHTML=mkBox('passes',st.pass,'answer ✓','spbox sb-pos')+
+      mkBox('converted',st.totalConverted,'total cells','spbox sb-pos');
+  } else if(st.type==='bad'){
+    sp.className='step-panel sp-bad';
+    spt.textContent=`Impossible! ${st.negLeft} unreachable negatives`;
+    spb.innerHTML=mkBox('answer','-1','impossible!','spbox sb-neg')+
+      mkBox('stuck',st.negLeft,'unreachable','spbox sb-neg');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Multi-source BFS seeding...';
+    spb.innerHTML='';
+  }
+
+  // Pass log right panel
+  const pl=document.getElementById('plRows');
+  pl.innerHTML='';
+  (st.passLog||[]).forEach((p,k)=>{
+    const isCur=k===(st.passLog||[]).length-1&&(st.type==='pass-done'||st.type==='done');
+    pl.innerHTML+=`<div class="pl-row ${isCur?'pl-cur':''}">
+      <span class="pl-pass">Pass ${p.pass}</span>
+      <span class="pl-conv">+${p.conv} converted</span>
+    </div>`;
+  });
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Vars
+  setVar('vPass','vcPass',st.pass??0);
+  setVar('vConv','vcConv',st.totalConverted??0);
+  setVar('vQSz','vcQSz',st.queueSize??'—');
+  setVar('vNeg','vcNeg',st.negLeft??'—');
+  document.getElementById('vNeg').style.color=st.negLeft>0?'var(--accent)':'var(--accent3)';
+
+  // Done
+  if(isFinal){
+    const ans=st.result.passes;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=ans===-1?
+      `★ IMPOSSIBLE — RETURN -1 (UNREACHABLE NEGATIVES)`:`★ MINIMUM PASSES = ${ans}`;
+    const db=document.getElementById('doneBar');
+    db.classList.add('show');
+    db.className='done-bar show'+(ans===-1?' db-bad':'');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=ans===-1?'-1':String(ans);
+    document.getElementById('bestMeta').textContent=ans===-1?'some negatives are unreachable':`${st.totalConverted} cells converted · O(w·h)`;
+    document.getElementById('cxPasses').textContent=ans===-1?'-1':String(ans);
+    document.getElementById('cxConv').textContent=st.totalConverted;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-bfs','pass-start':'ep-bfs',convert:'ep-pass','pass-done':'ep-pass',done:'ep-done',bad:'ep-bad'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-bfs');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

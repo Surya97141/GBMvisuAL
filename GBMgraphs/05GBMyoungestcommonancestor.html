@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Youngest Common Ancestor — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+  --d1:#2196f3;--d2:#e63946;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:vertical;width:280px;min-height:90px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:70px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:14px;height:14px;border-radius:50%;border:2px solid;flex-shrink:0;}
+
+/* TREE CANVAS */
+.tree-section{margin-bottom:14px;}
+.tree-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;}
+
+/* POINTER STRIP */
+.ptr-section{margin-bottom:14px;}
+.ptr-row{display:flex;gap:14px;align-items:flex-start;}
+.ptr-box{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;transition:border-color .3s;}
+.ptr-box.pb-d1{border-color:rgba(33,150,243,.4);}
+.ptr-box.pb-d2{border-color:rgba(230,57,70,.4);}
+.ptr-box.pb-match{border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.06);}
+.pb-label{font-family:'Space Mono',monospace;font-size:.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+.pb-label.l-d1{color:var(--d1);}
+.pb-label.l-d2{color:var(--d2);}
+.pb-label.l-lca{color:#028a5b;}
+.pb-val{font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.pb-depth{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:3px;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-depth{border-color:var(--pur);}
+.step-panel.sp-climb{border-color:var(--accent4);}
+.step-panel.sp-found{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;transition:all .3s;}
+.spbox.sb-d1{border-color:rgba(33,150,243,.5);background:rgba(33,150,243,.06);}
+.spbox.sb-d2{border-color:rgba(230,57,70,.45);background:rgba(230,57,70,.04);}
+.spbox.sb-lca{border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.07);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-depth{border-color:var(--pur);}
+.explain-panel.ep-climb{border-color:var(--accent4);}
+.explain-panel.ep-found{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-depth{border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-climb{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-found{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*13+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-depth{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-climb{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.path-section{margin-bottom:12px;}
+.ps-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.path-row{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-bottom:5px;}
+.path-chip{padding:2px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;}
+.path-chip.pc-d1{background:rgba(33,150,243,.15);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;}
+.path-chip.pc-d2{background:rgba(230,57,70,.12);border:1px solid rgba(230,57,70,.3);color:#ff6b6b;}
+.path-chip.pc-lca{background:rgba(6,214,160,.15);border:1px solid rgba(6,214,160,.4);color:var(--accent3);font-size:.72rem;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Youngest Common Ancestor</h1>
+    <div class="sub">Ancestor Pointers · Depth Leveling · Simultaneous Climb · O(D)</div>
+  </div>
+  <div class="family-badge">Trees · LCA</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Tree  (child: parent, one per line)</label>
+      <textarea id="inTree">A:
+B: A
+C: A
+D: B
+E: B
+F: C
+G: C
+H: D
+I: D</textarea>
+      <div class="hint">Format: Node: Parent. Root has no parent. First node = root.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="field"><label>Descendant 1</label><input type="text" id="inD1" value="E"></div>
+      <div class="field"><label>Descendant 2</label><input type="text" id="inD2" value="I"></div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.25);border-color:#2196f3;"></div> Descendant 1 path</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.2);border-color:#e63946;"></div> Descendant 2 path</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.3);border-color:#06d6a0;"></div> LCA (answer!)</div>
+    <div class="legend-item"><div class="ldot" style="background:#fff8c5;border-color:#f5a623;"></div> current pointer</div>
+  </div>
+
+  <!-- TREE CANVAS -->
+  <div class="tree-section">
+    <div class="section-label">Ancestral tree — 🔵 = d1 pointer · 🔴 = d2 pointer · 🟢 = LCA found</div>
+    <div class="tree-outer">
+      <canvas id="treeCanvas" height="270"></canvas>
+    </div>
+  </div>
+
+  <!-- POINTER DISPLAY -->
+  <div class="ptr-section">
+    <div class="section-label">Live pointers — climbing upward toward root</div>
+    <div class="ptr-row" id="ptrRow">
+      <div class="ptr-box pb-d1" id="ptrD1">
+        <div class="pb-label l-d1">Desc 1 pointer</div>
+        <div class="pb-val" id="ptrD1Val">—</div>
+        <div class="pb-depth" id="ptrD1Depth">depth —</div>
+      </div>
+      <div class="ptr-box pb-d2" id="ptrD2">
+        <div class="pb-label l-d2">Desc 2 pointer</div>
+        <div class="pb-val" id="ptrD2Val">—</div>
+        <div class="pb-depth" id="ptrD2Depth">depth —</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(D)</div>
+      <div class="cx-sub">D = depth difference</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">just two pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">LCA</div>
+      <div class="cx-val" id="cxAns" style="color:#7a5a00">—</div>
+      <div class="cx-sub">answer</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Steps</div>
+      <div class="cx-val" id="cxSteps" style="color:var(--accent2)">—</div>
+      <div class="cx-sub">climbs taken</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-depth" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — Youngest Common Ancestor</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">getYoungestCommonAncestor</span>(</span>
+<span class="code-line" id="cl-sg2">    topAncestor, descOne, descTwo):</span>
+<span class="code-line" id="cl-depth">  <span class="ck">def</span> <span class="cf">getDepth</span>(node, top):</span>
+<span class="code-line" id="cl-dep2">   depth=<span class="cn">0</span></span>
+<span class="code-line" id="cl-dep3">   <span class="ck">while</span> node!=top:</span>
+<span class="code-line" id="cl-dep4">    depth+=<span class="cn">1</span>; node=node.ancestor</span>
+<span class="code-line" id="cl-dep5">   <span class="ck">return</span> depth</span>
+<span class="code-line" id="cl-d1">  d1=getDepth(descOne,topAncestor)</span>
+<span class="code-line" id="cl-d2">  d2=getDepth(descTwo,topAncestor)</span>
+<span class="code-line" id="cl-lev">  <span class="cc"># bring deeper node to same level</span></span>
+<span class="code-line" id="cl-lev2">  <span class="ck">while</span> d1!=d2:</span>
+<span class="code-line" id="cl-lev3">   <span class="ck">if</span> d1>d2:</span>
+<span class="code-line" id="cl-lev4">    descOne=descOne.ancestor; d1-=<span class="cn">1</span></span>
+<span class="code-line" id="cl-lev5">   <span class="ck">else</span>:</span>
+<span class="code-line" id="cl-lev6">    descTwo=descTwo.ancestor; d2-=<span class="cn">1</span></span>
+<span class="code-line" id="cl-climb">  <span class="cc"># climb together until they meet</span></span>
+<span class="code-line" id="cl-cl2">  <span class="ck">while</span> descOne!=descTwo:</span>
+<span class="code-line" id="cl-cl3">   descOne=descOne.ancestor</span>
+<span class="code-line" id="cl-cl4">   descTwo=descTwo.ancestor</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> descOne</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(D) · O(1)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+<span style="color:#c084fc">struct</span> Node {
+  string name;
+  Node* ancestor=<span style="color:#c084fc">nullptr</span>;
+};
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">getDepth</span>(Node* n, Node* top){
+  <span style="color:#c084fc">int</span> d=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">while</span>(n!=top){d++;n=n-&gt;ancestor;}
+  <span style="color:#c084fc">return</span> d;
+}
+
+Node* <span style="color:#67e8f9">lca</span>(Node* top, Node* a, Node* b){
+  <span style="color:#c084fc">int</span> da=<span style="color:#67e8f9">getDepth</span>(a,top), db=<span style="color:#67e8f9">getDepth</span>(b,top);
+  <span style="color:#cc">// bring deeper to same level</span>
+  <span style="color:#c084fc">while</span>(da!=db){
+    <span style="color:#c084fc">if</span>(da&gt;db){a=a-&gt;ancestor;da--;}
+    <span style="color:#c084fc">else</span>    {b=b-&gt;ancestor;db--;}
+  }
+  <span style="color:#cc">// climb together</span>
+  <span style="color:#c084fc">while</span>(a!=b){
+    a=a-&gt;ancestor;
+    b=b-&gt;ancestor;
+  }
+  <span style="color:#c084fc">return</span> a;          <span style="color:#374151;font-style:italic">// LCA found</span>
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">depth leveling</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">2-pointer climb</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">ancestor ptr</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcD1N">  <div class="var-name">descOne</div>     <div class="var-value" id="vD1N"   style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcD2N">  <div class="var-name">descTwo</div>     <div class="var-value" id="vD2N"   style="color:#ff6b6b">—</div></div>
+      <div class="var-card" id="vcD1D">  <div class="var-name">depth1</div>      <div class="var-value" id="vD1D"   style="color:#4fc3f7">—</div></div>
+      <div class="var-card" id="vcD2D">  <div class="var-name">depth2</div>      <div class="var-value" id="vD2D"   style="color:#ff6b6b">—</div></div>
+      <div class="var-card" id="vcPhase" style="grid-column:1/3"><div class="var-name">phase</div><div class="var-value" id="vPhase" style="color:var(--pur)">—</div></div>
+    </div>
+
+    <div class="path-section">
+      <div class="ps-title">Ancestor paths traced</div>
+      <div class="path-row" id="pathD1"></div>
+      <div class="path-row" id="pathD2"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Youngest Common Ancestor</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ LCA FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── PARSE TREE ─────────────────────────────────────────────────────────────────
+function parseTree(text){
+  const lines=text.trim().split('\n').filter(l=>l.trim());
+  const parentMap={};
+  const childrenMap={};
+  let root=null;
+  lines.forEach((line,i)=>{
+    const [lhs,rhs]=[...line.split(':')];
+    const name=lhs.trim();
+    const par=(rhs||'').trim()||null;
+    parentMap[name]=par;
+    if(!childrenMap[name]) childrenMap[name]=[];
+    if(par){
+      if(!childrenMap[par]) childrenMap[par]=[];
+      childrenMap[par].push(name);
+    }
+    if(!par) root=name;
+  });
+  if(!root) root=lines[0].split(':')[0].trim();
+  return {root,parentMap,childrenMap};
+}
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {d1,d2,depth1,depth2,d1Start,d2Start,lca} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Two-pointer technique: each node has an .ancestor pointer. Start at both descendants. If they're at different depths, climb the deeper one until they're level. Then climb both simultaneously — the first node where they meet is the LCA.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Key insight:</strong> if two nodes are at the same depth, climbing them simultaneously will make them meet at their LCA — never passing it.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why depth-level first?</strong> If one is deeper, it must catch up first. If we climb both together from different depths, the deeper one's ancestors may never align with the shallower one's.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(D) time, O(1) space:</strong> we never store paths — just follow parent pointers. D = max depth of the two nodes.`},
+    ]
+  };
+  if(type==='depth') return {
+    why:`<div class="ep-why-block why-depth">Computing depths: ${d1Start} is at depth ${depth1} from root. ${d2Start} is at depth ${depth2}. Difference = ${Math.abs(depth1-depth2)}. ${depth1>depth2?`${d1Start} is deeper — climb it ${depth1-depth2} step${depth1-depth2!==1?'s':''}.`:depth2>depth1?`${d2Start} is deeper — climb it ${depth2-depth1} step${depth2-depth1!==1?'s':''}.`:'Same depth — can climb together immediately!'}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>depth(${d1Start})=${depth1}, depth(${d2Start})=${depth2}.</strong> Difference = ${Math.abs(depth1-depth2)}.`},
+    ]
+  };
+  if(type==='level') return {
+    why:`<div class="ep-why-block why-depth">Leveling phase: bringing the deeper node (${depth1>depth2?d1:d2}) up ${Math.abs(depth1-depth2)} level${Math.abs(depth1-depth2)!==1?'s':''} to match depth ${Math.min(depth1,depth2)}. After this, both pointers will be at the same depth and we can climb together.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Current:</strong> d1=${d1} (depth ${depth1}), d2=${d2} (depth ${depth2}). Climbing ${depth1>depth2?'d1':'d2'}.`},
+    ]
+  };
+  if(type==='climb') return {
+    why:`<div class="ep-why-block why-climb">Both pointers are now at the same depth. Moving both up one level simultaneously: ${d1}→${args.newD1}, ${d2}→${args.newD2}. They'll meet exactly at the LCA.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>d1=${d1}, d2=${d2} (same depth ${depth1}).</strong> Step together. If they equal, we found the LCA.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why this works:</strong> at equal depth, both are equidistant from their LCA. Stepping up simultaneously brings them closer by 1 each step.`},
+    ]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block why-found">d1 = d2 = <strong>${lca}</strong>! The two pointers point to the same node — this is the Youngest Common Ancestor. It's the deepest (youngest) node that is an ancestor of both.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>LCA = ${lca}.</strong> This is the deepest node that is an ancestor of both ${d1Start} and ${d2Start}.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-sg2','cl-depth','cl-dep2','cl-dep3','cl-dep4','cl-dep5','cl-d1','cl-d2'],cls:'hl-depth'},
+  depth: {ids:['cl-d1','cl-d2'],cls:'hl-depth'},
+  level: {ids:['cl-lev','cl-lev2','cl-lev3','cl-lev4','cl-lev5','cl-lev6'],cls:'hl-depth'},
+  climb: {ids:['cl-climb','cl-cl2','cl-cl3','cl-cl4'],cls:'hl-climb'},
+  found: {ids:['cl-ret'],cls:'hl-found'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,d1,d2,depth1,depth2,d1Start,d2Start,lca,newD1,newD2} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Finding the Youngest Common Ancestor of <strong style="color:#4fc3f7">${d1Start}</strong> and <strong style="color:#ff6b6b">${d2Start}</strong>. Step 1: measure their depths from the root. Step 2: bring the deeper one up. Step 3: climb both together until they meet.`};
+  if(type==='depth') return {color:'var(--pur-dark)',
+    text:`Computed depths: <strong style="color:#4fc3f7">${d1Start}</strong> is at depth <strong>${depth1}</strong>, <strong style="color:#ff6b6b">${d2Start}</strong> is at depth <strong>${depth2}</strong>. ${depth1>depth2?`${d1Start} is deeper by ${depth1-depth2} — it needs to climb first.`:depth2>depth1?`${d2Start} is deeper by ${depth2-depth1} — it needs to climb first.`:'Same depth — we can start climbing together immediately!'}`};
+  if(type==='level') return {color:'var(--pur-dark)',
+    text:`Leveling: ${depth1>depth2?`<strong style="color:#4fc3f7">d1</strong> (${d1}) climbs to its parent. depth1: ${depth1}→${depth1-1}.`:`<strong style="color:#ff6b6b">d2</strong> (${d2}) climbs to its parent. depth2: ${depth2}→${depth2-1}.`}`};
+  if(type==='climb') return {color:'var(--accent4)',
+    text:`Both at same depth ${depth1}. Climbing together: 🔵 ${d1}→${newD1}, 🔴 ${d2}→${newD2}. ${newD1===newD2?`They meet at <strong>${newD1}</strong>! 🎉`:'Still different — keep climbing.'}`};
+  if(type==='found') return {color:'var(--accent3)',
+    text:`✅ Found! Both pointers equal <strong>${lca}</strong>. This is the deepest ancestor shared by both <span style="color:#4fc3f7">${d1Start}</span> and <span style="color:#ff6b6b">${d2Start}</span>. Returning node <strong>${lca}</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(root, parentMap, childrenMap, d1Start, d2Start){
+  const steps=[];
+
+  // compute depth
+  const getDepth=(name)=>{
+    let d=0, n=name;
+    while(parentMap[n]){d++;n=parentMap[n];}
+    return d;
+  };
+
+  const depth1Init=getDepth(d1Start);
+  const depth2Init=getDepth(d2Start);
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,d1Start,d2Start,
+    ...extra,
+    explain:makeExplain(type,{d1Start,d2Start,...extra})
+  });
+
+  snap('init',`🔍 <strong>Start.</strong> Find LCA of <strong>${d1Start}</strong> and <strong>${d2Start}</strong>. Root = ${root}.`,
+    {d1:d1Start,d2:d2Start,depth1:depth1Init,depth2:depth2Init,path1:[d1Start],path2:[d2Start]});
+
+  snap('depth',
+    `📏 depth(${d1Start})=${depth1Init}, depth(${d2Start})=${depth2Init}. Diff=${Math.abs(depth1Init-depth2Init)}.`,
+    {d1:d1Start,d2:d2Start,depth1:depth1Init,depth2:depth2Init,path1:[d1Start],path2:[d2Start]}
+  );
+
+  let d1=d1Start, d2=d2Start;
+  let dep1=depth1Init, dep2=depth2Init;
+  const path1=[d1Start], path2=[d2Start];
+
+  // Phase 1: level up
+  while(dep1!==dep2){
+    if(dep1>dep2){
+      d1=parentMap[d1]; dep1--;
+      path1.push(d1);
+      snap('level',
+        `⬆️ d1 climbs: ${path1[path1.length-2]}→<strong>${d1}</strong>. depth1=${dep1}, depth2=${dep2}`,
+        {d1,d2,depth1:dep1,depth2:dep2,path1:[...path1],path2:[...path2]}
+      );
+    } else {
+      d2=parentMap[d2]; dep2--;
+      path2.push(d2);
+      snap('level',
+        `⬆️ d2 climbs: ${path2[path2.length-2]}→<strong>${d2}</strong>. depth1=${dep1}, depth2=${dep2}`,
+        {d1,d2,depth1:dep1,depth2:dep2,path1:[...path1],path2:[...path2]}
+      );
+    }
+  }
+
+  // Phase 2: climb together
+  while(d1!==d2){
+    const nd1=parentMap[d1], nd2=parentMap[d2];
+    path1.push(nd1); path2.push(nd2);
+    snap('climb',
+      `⬆️⬆️ Climb together: ${d1}→${nd1}, ${d2}→${nd2}${nd1===nd2?` → <strong>MEET AT ${nd1}!</strong>`:''}`,
+      {d1:nd1,d2:nd2,depth1:dep1-1,depth2:dep2-1,newD1:nd1,newD2:nd2,path1:[...path1],path2:[...path2]}
+    );
+    d1=nd1; d2=nd2; dep1--; dep2--;
+  }
+
+  snap('found',
+    `🎉 <strong>LCA = ${d1}!</strong> Both pointers equal ${d1}.`,
+    {d1,d2,depth1:dep1,depth2:dep2,lca:d1,path1:[...path1],path2:[...path2],
+     result:{lca:d1}}
+  );
+  steps[steps.length-1].result={lca:d1};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let parentMap={}, childrenMap={}, rootName='', allNodes=[], nodePos={};
+let d1Start='', d2Start='';
+const NRAD=18;
+
+// ─── LAYOUT ───────────────────────────────────────────────────────────────────
+function layoutTree(W,H){
+  const levelNodes={};
+  const getLevel=(n)=>{let d=0,x=n;while(parentMap[x]){d++;x=parentMap[x];}return d;};
+  allNodes.forEach(n=>{
+    const l=getLevel(n);
+    if(!levelNodes[l]) levelNodes[l]=[];
+    levelNodes[l].push(n);
+  });
+  const maxDepth=Math.max(...Object.keys(levelNodes).map(Number));
+  const vertGap=(H-40)/(Math.max(maxDepth,1));
+  Object.entries(levelNodes).forEach(([d,nodes])=>{
+    const y=30+Number(d)*vertGap;
+    const hg=W/(nodes.length+1);
+    nodes.forEach((name,k)=>{ nodePos[name]={x:hg*(k+1),y}; });
+  });
+}
+
+// ─── DRAW TREE ────────────────────────────────────────────────────────────────
+function drawTree(st){
+  const canvas=document.getElementById('treeCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=270;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,270);
+  layoutTree(W,270);
+
+  const path1Set=new Set(st.path1||[]);
+  const path2Set=new Set(st.path2||[]);
+  const isFinal=!!st.result;
+  const lca=st.result?.lca||st.lca;
+
+  // Draw edges (parent → child, edges go upward visually = child to parent)
+  allNodes.forEach(name=>{
+    const par=parentMap[name];
+    if(!par||!nodePos[name]||!nodePos[par]) return;
+    const p1=nodePos[name], p2=nodePos[par];
+    const inP1=path1Set.has(name)&&path1Set.has(par);
+    const inP2=path2Set.has(name)&&path2Set.has(par);
+    const inBoth=inP1&&inP2;
+    ctx.beginPath();
+    ctx.moveTo(p1.x,p1.y-NRAD); ctx.lineTo(p2.x,p2.y+NRAD);
+    ctx.strokeStyle=inBoth?'rgba(6,214,160,0.7)':inP1?'rgba(33,150,243,0.55)':inP2?'rgba(230,57,70,0.55)':'rgba(200,195,185,0.6)';
+    ctx.lineWidth=inP1||inP2?2.5:1.5;
+    ctx.setLineDash(inP1||inP2?[]:[]);
+    ctx.stroke();
+  });
+
+  // Draw nodes
+  allNodes.forEach(name=>{
+    const p=nodePos[name]; if(!p) return;
+    const isD1=st.d1===name;
+    const isD2=st.d2===name;
+    const isLCA=(isFinal||st.type==='found')&&name===lca;
+    const inP1=path1Set.has(name);
+    const inP2=path2Set.has(name);
+    const inBoth=inP1&&inP2&&name===lca;
+
+    let fill='#fdfaf4', stroke='#d4ccb8', lw=1.5;
+    if(isLCA)              {fill='rgba(6,214,160,.28)';stroke='#06d6a0';lw=3;}
+    else if(isD1&&isD2)    {fill='rgba(6,214,160,.2)';stroke='#06d6a0';lw=2.5;}
+    else if(isD1)          {fill='#fff8c5';stroke='#f5a623';lw=3;}
+    else if(isD2)          {fill='rgba(255,209,102,.25)';stroke='#f5a623';lw=2.5;}
+    else if(inP1&&inP2)    {fill='rgba(6,214,160,.18)';stroke='#06d6a0';lw=2;}
+    else if(inP1)          {fill='rgba(33,150,243,.18)';stroke='#2196f3';lw=2;}
+    else if(inP2)          {fill='rgba(230,57,70,.15)';stroke='#e63946';lw=2;}
+
+    ctx.beginPath(); ctx.arc(p.x,p.y,NRAD,0,Math.PI*2);
+    ctx.fillStyle=fill; ctx.fill();
+    ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();
+
+    if(isLCA&&(isFinal||st.type==='found')){
+      ctx.beginPath(); ctx.arc(p.x,p.y,NRAD+5,0,Math.PI*2);
+      ctx.strokeStyle='rgba(6,214,160,0.4)'; ctx.lineWidth=2;
+      ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    ctx.fillStyle='#1a1a2e';
+    ctx.font='bold 13px Space Mono'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(name,p.x,p.y);
+
+    // pointer indicators below node
+    const ind=[];
+    if(isD1&&!isLCA) ind.push({c:'#2196f3',t:'d1'});
+    if(isD2&&!isLCA) ind.push({c:'#e63946',t:'d2'});
+    if(isD1&&isD2&&!isLCA) {ind.length=0;ind.push({c:'#06d6a0',t:'d1=d2!'});}
+    ind.forEach((x,i)=>{
+      ctx.fillStyle=x.c;ctx.font='bold 9px Space Mono';
+      ctx.fillText(x.t,p.x,p.y+NRAD+10+i*12);
+    });
+    if(isLCA) {ctx.fillStyle='#028a5b';ctx.font='bold 9px Space Mono';ctx.fillText('LCA★',p.x,p.y+NRAD+10);}
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inTree').value.trim();
+  const parsed=parseTree(raw);
+  rootName=parsed.root;
+  parentMap=parsed.parentMap;
+  childrenMap=parsed.childrenMap;
+  allNodes=Object.keys(parentMap);
+  d1Start=document.getElementById('inD1').value.trim();
+  d2Start=document.getElementById('inD2').value.trim();
+  if(!parentMap[d1Start]&&d1Start!==rootName){alert(`Node "${d1Start}" not found`);return;}
+  if(!parentMap[d2Start]&&d2Start!==rootName){alert(`Node "${d2Start}" not found`);return;}
+
+  steps=computeSteps(rootName,parentMap,childrenMap,d1Start,d2Start);
+  currentStep=0;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAns').textContent='—';
+  document.getElementById('cxSteps').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Pointer boxes
+  const d1box=document.getElementById('ptrD1');
+  const d2box=document.getElementById('ptrD2');
+  document.getElementById('ptrD1Val').textContent=st.d1??'—';
+  document.getElementById('ptrD1Depth').textContent=`depth ${st.depth1??'—'}`;
+  document.getElementById('ptrD2Val').textContent=st.d2??'—';
+  document.getElementById('ptrD2Depth').textContent=`depth ${st.depth2??'—'}`;
+  d1box.className='ptr-box '+(st.d1===st.d2?'pb-match':'pb-d1');
+  d2box.className='ptr-box '+(st.d1===st.d2?'pb-match':'pb-d2');
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  if(st.type==='depth'){
+    sp.className='step-panel sp-depth';
+    spt.textContent='Computing depths from root';
+    spb.innerHTML=mkBox('depth(d1)',st.depth1,d1Start,'spbox sb-d1')+
+      mkBox('depth(d2)',st.depth2,d2Start,'spbox sb-d2')+
+      mkBox('diff',Math.abs(st.depth1-st.depth2),'to level','spbox');
+  } else if(st.type==='level'){
+    sp.className='step-panel sp-depth';
+    spt.textContent=`Leveling: climbing the deeper pointer`;
+    spb.innerHTML=mkBox('d1',st.d1,`dep ${st.depth1}`,'spbox sb-d1')+
+      mkBox('d2',st.d2,`dep ${st.depth2}`,'spbox sb-d2')+
+      mkBox('diff',Math.abs(st.depth1-st.depth2),'remaining','spbox');
+  } else if(st.type==='climb'){
+    sp.className='step-panel sp-climb';
+    spt.textContent='Climbing both together';
+    spb.innerHTML=mkBox('d1',st.d1||'—',`dep ${st.depth1}`,'spbox sb-d1')+
+      mkBox('d2',st.d2||'—',`dep ${st.depth2}`,'spbox sb-d2')+
+      mkBox(st.d1===st.d2?'MATCH!':'',st.d1===st.d2?st.d1:'≠',st.d1===st.d2?'LCA found!':'keep climbing','spbox'+(st.d1===st.d2?' sb-lca':''));
+  } else if(st.type==='found'){
+    sp.className='step-panel sp-found';
+    spt.textContent=`LCA found: ${st.lca}`;
+    spb.innerHTML=mkBox('d1',st.d1,'= d2','spbox sb-lca')+
+      mkBox('d2',st.d2,'= d1','spbox sb-lca')+
+      mkBox('LCA',st.lca,'★ answer','spbox sb-lca');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Initialising...';
+    spb.innerHTML='';
+  }
+
+  // Path chips
+  const p1=document.getElementById('pathD1');
+  const p2=document.getElementById('pathD2');
+  p1.innerHTML=(st.path1||[]).map((n,k)=>
+    `<div class="path-chip pc-d1">${n}</div>${k<(st.path1||[]).length-1?'<span style="color:var(--muted);font-size:.65rem;">↑</span>':''}`).join('');
+  p2.innerHTML=(st.path2||[]).map((n,k)=>
+    `<div class="path-chip pc-d2">${n}</div>${k<(st.path2||[]).length-1?'<span style="color:var(--muted);font-size:.65rem;">↑</span>':''}`).join('');
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Vars
+  setVar('vD1N','vcD1N',st.d1??'—');
+  setVar('vD2N','vcD2N',st.d2??'—');
+  setVar('vD1D','vcD1D',st.depth1!=null?st.depth1:'—');
+  setVar('vD2D','vcD2D',st.depth2!=null?st.depth2:'—');
+  const phaseMap={init:'Init',depth:'1: Compute depths',level:'2: Level up',climb:'3: Climb together',found:'✓ Found!'};
+  setVar('vPhase','vcPhase',phaseMap[st.type]||'—');
+  document.getElementById('vPhase').style.color=st.type==='found'?'var(--accent3)':st.type==='climb'?'var(--accent4)':'var(--pur)';
+
+  // Draw tree
+  drawTree(st);
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ YCA = NODE ${st.result.lca}`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`Node ${st.result.lca}`;
+    document.getElementById('bestMeta').textContent=`LCA of ${d1Start} and ${d2Start} · O(D) time · O(1) space`;
+    document.getElementById('cxAns').textContent=`Node ${st.result.lca}`;
+    document.getElementById('cxSteps').textContent=steps.filter(s=>s.type==='level'||s.type==='climb').length;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-depth',depth:'ep-depth',level:'ep-depth',climb:'ep-climb',found:'ep-found'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-depth');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)drawTree(steps[currentStep]);});
+buildUI();
+</script>
+</body>
+</html>

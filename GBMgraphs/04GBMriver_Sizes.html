@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>River Sizes — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:vertical;width:320px;min-height:90px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:14px;height:14px;border-radius:3px;border:1.5px solid;flex-shrink:0;}
+
+/* GRID */
+.grid-section{margin-bottom:14px;}
+.grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;overflow:auto;}
+.grid-wrap{display:inline-grid;gap:3px;}
+.gcell{
+  width:50px;height:46px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+}
+.gcell .gv{font-weight:700;}
+.gcell .gr{font-size:.44rem;color:var(--muted);margin-top:2px;}
+
+/* land */
+.gc-land{background:var(--surface);color:var(--muted);}
+/* current cell being explored */
+.gc-cur{
+  transform:scale(1.14) translateY(-4px);
+  box-shadow:0 6px 18px rgba(245,166,35,.5);z-index:4;
+  border-width:2.5px!important;
+  animation:gcp .8s ease infinite alternate;
+}
+@keyframes gcp{from{box-shadow:0 4px 10px rgba(245,166,35,.4);}to{box-shadow:0 8px 22px rgba(245,166,35,.65);}}
+/* visited land */
+.gc-visited{color:var(--muted);opacity:.4;}
+/* river colors — assigned per river */
+.gc-r0{background:rgba(33,150,243,.22);border-color:rgba(33,150,243,.5);}
+.gc-r1{background:rgba(6,214,160,.22);border-color:rgba(6,214,160,.5);}
+.gc-r2{background:rgba(230,57,70,.18);border-color:rgba(230,57,70,.45);}
+.gc-r3{background:rgba(192,84,252,.18);border-color:rgba(192,84,252,.45);}
+.gc-r4{background:rgba(255,209,102,.25);border-color:rgba(255,209,102,.55);}
+.gc-r5{background:rgba(255,107,107,.2);border-color:rgba(255,107,107,.45);}
+.gc-r6{background:rgba(79,195,247,.22);border-color:rgba(79,195,247,.5);}
+.gc-r7{background:rgba(165,243,203,.3);border-color:rgba(165,243,203,.6);}
+
+/* RIVER RESULT CHIPS */
+.rivers-section{margin-bottom:14px;}
+.rivers-row{display:flex;gap:6px;flex-wrap:wrap;min-height:36px;align-items:center;}
+.rchip{
+  padding:5px 14px;border-radius:7px;border:2px solid;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  transition:all .3s;flex-shrink:0;
+}
+.rchip.rc-cur{transform:scale(1.1);box-shadow:0 4px 12px rgba(0,0,0,.15);animation:rcp .8s ease infinite alternate;}
+@keyframes rcp{from{box-shadow:0 3px 8px rgba(0,0,0,.1);}to{box-shadow:0 7px 18px rgba(0,0,0,.25);}}
+.rchip.rc-new{animation:rcnew .45s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rcnew{from{transform:scale(1.4) translateY(-5px);opacity:0;}to{transform:none;opacity:1;}}
+
+/* SCANNER ARROW */
+.scan-section{margin-bottom:14px;}
+.scan-row{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-height:28px;}
+.scan-chip{padding:2px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.3);color:#7a5a00;}
+.scan-chip.sc-cur{background:rgba(255,209,102,.25);border-color:var(--accent4);color:#7a4800;transform:scale(1.06);}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-scan {border-color:var(--accent4);}
+.step-panel.sp-flood{border-color:var(--accent2);}
+.step-panel.sp-done {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-hi{border-width:2.5px;background:rgba(6,214,160,.06);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-scan {border-color:var(--accent4);}
+.explain-panel.ep-flood{border-color:var(--accent2);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init  {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-scan  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-flood {border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.64rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-scan {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-flood{background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.rivers-log{margin-bottom:12px;}
+.rl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.rl-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+.rl-rows::-webkit-scrollbar{width:3px;}.rl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.rl-row{display:flex;gap:6px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.62rem;align-items:center;}
+.rl-row.rl-cur{border-color:#ffd166;background:rgba(255,209,102,.07);}
+.rl-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.rl-size{font-weight:700;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>River Sizes</h1>
+    <div class="sub">Matrix DFS · Flood Fill · Connected Components · O(wh)</div>
+  </div>
+  <div class="family-badge">Graph · Matrix</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Matrix  (rows separated by | values by comma)</label>
+      <textarea id="inMatrix">1,0,0,1,0|1,0,1,0,0|0,0,1,0,1|1,0,1,0,1|1,0,1,1,0</textarea>
+      <div class="hint">0 = land (grey), 1 = river. Each connected group of 1s is a river.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1200">0.5×</button>
+        <button class="speed-btn active" data-ms="550">1×</button>
+        <button class="speed-btn" data-ms="250">2×</button>
+        <button class="speed-btn" data-ms="90">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:var(--surface);border-color:var(--border);"></div> 0 = land</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#f5a623;"></div> current cell</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.22);border-color:#2196f3;"></div> river 1 (blue)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.22);border-color:#06d6a0;"></div> river 2 (green)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.18);border-color:#e63946;"></div> river 3 (red)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.18);border-color:#c084fc;"></div> river 4+</div>
+  </div>
+
+  <!-- GRID -->
+  <div class="grid-section">
+    <div class="section-label">Grid — each river gets a unique colour</div>
+    <div class="grid-outer">
+      <div class="grid-wrap" id="mainGrid"></div>
+    </div>
+  </div>
+
+  <!-- SCANNER PROGRESS -->
+  <div class="scan-section">
+    <div class="section-label">Scanner progress — scanning row by row, left to right</div>
+    <div class="scan-row" id="scanRow"></div>
+  </div>
+
+  <!-- RIVER RESULT -->
+  <div class="rivers-section">
+    <div class="section-label">River sizes — each chip = one river's cell count</div>
+    <div class="rivers-row" id="riversRow">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will appear as rivers are found</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin scanning</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(w·h)</div>
+      <div class="cx-sub">each cell visited once</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--pur-dark)">O(w·h)</div>
+      <div class="cx-sub">visited + call stack</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Rivers</div>
+      <div class="cx-val" id="cxRivers" style="color:#7a5a00">—</div>
+      <div class="cx-sub">found</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Sizes</div>
+      <div class="cx-val" id="cxSizes" style="color:#028a5b">—</div>
+      <div class="cx-sub">result array</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-scan" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python — River Sizes</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">riverSizes</span>(matrix):</span>
+<span class="code-line" id="cl-n">  R,C=len(matrix),len(matrix[<span class="cn">0</span>])</span>
+<span class="code-line" id="cl-vis">  visited=[[<span class="ck">False</span>]*C <span class="ck">for</span> _ <span class="ck">in</span> range(R)]</span>
+<span class="code-line" id="cl-sizes">  sizes=[]</span>
+<span class="code-line" id="cl-scan">  <span class="ck">for</span> r <span class="ck">in</span> range(R):</span>
+<span class="code-line" id="cl-scan2">   <span class="ck">for</span> c <span class="ck">in</span> range(C):</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span> visited[r][c]: <span class="ck">continue</span></span>
+<span class="code-line" id="cl-check2">    <span class="ck">if</span> matrix[r][c]==<span class="cn">0</span>:</span>
+<span class="code-line" id="cl-check3">     visited[r][c]=<span class="ck">True</span>; <span class="ck">continue</span></span>
+<span class="code-line" id="cl-dfs">    <span class="cc"># DFS flood fill this river</span></span>
+<span class="code-line" id="cl-stack">    stack=[(r,c)]; size=<span class="cn">0</span></span>
+<span class="code-line" id="cl-loop">    <span class="ck">while</span> stack:</span>
+<span class="code-line" id="cl-pop">     cr,cc=stack.pop()</span>
+<span class="code-line" id="cl-vis2">     <span class="ck">if</span> visited[cr][cc]: <span class="ck">continue</span></span>
+<span class="code-line" id="cl-mark">     visited[cr][cc]=<span class="ck">True</span></span>
+<span class="code-line" id="cl-water">     <span class="ck">if</span> matrix[cr][cc]==<span class="cn">1</span>: size+=<span class="cn">1</span></span>
+<span class="code-line" id="cl-nb">     <span class="ck">for</span> dr,dc <span class="ck">in</span> [(-<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">1</span>,<span class="cn">0</span>),(<span class="cn">0</span>,-<span class="cn">1</span>),(<span class="cn">0</span>,<span class="cn">1</span>)]:</span>
+<span class="code-line" id="cl-nb2">      nr,nc=cr+dr,cc+dc</span>
+<span class="code-line" id="cl-nb3">      <span class="ck">if</span> <span class="cn">0</span>&lt;=nr&lt;R <span class="ck">and</span> <span class="cn">0</span>&lt;=nc&lt;C \</span>
+<span class="code-line" id="cl-nb4">         <span class="ck">and not</span> visited[nr][nc]:</span>
+<span class="code-line" id="cl-nb5">       stack.append((nr,nc))</span>
+<span class="code-line" id="cl-append">    <span class="ck">if</span> size&gt;<span class="cn">0</span>: sizes.append(size)</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> sizes</span></pre>
+  </div>
+
+  <!-- CP SECTION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ CP Ready (C++)</div>
+      <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(230,57,70,.15);border:1px solid rgba(230,57,70,.35);color:#ff6b6b;padding:2px 7px;border-radius:3px;">O(w·h)</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:260px;color:#9ca3af;">
+<span style="color:#c084fc">#pragma GCC optimize</span><span style="color:#fda4af">("O3")</span>
+<span style="color:#67e8f9">#include</span><span style="color:#fda4af">&lt;bits/stdc++.h&gt;</span>
+<span style="color:#c084fc">using namespace</span> std;
+
+vector&lt;<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">riverSizes</span>(
+    vector&lt;vector&lt;<span style="color:#c084fc">int</span>&gt;&gt;&amp; m){
+  <span style="color:#c084fc">int</span> R=m.size(),C=m[<span style="color:#fda4af">0</span>].size();
+  vector&lt;vector&lt;<span style="color:#c084fc">bool</span>&gt;&gt; vis(R,vector&lt;<span style="color:#c084fc">bool</span>&gt;(C,<span style="color:#fda4af">false</span>));
+  <span style="color:#c084fc">int</span> dx[]={-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>,<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>}, dy[]={<span style="color:#fda4af">0</span>,<span style="color:#fda4af">0</span>,-<span style="color:#fda4af">1</span>,<span style="color:#fda4af">1</span>};
+  vector&lt;<span style="color:#c084fc">int</span>&gt; sizes;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r=<span style="color:#fda4af">0</span>;r&lt;R;r++){
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c=<span style="color:#fda4af">0</span>;c&lt;C;c++){
+      <span style="color:#c084fc">if</span>(vis[r][c]||m[r][c]==<span style="color:#fda4af">0</span>){vis[r][c]=<span style="color:#fda4af">true</span>;<span style="color:#c084fc">continue</span>;}
+      <span style="color:#cc">// DFS iterative</span>
+      stack&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt; stk;
+      stk.push({r,c}); <span style="color:#c084fc">int</span> sz=<span style="color:#fda4af">0</span>;
+      <span style="color:#c084fc">while</span>(!stk.empty()){
+        <span style="color:#c084fc">auto</span> [cr,cc]=stk.top(); stk.pop();
+        <span style="color:#c084fc">if</span>(vis[cr][cc]) <span style="color:#c084fc">continue</span>;
+        vis[cr][cc]=<span style="color:#fda4af">true</span>;
+        <span style="color:#c084fc">if</span>(m[cr][cc]==<span style="color:#fda4af">1</span>) sz++;
+        <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> d=<span style="color:#fda4af">0</span>;d&lt;<span style="color:#fda4af">4</span>;d++){
+          <span style="color:#c084fc">int</span> nr=cr+dx[d],nc=cc+dy[d];
+          <span style="color:#c084fc">if</span>(nr&gt;=<span style="color:#fda4af">0</span>&amp;&amp;nr&lt;R&amp;&amp;nc&gt;=<span style="color:#fda4af">0</span>&amp;&amp;nc&lt;C&amp;&amp;!vis[nr][nc])
+            stk.push({nr,nc});
+        }
+      }
+      <span style="color:#c084fc">if</span>(sz) sizes.push_back(sz);
+    }
+  }
+  <span style="color:#c084fc">return</span> sizes;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">iterative DFS</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">visited[][] flag</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">4-dir flood fill</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">struct binding</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcCell"> <div class="var-name">cell (r,c)</div>   <div class="var-value" id="vCell"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcSize"> <div class="var-name">current size</div> <div class="var-value" id="vSize"  style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcRiver"><div class="var-name">river #</div>      <div class="var-value" id="vRiver" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcStack"><div class="var-name">|stack|</div>      <div class="var-value" id="vStack" style="color:var(--accent2)">—</div></div>
+    </div>
+
+    <div class="rivers-log">
+      <div class="rl-title">Rivers found so far</div>
+      <div class="rl-rows" id="rlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Final Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ ALL RIVERS FOUND</div>
+</div>
+</div>
+
+<script>
+// River colour palette (CSS class + hex for chips)
+const RIVER_COLORS=[
+  {cls:'gc-r0',hex:'#2196f3',bg:'rgba(33,150,243,.22)',border:'rgba(33,150,243,.6)'},
+  {cls:'gc-r1',hex:'#06d6a0',bg:'rgba(6,214,160,.22)', border:'rgba(6,214,160,.6)'},
+  {cls:'gc-r2',hex:'#e63946',bg:'rgba(230,57,70,.18)', border:'rgba(230,57,70,.55)'},
+  {cls:'gc-r3',hex:'#c084fc',bg:'rgba(192,84,252,.18)',border:'rgba(192,84,252,.55)'},
+  {cls:'gc-r4',hex:'#f5a623',bg:'rgba(255,209,102,.25)',border:'rgba(255,209,102,.65)'},
+  {cls:'gc-r5',hex:'#ff6b6b',bg:'rgba(255,107,107,.2)',border:'rgba(255,107,107,.55)'},
+  {cls:'gc-r6',hex:'#4fc3f7',bg:'rgba(79,195,247,.22)',border:'rgba(79,195,247,.6)'},
+  {cls:'gc-r7',hex:'#a5f3cb',bg:'rgba(165,243,203,.3)',border:'rgba(165,243,203,.7)'},
+];
+const rc=i=>RIVER_COLORS[i%RIVER_COLORS.length];
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {r,c,riverIdx,currentSize,stackSize,rivers,rows,cols} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Scan every cell row-by-row. When we hit an unvisited 1 (river cell), launch a DFS flood fill to explore the entire connected river and count its cells. Mark every cell as visited once touched — this prevents counting any cell twice.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>visited[][]</strong>: every cell is marked true once encountered, whether it's land or river. This ensures O(w·h) total work — no cell revisited.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>DFS with explicit stack</strong>: avoids Python/deep-recursion stack overflow for large grids. Same logic as recursive DFS but iterative.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Connected component counting:</strong> each DFS from an unvisited 1 finds exactly one river. The total number of DFS launches = number of rivers.`},
+    ]
+  };
+  if(type==='scan') return {
+    why:`<div class="ep-why-block why-scan">Scanning cell (${r},${c}): it's a ${args.val===1?'1 (river) — launch DFS flood fill!':'0 (land) — mark visited and move on.'}${args.alreadyVisited?' Already visited — skip.':''}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Outer scan loop:</strong> guarantees we start a DFS from every disconnected river. If we only did DFS from (0,0), isolated rivers elsewhere would be missed.`},
+    ]
+  };
+  if(type==='flood') return {
+    why:`<div class="ep-why-block why-flood">DFS visiting (${r},${c}): it's a river cell! Size counter → ${currentSize}. Pushing unvisited neighbours to the stack. River #${riverIdx+1} is currently ${currentSize} cells large.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Size count = ${currentSize}.</strong> Each time we pop a 1 from the stack and it's unvisited, increment size.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Stack-based DFS:</strong> push unvisited neighbors. The stack may contain the same neighbor multiple times — the visited check at pop time prevents double-counting.`},
+    ]
+  };
+  if(type==='river-done') return {
+    why:`<div class="ep-why-block why-flood">River #${riverIdx+1} fully explored! Size = <strong>${currentSize}</strong>. Adding to result. Continue outer scan for more rivers.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>River #${riverIdx+1} complete, size ${currentSize}.</strong> DFS exhausted — stack is empty. Result so far: [${rivers?.join(', ')}].`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All cells visited. Found ${rivers?.length} river${rivers?.length!==1?'s':''}. Sizes: [${rivers?.join(', ')}]. O(w·h) time — each cell visited exactly once.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Result: [${rivers?.join(', ')}]</strong>. ${rivers?.length} rivers.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(w·h):</strong> outer scan visits every cell once, DFS visits every 1 once. Total ≤ 2·w·h operations.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:       {ids:['cl-sig','cl-n','cl-vis','cl-sizes'],cls:'hl-scan'},
+  scan:       {ids:['cl-scan','cl-scan2','cl-check','cl-check2','cl-check3'],cls:'hl-scan'},
+  flood:      {ids:['cl-stack','cl-loop','cl-pop','cl-vis2','cl-mark','cl-water','cl-nb','cl-nb2','cl-nb3','cl-nb4','cl-nb5'],cls:'hl-flood'},
+  'river-done':{ids:['cl-append'],cls:'hl-flood'},
+  done:       {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,r,c,val,riverIdx,currentSize,rivers,rows,cols,alreadyVisited} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Scanning a ${rows}×${cols} grid. We'll scan every cell. When we find an unvisited 1 (river), we flood-fill to measure its entire connected size. Every found river gets its own colour.`};
+  if(type==='scan'){
+    if(alreadyVisited) return {color:'var(--muted)', text:`Cell (${r},${c}) — already visited (part of a river we already measured). Skipping.`};
+    if(val===0) return {color:'var(--muted)', text:`Cell (${r},${c}) = 0 (land). Marking visited, moving on.`};
+    return {color:'var(--accent4)', text:`Cell (${r},${c}) = 1 (river)! First time seeing this river. Starting flood-fill to measure it — this will be River #${riverIdx+1}.`};
+  }
+  if(type==='flood') return {color:rc(riverIdx).hex,
+    text:`Flood-filling River #${riverIdx+1}: visiting cell (${r},${c}). Size counter → <strong>${currentSize}</strong>. Pushing unvisited neighbours to explore next.`};
+  if(type==='river-done') return {color:'var(--accent3)',
+    text:`🏁 River #${riverIdx+1} fully explored! Its total size is <strong>${currentSize}</strong>. Adding to results. Continuing outer scan...`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Found <strong>${rivers?.length}</strong> river${rivers?.length!==1?'s':''}. Sizes: <strong>[${rivers?.join(', ')}]</strong>. Every cell was visited exactly once — O(w·h) total.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(matrix){
+  const rows=matrix.length, cols=matrix[0].length;
+  const visited=Array.from({length:rows},()=>new Array(cols).fill(false));
+  const riverMap=Array.from({length:rows},()=>new Array(cols).fill(-1)); // which river index
+  const rivers=[];
+  const steps=[];
+  let riverIdx=0;
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,rows,cols,matrix,
+    visited:visited.map(r=>[...r]),
+    riverMap:riverMap.map(r=>[...r]),
+    rivers:[...rivers],
+    ...extra,
+    explain:makeExplain(type,{rows,cols,rivers:[...rivers],...extra})
+  });
+
+  snap('init',`🏞️ <strong>Start.</strong> ${rows}×${cols} grid. Scan for rivers.`,{r:null,c:null});
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      if(visited[r][c]){
+        snap('scan',`(${r},${c}) already visited — skip`,{r,c,val:matrix[r][c],alreadyVisited:true,riverIdx});
+        continue;
+      }
+      if(matrix[r][c]===0){
+        visited[r][c]=true;
+        snap('scan',`(${r},${c})=0 (land). Mark visited.`,{r,c,val:0,alreadyVisited:false,riverIdx});
+        continue;
+      }
+      // River found — DFS
+      snap('scan',`🌊 (${r},${c})=1 → New river #${riverIdx+1}! Start DFS.`,{r,c,val:1,alreadyVisited:false,riverIdx});
+
+      const stack=[[r,c]];
+      let size=0;
+
+      while(stack.length>0){
+        const [cr,cc]=stack.pop();
+        if(visited[cr][cc]) continue;
+        visited[cr][cc]=true;
+        riverMap[cr][cc]=riverIdx;
+        size++;
+
+        snap('flood',
+          `DFS (${cr},${cc}) → size=${size}. River #${riverIdx+1}.`,
+          {r:cr,c:cc,riverIdx,currentSize:size,stackSize:stack.length}
+        );
+
+        for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+          const nr=cr+dr, nc=cc+dc;
+          if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&!visited[nr][nc])
+            stack.push([nr,nc]);
+        }
+      }
+
+      rivers.push(size);
+      snap('river-done',
+        `✅ River #${riverIdx+1} done! Size=${size}. Sizes so far: [${rivers.join(', ')}]`,
+        {r,c,riverIdx,currentSize:size,stackSize:0}
+      );
+      riverIdx++;
+    }
+  }
+
+  snap('done',
+    `🎉 <strong>Done!</strong> [${rivers.join(', ')}]`,
+    {r:null,c:null,riverIdx,result:{rivers:[...rivers]}}
+  );
+  steps[steps.length-1].result={rivers:[...rivers]};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=550;
+let mat=[], rows=0, cols=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inMatrix').value.trim();
+  mat=raw.split('|').map(r=>r.trim().split(',').map(Number));
+  rows=mat.length; cols=mat[0].length;
+  steps=computeSteps(mat);
+  currentStep=0;
+
+  // Grid
+  const mg=document.getElementById('mainGrid');
+  mg.style.gridTemplateColumns=`repeat(${cols},50px)`;
+  mg.innerHTML='';
+  for(let r=0;r<rows;r++)
+    for(let c=0;c<cols;c++){
+      const v=mat[r][c];
+      mg.innerHTML+=`<div class="gcell ${v===0?'gc-land':''}" id="gc-${r}-${c}">
+        <span class="gv">${v}</span>
+        <span class="gr">(${r},${c})</span>
+      </div>`;
+    }
+
+  // Scanner chips
+  const sr=document.getElementById('scanRow');
+  sr.innerHTML=Array.from({length:rows*cols},(_,i)=>{
+    const r=Math.floor(i/cols), c=i%cols;
+    return `<div class="scan-chip" id="sc-${r}-${c}">(${r},${c})</div>`;
+  }).join('');
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxRivers').textContent='—';
+  document.getElementById('cxSizes').textContent='—';
+  document.getElementById('riversRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will appear as rivers are found</span>';
+  document.getElementById('rlRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Grid cells
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const el=document.getElementById(`gc-${r}-${c}`);
+      if(!el)continue;
+      const v=mat[r][c];
+      const isVisited=st.visited[r][c];
+      const isCur=st.r===r&&st.c===c&&(st.type==='flood'||st.type==='scan');
+      const rIdx=st.riverMap[r][c];
+      if(isCur&&v===1)      el.className=`gcell ${rIdx>=0?rc(rIdx).cls:''} gc-cur`;
+      else if(isFinal&&rIdx>=0) el.className=`gcell ${rc(rIdx).cls}`;
+      else if(rIdx>=0)      el.className=`gcell ${rc(rIdx).cls}`;
+      else if(isVisited&&v===0) el.className='gcell gc-visited';
+      else                  el.className=`gcell ${v===0?'gc-land':''}`;
+    }
+  }
+
+  // Scanner chips — current position highlighted
+  for(let r=0;r<rows;r++)
+    for(let c=0;c<cols;c++){
+      const el=document.getElementById(`sc-${r}-${c}`);
+      if(!el)continue;
+      const isCur=st.r===r&&st.c===c&&(st.type==='scan');
+      el.className='scan-chip'+(isCur?' sc-cur':'');
+    }
+
+  // River result chips
+  const rr=document.getElementById('riversRow');
+  if(st.rivers.length>0){
+    const isNewRiver=st.type==='river-done';
+    rr.innerHTML=st.rivers.map((size,i)=>{
+      const col=rc(i);
+      const isNew=i===st.rivers.length-1&&isNewRiver;
+      return `<div class="rchip ${isNew?'rc-new':''}" style="background:${col.bg};border-color:${col.border};color:${col.hex};">
+        R${i+1}:${size}
+      </div>`;
+    }).join('');
+  } else {
+    rr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will appear as rivers are found</span>';
+  }
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='flood'){
+    const col=rc(st.riverIdx);
+    sp.className='step-panel sp-flood';
+    spt.textContent=`DFS exploring River #${st.riverIdx+1} at (${st.r},${st.c})`;
+    spb.innerHTML=mkBox('cell',`(${st.r},${st.c})`,'river cell','spbox sb-hi')+
+      mkBox('river #',st.riverIdx+1,'current','spbox')+
+      mkBox('size',st.currentSize,'cells so far','spbox sb-hi')+
+      mkBox('|stack|',st.stackSize,'to explore','spbox');
+    sp.querySelector('.spbox.sb-hi')?.style.setProperty('border-color',col.border);
+  } else if(st.type==='scan'){
+    sp.className='step-panel sp-scan';
+    spt.textContent=`Scanning (${st.r},${st.c}) = ${st.val}`;
+    spb.innerHTML=mkBox('cell',`(${st.r},${st.c})`,`value=${st.val}`,'spbox')+
+      mkBox('action',st.alreadyVisited?'skip':st.val===0?'land':
+        `start DFS`,st.alreadyVisited?'visited':st.val===0?'mark visited':
+        `river #${st.riverIdx+1}`,'spbox sb-hi');
+  } else if(st.type==='river-done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=`River #${st.riverIdx+1} complete! Size = ${st.currentSize}`;
+    spb.innerHTML=mkBox('size',st.currentSize,'cells','spbox sb-hi')+
+      mkBox('rivers',st.rivers.length,'found total','spbox')+
+      mkBox('result',`[${st.rivers.join(', ')}]`,'so far','spbox');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent='All rivers found!';
+    spb.innerHTML=mkBox('rivers',st.rivers.length,'total','spbox sb-hi')+
+      mkBox('result',`[${st.rivers.join(', ')}]`,'final','spbox sb-hi');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Starting scan...';
+    spb.innerHTML='';
+  }
+
+  // Right panel river log
+  const rl=document.getElementById('rlRows');
+  rl.innerHTML='';
+  st.rivers.forEach((size,i)=>{
+    const col=rc(i);
+    const isCur=i===st.riverIdx&&st.type==='flood';
+    rl.innerHTML+=`<div class="rl-row ${isCur?'rl-cur':''}">
+      <div class="rl-dot" style="background:${col.hex};border-radius:3px;"></div>
+      <span style="color:${col.hex};font-weight:700;font-size:.6rem;">R${i+1}</span>
+      <span class="rl-size" style="color:var(--bg)">${size} cells</span>
+    </div>`;
+  });
+  if(st.type==='flood'&&st.currentSize>0){
+    const col=rc(st.riverIdx);
+    rl.innerHTML+=`<div class="rl-row rl-cur">
+      <div class="rl-dot" style="background:${col.hex};opacity:.7;"></div>
+      <span style="color:${col.hex};font-weight:700;font-size:.6rem;">R${st.riverIdx+1}</span>
+      <span class="rl-size" style="color:var(--bg)">${st.currentSize} (in progress…)</span>
+    </div>`;
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  const codeT=st.type==='flood'||st.type==='river-done'?'flood':st.type==='done'?'done':st.type==='scan'?'scan':'init';
+  highlightCode(codeT);
+
+  // Vars
+  setVar('vCell','vcCell',st.r!=null?`(${st.r},${st.c})`:'—');
+  setVar('vSize','vcSize',st.currentSize!=null?st.currentSize:'—');
+  setVar('vRiver','vcRiver',st.riverIdx!=null?`#${st.riverIdx+1}`:'—');
+  setVar('vStack','vcStack',st.stackSize!=null?st.stackSize:'—');
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ RESULT: [${st.result.rivers.join(', ')}] — ${st.result.rivers.length} RIVERS`;
+    document.getElementById('doneBar').classList.add('show');
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`[${st.result.rivers.join(', ')}]`;
+    document.getElementById('bestMeta').textContent=`${st.result.rivers.length} rivers · O(w·h) time`;
+    document.getElementById('cxRivers').textContent=st.result.rivers.length;
+    document.getElementById('cxSizes').textContent=`[${st.result.rivers.join(', ')}]`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-scan',scan:'ep-scan',flood:'ep-flood','river-done':'ep-done',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-scan');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
