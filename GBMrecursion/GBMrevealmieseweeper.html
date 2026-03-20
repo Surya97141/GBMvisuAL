@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reveal Minesweeper — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(230,57,70,.2);border:1px solid var(--accent);color:#7a0000;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input,.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input{width:80px;}
+.field textarea{width:280px;height:90px;resize:vertical;line-height:1.6;}
+.field input:focus,.field textarea:focus{border-color:var(--accent);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent);}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: MINESWEEPER GRID ══ */
+.grid-section{margin-bottom:14px;}
+.grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;overflow:auto;transition:border-color .3s;}
+.grid-outer.go-mine  {border-color:var(--accent);}
+.grid-outer.go-reveal{border-color:var(--accent3);}
+.grid-outer.go-number{border-color:var(--accent4);}
+.grid-outer.go-done  {border-color:var(--accent3);}
+.ms-grid{border-collapse:separate;border-spacing:4px;margin:0 auto;}
+.ms-cell{
+  width:46px;height:46px;border-radius:7px;border:2px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;
+  text-align:center;vertical-align:middle;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  cursor:default;user-select:none;position:relative;
+}
+/* cell state classes */
+.mc-H    {background:rgba(33,150,243,.08); border-color:rgba(33,150,243,.4); color:#1565c0;}           /* hidden */
+.mc-M    {background:rgba(150,150,150,.1); border-color:#aaa;                color:#888;}               /* mine hidden */
+.mc-X    {background:rgba(230,57,70,.25);  border-color:#e63946;             color:#b71c1c;             /* mine hit */
+          animation:mineBlast .5s ease; box-shadow:0 0 14px rgba(230,57,70,.5);}
+@keyframes mineBlast{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+.mc-0    {background:rgba(6,214,160,.1);   border-color:rgba(6,214,160,.4);  color:#028a5b;}            /* revealed 0 */
+.mc-num  {background:rgba(255,209,102,.12);border-color:rgba(255,209,102,.6);color:#7a4800;}            /* revealed 1-8 */
+.mc-cur  {background:rgba(255,209,102,.3); border-color:#ffd166;             color:#7a4800;             /* currently visiting */
+          transform:scale(1.1) translateY(-3px);box-shadow:0 6px 16px rgba(255,209,102,.35);}
+.mc-queue{background:rgba(33,150,243,.15); border-color:#2196f3;             color:#0d47a1;}            /* in DFS queue */
+.mc-click{background:rgba(230,57,70,.2);   border-color:var(--accent);       color:#b71c1c;             /* initial click */
+          transform:scale(1.12) translateY(-4px);box-shadow:0 8px 20px rgba(230,57,70,.35);}
+/* row/col headers */
+.ms-hdr{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-align:center;vertical-align:middle;padding:0 4px;width:18px;}
+
+/* ══ UNIQUE VISUAL 2: DFS STACK + NEIGHBOR PROBE ══ */
+.stack-section{margin-bottom:14px;}
+.stack-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.stack-outer.so-active{border-color:var(--accent4);}
+.stack-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.sh-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.sh-depth{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--accent3);}
+/* Stack frames row */
+.stack-frames{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;min-height:40px;margin-bottom:10px;}
+.stack-frame{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:50px;padding:5px 8px;border-radius:7px;border:2px solid;
+  font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+}
+.sf-top{transform:translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,.3);}
+.sf-cur{background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+.sf-prev{background:rgba(6,214,160,.1);border-color:#06d6a0;color:#024d37;}
+.sf-lbl{font-size:.44rem;opacity:.7;margin-bottom:2px;}
+.stack-arrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);margin-bottom:6px;}
+/* 8-neighbor probe chips */
+.neighbor-probe{display:flex;gap:5px;flex-wrap:wrap;}
+.np-chip{
+  font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;
+  padding:3px 8px;border-radius:5px;border:1.5px solid var(--border);
+  background:var(--surface);color:var(--muted);transition:all .25s;
+}
+.np-chip.np-mine {border-color:var(--accent);background:rgba(230,57,70,.1);color:var(--accent);}
+.np-chip.np-h    {border-color:var(--accent2);background:rgba(33,150,243,.1);color:#0d47a1;}
+.np-chip.np-oob  {border-color:var(--border);opacity:.35;}
+.np-chip.np-done {border-color:var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+.np-chip.np-num  {border-color:var(--accent4);background:rgba(255,209,102,.1);color:#7a4800;}
+
+/* ══ UNIQUE VISUAL 3: MINE COUNT PANEL ══ */
+.minecount-section{margin-bottom:14px;}
+.minecount-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.minecount-outer.mco-active{border-color:var(--accent4);}
+.mc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.mc-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.mc-result{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.adj-grid{display:grid;grid-template-columns:repeat(3,44px);gap:4px;margin-bottom:8px;}
+.adj-cell{
+  height:40px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--muted);
+  background:var(--surface);transition:all .3s;
+}
+.adj-cell.ac-center{background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+.adj-cell.ac-mine  {background:rgba(230,57,70,.15);border-color:#e63946;color:#b71c1c;}
+.adj-cell.ac-h     {background:rgba(33,150,243,.08);border-color:#2196f3;color:#0d47a1;}
+.adj-cell.ac-oob   {background:rgba(0,0,0,.03);border-color:var(--border);color:#ddd;border-style:dashed;}
+.adj-cell.ac-num   {background:rgba(6,214,160,.08);border-color:#06d6a0;color:#024d37;}
+.adj-cell.ac-zero  {background:rgba(6,214,160,.08);border-color:#06d6a0;color:#024d37;}
+.mine-counter-badge{
+  font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;
+  padding:6px 16px;border-radius:7px;display:inline-block;
+  border:2px solid var(--accent4);background:rgba(255,209,102,.1);color:#7a4800;
+  transition:all .3s;
+}
+.mine-counter-badge.mcb-zero{border-color:var(--accent3);background:rgba(6,214,160,.12);color:#024d37;}
+.mine-counter-badge.mcb-mine{border-color:var(--accent);background:rgba(230,57,70,.12);color:#b71c1c;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-click {border-color:var(--accent);}
+.step-panel.sp-reveal{border-color:var(--accent3);}
+.step-panel.sp-number{border-color:var(--accent4);}
+.step-panel.sp-mine  {border-color:var(--accent);}
+.step-panel.sp-done  {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* CX */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-click {border-color:var(--accent);}
+.explain-panel.ep-reveal{border-color:var(--accent3);}
+.explain-panel.ep-number{border-color:var(--accent4);}
+.explain-panel.ep-done  {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-click {border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-reveal{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-number{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-red{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.2);}
+.inv-row.inv-red .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+.done-banner.db-lose{background:var(--accent);color:white;}
+.done-banner.db-win {background:var(--accent3);color:#012a1e;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-click {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-reveal{background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-number{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done  {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.mini-board{margin-bottom:12px;}
+.mb-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.mini-grid{border-collapse:separate;border-spacing:2px;}
+.mini-cell{width:22px;height:22px;border-radius:3px;border:1px solid #2a2a3e;background:#0d0d18;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;text-align:center;vertical-align:middle;color:#333;transition:all .22s;}
+.mini-cell.mcm-H    {background:rgba(33,150,243,.15);border-color:#2196f3;color:#4fc3f7;}
+.mini-cell.mcm-M    {background:#0d0d18;color:#555;}
+.mini-cell.mcm-X    {background:rgba(230,57,70,.3);border-color:#e63946;color:#ff6b6b;}
+.mini-cell.mcm-0    {background:rgba(6,214,160,.2);border-color:#06d6a0;color:#06d6a0;}
+.mini-cell.mcm-num  {background:rgba(255,209,102,.2);border-color:#ffd166;color:#ffd166;}
+.mini-cell.mcm-cur  {background:rgba(255,209,102,.35);border-color:#ffd166;color:#ffd166;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;}
+.best-box.show{opacity:1;}
+.best-box.bb-done{background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.bb-lose{background:rgba(230,57,70,.06);border:1px solid rgba(230,57,70,.2);}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bb-done .best-label{color:var(--accent3);}
+.bb-lose .best-label{color:var(--accent);}
+.best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show.db-lose{display:block;background:var(--accent);color:white;animation:fadeUp .4s ease;}
+.done-bar.show.db-win {display:block;background:var(--accent3);color:#012a1e;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Reveal Minesweeper</h1>
+    <div class="sub">DFS Flood Fill · 8-directional · Mine Counting</div>
+  </div>
+  <div class="family-badge">DFS · Grid · BFS</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Board (rows, space-separated cells)</label>
+      <textarea id="inBoard">H H H H M
+H 1 M H 1
+H H H H H
+H H H H H</textarea>
+      <div class="hint">M=mine, H=hidden, 0-8=revealed number</div>
+    </div>
+    <div class="field">
+      <label>Click Row</label>
+      <input type="number" id="inRow" value="3" min="0">
+    </div>
+    <div class="field">
+      <label>Click Col</label>
+      <input type="number" id="inCol" value="4" min="0">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.08);border-color:rgba(33,150,243,.4);border-radius:3px"></div> H — hidden</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(150,150,150,.1);border-color:#aaa;border-radius:3px"></div> M — mine (hidden)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.25);border-color:#e63946;border-radius:3px"></div> X — mine hit!</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.1);border-color:#06d6a0;border-radius:3px"></div> 0 — revealed safe</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.12);border-color:#ffd166;border-radius:3px"></div> 1-8 — adj mines</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.3);border-color:#ffd166;border-radius:3px;border-radius:50%"></div> current cell</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: MINESWEEPER GRID -->
+  <div class="grid-section">
+    <div class="section-label">Board state</div>
+    <div class="grid-outer" id="gridOuter">
+      <table class="ms-grid" id="msGrid"></table>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DFS STACK + NEIGHBOR PROBE -->
+  <div class="stack-section">
+    <div class="section-label">DFS stack  (flood-fill from zeros)</div>
+    <div class="stack-outer" id="stackOuter">
+      <div class="stack-header">
+        <div class="sh-label">← bottom &nbsp; top →</div>
+        <div class="sh-depth">size: <span id="stackSize">0</span></div>
+      </div>
+      <div class="stack-frames" id="stackFrames">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>
+      </div>
+      <div class="section-label" style="margin-bottom:6px;margin-top:4px">8 neighbors of current cell</div>
+      <div class="neighbor-probe" id="neighborProbe">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: MINE COUNT PANEL -->
+  <div class="minecount-section">
+    <div class="section-label">Adjacent mine count (8-directional)</div>
+    <div class="minecount-outer" id="minecountOuter">
+      <div class="mc-header">
+        <div class="mc-label">3×3 neighborhood around current cell</div>
+        <div class="mine-counter-badge" id="mineCountBadge">mines: —</div>
+      </div>
+      <div class="adj-grid" id="adjGrid"></div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-click" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(R·C)</div>
+      <div class="cx-sub">each cell visited once</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(R·C)</div>
+      <div class="cx-sub">DFS stack worst case</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Revealed</div>
+      <div class="cx-val" id="cxRevealed" style="color:#7a5a00">—</div>
+      <div class="cx-sub">cells</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(230,57,70,.3)">
+      <div class="cx-lbl">Result</div>
+      <div class="cx-val" id="cxResult" style="color:var(--accent)">—</div>
+      <div class="cx-sub">outcome</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-click" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Reveal Minesweeper</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">void</span> <span class="cf">reveal</span>(board, <span class="ck">int</span> r, <span class="ck">int</span> c) {</span>
+<span class="code-line" id="cl-mine">  <span class="ck">if</span> (board[r][c]==<span class="cn">"M"</span>) {</span>
+<span class="code-line" id="cl-hit">    board[r][c]=<span class="cn">"X"</span>; <span class="ck">return</span>; <span class="cc">// lose</span></span>
+<span class="code-line" id="cl-mend">  }</span>
+<span class="code-line" id="cl-cnt">  <span class="ck">int</span> mines = <span class="cf">countAdj</span>(board,r,c);</span>
+<span class="code-line" id="cl-num">  <span class="ck">if</span> (mines &gt; <span class="cn">0</span>) {</span>
+<span class="code-line" id="cl-setnum">    board[r][c]=to_string(mines); <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-nend">  }</span>
+<span class="code-line" id="cl-zero">  board[r][c]=<span class="cn">"0"</span>; <span class="cc">// safe zone flood</span></span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">auto</span> [nr,nc] : neighbors(r,c))</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span> (board[nr][nc]==<span class="cn">"H"</span>)</span>
+<span class="code-line" id="cl-rec">      <span class="cf">reveal</span>(board, nr, nc);</span>
+<span class="code-line" id="cl-end">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcR">    <div class="var-name">row r</div>        <div class="var-value" id="vR"     style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcC">    <div class="var-name">col c</div>        <div class="var-value" id="vC"     style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcCell"> <div class="var-name">board[r][c]</div>  <div class="var-value" id="vCell"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcMines"><div class="var-name">adj mines</div>    <div class="var-value" id="vMines" style="color:var(--accent)">—</div></div>
+      <div class="var-card" id="vcStack"><div class="var-name">stack depth</div>  <div class="var-value" id="vStack" style="color:var(--pur)">0</div></div>
+      <div class="var-card" id="vcRev">  <div class="var-name">revealed</div>     <div class="var-value" id="vRev"   style="color:var(--accent3)">0</div></div>
+    </div>
+
+    <!-- MINI BOARD -->
+    <div class="mini-board">
+      <div class="mb-title">Board state</div>
+      <table class="mini-grid" id="miniGrid"></table>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Outcome</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar"></div>
+</div>
+</div>
+
+<script>
+const DIRS=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{r,c,cell,mines,R,C}=args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-click">Three cases on click:<br>1) Mine (M) → mark X, game over.<br>2) Adjacent mines > 0 → reveal count, stop DFS here.<br>3) No adjacent mines → reveal "0", DFS into all 8 hidden neighbors.<br>The flood-fill (case 3) propagates until every reachable zero-cell's hidden neighbors are revealed.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Board cells:</strong> "H"=hidden, "M"=mine, "X"=exploded, "0"–"8"=revealed.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>DFS termination:</strong> We only recurse into "H" cells. Already-revealed cells (0–8) are never re-processed, preventing infinite loops.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(R×C) time:</strong> Each cell is visited at most once. Each visit does O(1) work (count 8 neighbors). Total O(R×C).`},
+    ]
+  };
+  if(type==='mine') return {
+    why:`<div class="ep-why-block why-click">Cell (${r},${c}) contains a mine "M". Replace with "X". Game over — the DFS stops immediately. No neighbors are explored.</div>`,
+    inv:[{icon:'💥',cls:'inv-red',text:`<strong>Mine hit at (${r},${c}).</strong> board[${r}][${c}]="X". Return immediately.`}]
+  };
+  if(type==='number') return {
+    why:`<div class="ep-why-block why-number">Cell (${r},${c}) is safe. Count adjacent mines: ${mines}. Since mines > 0, reveal the count "${mines}" and STOP — don't DFS further. This cell acts as a border.</div>`,
+    inv:[
+      {icon:'🔢',cls:'',text:`<strong>board[${r}][${c}] = "${mines}".</strong> ${mines} adjacent mine(s). DFS stops here — numbered cells don't propagate.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why stop at numbered cells?</strong> A numbered cell contains information. Revealing its neighbors would skip over this information and potentially reveal too much.`},
+    ]
+  };
+  if(type==='zero') return {
+    why:`<div class="ep-why-block why-reveal">Cell (${r},${c}) has 0 adjacent mines. Set to "0" and flood-fill: push all hidden neighbors onto the DFS stack to be processed next.</div>`,
+    inv:[
+      {icon:'🌊',cls:'',text:`<strong>board[${r}][${c}] = "0".</strong> Flood-fill: recurse into all 8 hidden neighbors.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>The flood-fill invariant:</strong> A zero cell always has its hidden neighbors revealed. The revealed region expands until every reachable zero's hidden neighbors are processed.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">DFS complete. All reachable zero-cells and their borders have been revealed. The board is updated in-place.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Correctness:</strong> Every "H" cell reachable through connected zeros (and their immediate borders) has been revealed exactly once.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(R×C)</strong> time and space. Each cell processed at most once.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-sig','cl-mine'],   cls:'hl-click'},
+  mine:  {ids:['cl-mine','cl-hit'],   cls:'hl-click'},
+  count: {ids:['cl-cnt'],             cls:'hl-number'},
+  number:{ids:['cl-num','cl-setnum'], cls:'hl-number'},
+  zero:  {ids:['cl-zero','cl-loop','cl-check','cl-rec'],cls:'hl-reveal'},
+  done:  {ids:['cl-end'],             cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── countAdj ──────────────────────────────────────────────────────────────
+function countAdj(board,r,c){
+  let m=0;
+  const R=board.length,C=board[0].length;
+  for(const[dr,dc] of DIRS){
+    const nr=r+dr,nc=c+dc;
+    if(nr>=0&&nr<R&&nc>=0&&nc<C&&(board[nr][nc]==='M'||board[nr][nc]==='X'))m++;
+  }
+  return m;
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(initBoard,clickR,clickC){
+  const steps=[];
+  const R=initBoard.length,C=initBoard[0].length;
+  let board=initBoard.map(r=>[...r]);
+  let revealed=0;
+  const dfStack=[];
+
+  const snap=(type,desc,r,c,extra={})=>{
+    steps.push({type,desc,board:board.map(row=>[...row]),R,C,
+      curR:r,curC:c,dfStack:[...dfStack],revealed,
+      result:null,...extra,
+      explain:makeExplain(type,{r,c,R,C,...extra})});
+  };
+
+  snap('init',`🖱️ Click at (${clickR},${clickC}). board[${clickR}][${clickC}]="${board[clickR][clickC]}".`,
+    clickR,clickC,{cell:board[clickR][clickC],mines:null});
+
+  // Iterative DFS
+  dfStack.push([clickR,clickC]);
+
+  while(dfStack.length>0){
+    const[r,c]=dfStack[dfStack.length-1];
+    dfStack.pop();
+
+    if(board[r][c]!=='H')continue;
+
+    if(board[r][c]==='M'||board[r][c]==='X'){
+      board[r][c]='X';
+      snap('mine',`💥 Mine at (${r},${c})! board[${r}][${c}]="X". Game over.`,r,c,{cell:'X',mines:null});
+      break;
+    }
+
+    // Count adjacent mines
+    const mines=countAdj(board,r,c);
+    const adjInfo=DIRS.map(([dr,dc])=>{
+      const nr=r+dr,nc=c+dc;
+      if(nr<0||nr>=R||nc<0||nc>=C)return{r:nr,c:nc,val:'OOB',oob:true};
+      return{r:nr,c:nc,val:board[nr][nc],oob:false};
+    });
+
+    snap('count',`🔢 Counting adj mines at (${r},${c}): ${mines} mines found.`,r,c,{cell:board[r][c],mines,adjInfo});
+
+    if(mines>0){
+      board[r][c]=String(mines);
+      revealed++;
+      snap('number',`🔢 (${r},${c}) has ${mines} adj mine${mines>1?'s':''}. Set board[${r}][${c}]="${mines}". Stop DFS here.`,r,c,{cell:String(mines),mines,adjInfo});
+    } else {
+      board[r][c]='0';
+      revealed++;
+      snap('zero',`🌊 (${r},${c}) has 0 adj mines. Set "0". Push hidden neighbors to stack.`,r,c,{cell:'0',mines:0,adjInfo});
+      // Push hidden neighbors
+      for(const[dr,dc] of DIRS){
+        const nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<R&&nc>=0&&nc<C&&board[nr][nc]==='H'){
+          dfStack.push([nr,nc]);
+        }
+      }
+    }
+  }
+
+  const lost=board.flat().includes('X');
+  snap('done',`${lost?'💥 Game over — mine hit!':'✅ Reveal complete!'} ${revealed} cell${revealed!==1?'s':''} revealed.`,
+    clickR,clickC,{cell:board[clickR][clickC],mines:null,result:{lost,revealed}});
+  steps[steps.length-1].result={lost,revealed};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let Rg=0,Cg=0;
+
+// ─── PARSE ─────────────────────────────────────────────────────────────────
+function parseBoard(){
+  const raw=document.getElementById('inBoard').value.trim();
+  const rows=raw.split('\n').map(r=>r.trim().split(/\s+/).filter(Boolean));
+  if(!rows.length||!rows[0].length)return null;
+  const C=rows[0].length;
+  if(!rows.every(r=>r.length===C))return null;
+  return rows;
+}
+
+// ─── BUILD GRID TABLE ──────────────────────────────────────────────────────
+function buildGridTable(board,R,C){
+  const tbl=document.getElementById('msGrid');
+  tbl.innerHTML='';
+  // Header row
+  const hr=document.createElement('tr');
+  hr.appendChild(Object.assign(document.createElement('th'),{className:'ms-hdr'}));
+  for(let c=0;c<C;c++){const th=document.createElement('th');th.className='ms-hdr';th.textContent=c;hr.appendChild(th);}
+  tbl.appendChild(hr);
+  for(let r=0;r<R;r++){
+    const tr=document.createElement('tr');
+    const rh=document.createElement('th');rh.className='ms-hdr';rh.textContent=r;tr.appendChild(rh);
+    for(let c=0;c<C;c++){
+      const td=document.createElement('td');td.className='ms-cell';td.id=`ms-${r}-${c}`;
+      td.textContent=board[r][c]==='M'?'?':board[r][c]; // hide mines initially
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+  // Mini
+  const mini=document.getElementById('miniGrid');
+  mini.innerHTML='';
+  for(let r=0;r<R;r++){
+    const tr=document.createElement('tr');
+    for(let c=0;c<C;c++){
+      const td=document.createElement('td');td.className='mini-cell';td.id=`mini-${r}-${c}`;
+      td.textContent=board[r][c]==='M'?'?':board[r][c];tr.appendChild(td);
+    }
+    mini.appendChild(tr);
+  }
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  const board=parseBoard();
+  if(!board)return;
+  Rg=board.length; Cg=board[0].length;
+  const clickR=Math.min(parseInt(document.getElementById('inRow').value)||0,Rg-1);
+  const clickC=Math.min(parseInt(document.getElementById('inCol').value)||0,Cg-1);
+
+  steps=computeSteps(board,clickR,clickC);
+  currentStep=0;
+
+  buildGridTable(board,Rg,Cg);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxRevealed').textContent='—';
+  document.getElementById('cxResult').textContent='—';
+  document.getElementById('stackFrames').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  document.getElementById('neighborProbe').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">—</span>';
+  document.getElementById('adjGrid').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function cellClass(val,isCur,inStack){
+  if(isCur)return 'ms-cell mc-cur';
+  if(inStack)return 'ms-cell mc-queue';
+  if(val==='H')return 'ms-cell mc-H';
+  if(val==='M')return 'ms-cell mc-M';
+  if(val==='X')return 'ms-cell mc-X';
+  if(val==='0')return 'ms-cell mc-0';
+  return 'ms-cell mc-num';
+}
+function miniClass(val,isCur){
+  if(isCur)return 'mini-cell mcm-cur';
+  if(val==='H')return 'mini-cell mcm-H';
+  if(val==='M')return 'mini-cell mcm-M';
+  if(val==='X')return 'mini-cell mcm-X';
+  if(val==='0')return 'mini-cell mcm-0';
+  if(val&&val>='1'&&val<='8')return 'mini-cell mcm-num';
+  return 'mini-cell';
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const stackSet=new Set(st.dfStack.map(([r,c])=>`${r},${c}`));
+
+  // ── Grid ──
+  const go=document.getElementById('gridOuter');
+  go.className='grid-outer '+(isFinal?(st.result.lost?'go-mine':'go-done'):
+    st.type==='mine'?'go-mine':st.type==='number'?'go-number':'go-reveal');
+
+  for(let r=0;r<st.R;r++){
+    for(let c=0;c<st.C;c++){
+      const cell=document.getElementById(`ms-${r}-${c}`);
+      const mini=document.getElementById(`mini-${r}-${c}`);
+      if(!cell||!mini)continue;
+      const v=st.board[r][c];
+      const isCur=st.curR===r&&st.curC===c&&!isFinal;
+      const inStack=stackSet.has(`${r},${c}`)&&!isCur;
+      cell.className=cellClass(v,isCur,inStack);
+      // Show M as '?' unless exploded
+      cell.textContent=v==='M'?'?':v==='H'?'·':v;
+      mini.className=miniClass(v,isCur);
+      mini.textContent=v==='M'?'?':v==='H'?'·':v;
+    }
+  }
+
+  // ── Stack frames ──
+  const sf=document.getElementById('stackFrames');
+  document.getElementById('stackSize').textContent=st.dfStack.length;
+  if(!st.dfStack||st.dfStack.length===0){
+    sf.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  } else {
+    sf.innerHTML='';
+    st.dfStack.forEach(([r,c],i)=>{
+      const isTop=i===st.dfStack.length-1;
+      const fr=document.createElement('div');
+      fr.className=`stack-frame ${isTop?'sf-cur sf-top':'sf-prev'}`;
+      fr.innerHTML=`<div class="sf-lbl">${isTop?'TOP':''}</div>(${r},${c})`;
+      sf.appendChild(fr);
+      if(!isTop){const a=document.createElement('div');a.className='stack-arrow';a.textContent='→';sf.appendChild(a);}
+    });
+  }
+
+  // ── Neighbor probe ──
+  const np=document.getElementById('neighborProbe');
+  if(st.adjInfo&&st.adjInfo.length){
+    np.innerHTML='';
+    st.adjInfo.forEach(({r,c,val,oob})=>{
+      const chip=document.createElement('div');
+      const cls=oob?'np-oob':val==='M'||val==='X'?'np-mine':val==='H'?'np-h':val==='0'?'np-done':'np-num';
+      chip.className=`np-chip ${cls}`;
+      chip.textContent=oob?'OOB':`(${r},${c})=${val==='M'?'💣':val}`;
+      np.appendChild(chip);
+    });
+  } else {
+    np.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">—</span>';
+  }
+
+  // ── 3×3 adj grid ──
+  const ag=document.getElementById('adjGrid');
+  if(st.adjInfo&&st.adjInfo.length===8&&st.curR!=null){
+    ag.innerHTML='';
+    const dirs=[[-1,-1],[-1,0],[-1,1],[0,-1],null,[0,1],[1,-1],[1,0],[1,1]];
+    dirs.forEach((d,di)=>{
+      const cell=document.createElement('div');
+      if(!d){
+        // center
+        cell.className='adj-cell ac-center';
+        cell.textContent=`${st.curR},${st.curC}`;
+        ag.appendChild(cell);return;
+      }
+      const info=st.adjInfo[di<4?di:di-1];
+      if(!info){ag.appendChild(Object.assign(document.createElement('div'),{className:'adj-cell ac-oob',textContent:'—'}));return;}
+      const cls=info.oob?'ac-oob':info.val==='M'||info.val==='X'?'ac-mine':info.val==='H'?'ac-h':info.val==='0'?'ac-zero':'ac-num';
+      cell.className=`adj-cell ${cls}`;
+      cell.textContent=info.oob?'×':info.val==='M'?'💣':info.val;
+      ag.appendChild(cell);
+    });
+  }
+
+  // Mine count badge
+  const mcb=document.getElementById('mineCountBadge');
+  const mo=document.getElementById('minecountOuter');
+  if(st.mines!=null){
+    mcb.textContent=`mines: ${st.mines}`;
+    mcb.className=`mine-counter-badge ${st.mines===0?'mcb-zero':st.mines>0?'mcb-mine':''}`;
+    mo.className='minecount-outer mco-active';
+  } else {
+    mcb.textContent='mines: —';mcb.className='mine-counter-badge';mo.className='minecount-outer';
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  const typeMap={mine:'sp-mine',count:'sp-number',number:'sp-number',zero:'sp-reveal',done:'sp-done',init:'sp-click'};
+  sp.className=`step-panel ${typeMap[st.type]||'sp-click'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+
+  if(st.type==='number'){
+    spb.innerHTML=mkBox('cell',`(${st.curR},${st.curC})`,'position','spbox sb-yel')+
+      mkBox('adj mines',st.mines,'counted','spbox sb-red')+
+      mkBox('result',`"${st.mines}"`,'revealed','spbox sb-yel');
+  } else if(st.type==='zero'){
+    spb.innerHTML=mkBox('cell',`(${st.curR},${st.curC})`,'position','spbox sb-yel')+
+      mkBox('adj mines','0','flood fill!','spbox sb-grn')+
+      mkBox('stack',st.dfStack.length,'queued','spbox sb-blue');
+  } else if(st.type==='mine'){
+    spb.innerHTML=mkBox('cell',`(${st.curR},${st.curC})`,'position','spbox sb-red')+
+      mkBox('result','X!','💥 hit','spbox sb-red');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('revealed',st.revealed,'cells','spbox sb-grn')+
+      mkBox('result',st.result.lost?'LOST':'SAFE',st.result.lost?'mine hit':'no mines','spbox '+(st.result.lost?'sb-red':'sb-grn'));
+  } else {
+    spb.innerHTML=mkBox('click',`(${st.curR},${st.curC})`,'initial','spbox sb-blue')+
+      mkBox('cell',st.board[st.curR]?.[st.curC]??'—','value','spbox sb-yel');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:  `Clicked (${st.curR},${st.curC}). Cell="${st.board[st.curR]?.[st.curC]}". Checking: mine? → X. Adjacent mines? → reveal count. Zero? → flood fill.`,
+    count: `Counting adjacent mines around (${st.curR},${st.curC}). Found ${st.mines} mine${st.mines!==1?'s':''}.`,
+    mine:  `💥 Mine hit at (${st.curR},${st.curC})! Replace M→X. Game over.`,
+    number:`(${st.curR},${st.curC}) has ${st.mines} adjacent mine${st.mines!==1?'s':''}. Reveal "<strong>${st.mines}</strong>". DFS stops here — numbered cells are borders.`,
+    zero:  `(${st.curR},${st.curC}) has 0 adjacent mines. Reveal "0". <strong>Flood-fill:</strong> push all hidden neighbors to DFS stack.`,
+    done:  st.result?.lost?`💥 Game over. Mine was hit.`:`✅ Reveal complete! ${st.revealed} cell${st.revealed!==1?'s':''} revealed.`,
+  };
+  const narr=narrs[st.type]||'';
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={init:'var(--accent2)',count:'var(--accent4)',mine:'var(--accent)',number:'var(--accent4)',zero:'var(--accent3)',done:'var(--accent3)'}[st.type]||'var(--accent)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narr;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vR',    'vcR',    st.curR!=null?st.curR:'—');
+  setVar('vC',    'vcC',    st.curC!=null?st.curC:'—');
+  setVar('vCell', 'vcCell', st.curR!=null&&st.board[st.curR]?.[st.curC]?st.board[st.curR][st.curC]:'—');
+  setVar('vMines','vcMines',st.mines!=null?st.mines:'—');
+  setVar('vStack','vcStack',st.dfStack.length);
+  setVar('vRev',  'vcRev',  st.revealed);
+  document.getElementById('cxRevealed').textContent=st.revealed;
+
+  // ── Done ──
+  if(isFinal){
+    const lost=st.result.lost;
+    const db=document.getElementById('doneBanner');
+    db.className=`done-banner show ${lost?'db-lose':'db-win'}`;
+    db.textContent=lost?'💥 GAME OVER — MINE HIT':`✅ ${st.result.revealed} CELLS REVEALED`;
+    document.getElementById('doneBar').className=`done-bar show ${lost?'db-lose':'db-win'}`;
+    document.getElementById('doneBar').textContent=lost?'💥 LOST':'✓ SAFE REVEAL';
+    const bb=document.getElementById('bestBox');
+    bb.className=`best-box show ${lost?'bb-lose':'bb-done'}`;
+    document.getElementById('bestVal').textContent=lost?'GAME OVER':'SAFE';
+    document.getElementById('bestMeta').textContent=`${st.revealed} cells revealed · O(R×C)`;
+    document.getElementById('cxResult').textContent=lost?'LOST':'SAFE';
+    document.getElementById('cxResult').style.color=lost?'var(--accent)':'var(--accent3)';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-click',mine:'ep-click',count:'ep-number',number:'ep-number',zero:'ep-reveal',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-click');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

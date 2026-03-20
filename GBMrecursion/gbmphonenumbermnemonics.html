@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phone Number Mnemonics — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent2);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(33,150,243,.2);border:1px solid var(--accent2);color:#0d47a1;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:200px;transition:border-color .2s;letter-spacing:2px;}
+.field input:focus{border-color:var(--accent2);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#0d47a1;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: PHONE KEYPAD + DIGIT STRIP ══ */
+.keypad-digit-section{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
+
+/* Mini keypad */
+.keypad-wrap{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px;flex-shrink:0;}
+.keypad-grid{display:grid;grid-template-columns:repeat(3,44px);gap:4px;}
+.key{
+  height:44px;border-radius:7px;border:1.5px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-family:'Space Mono',monospace;background:var(--surface);transition:all .25s;
+}
+.key-num{font-size:.82rem;font-weight:700;color:var(--ink);}
+.key-letters{font-size:.48rem;color:var(--muted);letter-spacing:.5px;}
+.key.k-active{border-color:var(--accent2);background:rgba(33,150,243,.12);transform:scale(1.08);box-shadow:0 4px 12px rgba(33,150,243,.2);}
+.key.k-active .key-num{color:#0d47a1;}
+.key.k-active .key-letters{color:#1565c0;}
+.key.k-done{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.key.k-done .key-num{color:#024d37;}
+
+/* Digit strip with current letter choices */
+.digit-strip-wrap{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+.digit-strip{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px;}
+.digit-slot{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  min-width:52px;flex-shrink:0;
+}
+.ds-digit{
+  width:52px;height:38px;border-radius:7px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--muted);
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.ds-digit.dsd-active {background:rgba(33,150,243,.18);border-color:#2196f3;color:#0d47a1;transform:scale(1.08) translateY(-3px);box-shadow:0 5px 14px rgba(33,150,243,.25);}
+.ds-digit.dsd-placed {background:rgba(6,214,160,.12);border-color:#06d6a0;color:#024d37;}
+.ds-digit.dsd-pending{background:rgba(0,0,0,.02);border-color:var(--border);border-style:dashed;color:#ccc;}
+.ds-idx{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+/* letter choices row */
+.letter-choices{display:flex;gap:3px;justify-content:center;}
+.lc-chip{
+  font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;
+  padding:2px 5px;border-radius:4px;border:1.5px solid var(--border);
+  background:var(--surface);color:var(--muted);transition:all .25s;
+}
+.lc-chip.lc-chosen {border-color:var(--accent4);background:rgba(255,209,102,.2);color:#7a4800;transform:scale(1.1);}
+.lc-chip.lc-used   {border-color:var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+.lc-chip.lc-future {opacity:.4;}
+
+/* ══ UNIQUE VISUAL 2: CURRENT MNEMONIC BUILDER ══ */
+.builder-section{margin-bottom:14px;}
+.builder-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.builder-outer.bo-place{border-color:var(--accent4);}
+.builder-outer.bo-found{border-color:var(--accent3);}
+.builder-outer.bo-back {border-color:var(--accent);}
+.builder-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.bh-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.bh-found{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--accent2);}
+.mnemonic-display{display:flex;gap:5px;align-items:center;margin-bottom:10px;}
+.mchar{
+  width:38px;height:44px;border-radius:7px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-family:'Space Mono',monospace;font-size:1.05rem;font-weight:700;
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.mchar .mc-digit{font-size:.45rem;color:var(--muted);}
+.mchar.mc-placed {background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+.mchar.mc-active {background:rgba(33,150,243,.18);border-color:#2196f3;color:#0d47a1;transform:scale(1.1) translateY(-3px);box-shadow:0 5px 14px rgba(33,150,243,.25);}
+.mchar.mc-open   {border-style:dashed;color:#ccc;}
+.mchar.mc-found  {background:rgba(6,214,160,.18);border-color:#06d6a0;color:#024d37;box-shadow:0 0 10px rgba(6,214,160,.2);}
+.mchar.mc-back   {background:rgba(230,57,70,.1);border-color:#e63946;color:var(--accent);}
+.mnem-arrow{font-size:.9rem;color:var(--border);}
+
+/* ══ UNIQUE VISUAL 3: MNEMONIC GALLERY ══ */
+.gallery-section{margin-bottom:14px;}
+.gallery-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.gallery-outer.go-active{border-color:var(--accent2);}
+.gallery-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.gh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.gh-count{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;}
+.gallery-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:28px;}
+.mgc{
+  font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  padding:4px 10px;border-radius:6px;border:1.5px solid var(--accent2);
+  background:rgba(33,150,243,.08);color:#0d47a1;
+  transition:all .3s;white-space:nowrap;letter-spacing:1px;
+}
+.mgc-new{animation:gcPop .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes gcPop{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+.mgc-latest{background:rgba(33,150,243,.2);border-width:2px;box-shadow:0 3px 10px rgba(33,150,243,.2);}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-place{border-color:var(--accent4);}
+.step-panel.sp-found{border-color:var(--accent3);}
+.step-panel.sp-back {border-color:var(--accent);}
+.step-panel.sp-done {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent2);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-place{border-color:var(--accent4);}
+.explain-panel.ep-found{border-color:var(--accent3);}
+.explain-panel.ep-back {border-color:var(--accent);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent2);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init {border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-place{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-found{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-back {border-left-color:var(--accent); background:rgba(230,57,70,.05);}
+.ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent2);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent2);color:white;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(33,150,243,.14); border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-place{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(6,214,160,.18); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-back {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.mnem-log-right{margin-bottom:12px;}
+.mlr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.mlr-rows{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+.mlr-rows::-webkit-scrollbar{width:3px;}.mlr-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.mlr-row{padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.65rem;color:#9ca3af;letter-spacing:1px;}
+.mlr-row.mlr-new{border-color:rgba(33,150,243,.5);background:rgba(33,150,243,.07);animation:fadeUp .35s ease;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(33,150,243,.06);border:1px solid rgba(33,150,243,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent2);color:white;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Phone Number Mnemonics</h1>
+    <div class="sub">Backtracking · Digit → Letters · O(4ⁿ·n)</div>
+  </div>
+  <div class="family-badge">Backtracking · Strings</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="text" id="inPhone" value="1905" maxlength="8">
+      <div class="hint">Digits 0-9. 0 and 1 stay as-is.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.18);border-color:#2196f3;border-radius:3px"></div> active digit</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> letter placed</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.18);border-color:#06d6a0;border-radius:3px"></div> mnemonic found</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.1);border-color:#e63946;border-radius:3px"></div> backtracking</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: KEYPAD + DIGIT STRIP -->
+  <div class="keypad-digit-section">
+    <!-- Mini keypad -->
+    <div class="keypad-wrap">
+      <div class="section-label" style="margin-bottom:6px">Keypad</div>
+      <div class="keypad-grid" id="keypadGrid"></div>
+    </div>
+    <!-- Digit strip -->
+    <div class="digit-strip-wrap">
+      <div class="section-label" style="margin-bottom:8px">Digits &amp; letter choices</div>
+      <div class="digit-strip" id="digitStrip"></div>
+      <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);">
+        highlighted letter = currently chosen for this position
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: MNEMONIC BUILDER -->
+  <div class="builder-section">
+    <div class="section-label">Current mnemonic being built</div>
+    <div class="builder-outer" id="builderOuter">
+      <div class="builder-header">
+        <div class="bh-label">char by char — backtrack on each exhausted digit</div>
+        <div class="bh-found"><span id="foundCount">0</span> found</div>
+      </div>
+      <div class="mnemonic-display" id="mnemonicDisplay"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: MNEMONIC GALLERY -->
+  <div class="gallery-section">
+    <div class="section-label">All mnemonics found</div>
+    <div class="gallery-outer" id="galleryOuter">
+      <div class="gallery-header">
+        <div class="gh-title">each = one valid letter combination</div>
+        <div class="gh-count" style="color:var(--accent2)"><span id="galleryCount">0</span> / <span id="galleryTotal">?</span></div>
+      </div>
+      <div class="gallery-chips" id="galleryChips">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">none yet…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-place" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(4ⁿ·n)</div>
+      <div class="cx-sub">up to 4 letters/digit</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(4ⁿ·n)</div>
+      <div class="cx-sub">store all mnemonics</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Mnemonics</div>
+      <div class="cx-val" id="cxTotal" style="color:#7a5a00">—</div>
+      <div class="cx-sub">= product of choices</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Length</div>
+      <div class="cx-val" id="cxLen" style="color:#028a5b">—</div>
+      <div class="cx-sub">= phone digits</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-place" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Phone Number Mnemonics</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-map"><span class="ck">const</span> vector&lt;string&gt; PAD = {</span>
+<span class="code-line" id="cl-map2">  <span class="cn">"0","1","abc","def","ghi"</span>,</span>
+<span class="code-line" id="cl-map3">  <span class="cn">"jkl","mno","pqrs","tuv","wxyz"</span>};</span>
+<span class="code-line" id="cl-sig"><span class="ck">void</span> <span class="cf">bt</span>(string& phone, <span class="ck">int</span> idx,</span>
+<span class="code-line" id="cl-sg2">     string& cur, vector&lt;string&gt;& res) {</span>
+<span class="code-line" id="cl-base">  <span class="ck">if</span> (idx==phone.size()){</span>
+<span class="code-line" id="cl-push">    res.push_back(cur); <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-bend">  }</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">char</span> c : PAD[phone[idx]-<span class="cn">'0'</span>]) {</span>
+<span class="code-line" id="cl-place">    cur.push_back(c);</span>
+<span class="code-line" id="cl-rec">    <span class="cf">bt</span>(phone, idx+<span class="cn">1</span>, cur, res);</span>
+<span class="code-line" id="cl-back">    cur.pop_back(); <span class="cc">// backtrack</span></span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcIdx">  <div class="var-name">idx (digit pos)</div><div class="var-value" id="vIdx"   style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcDigit"><div class="var-name">phone[idx]</div>    <div class="var-value" id="vDigit" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcChar"> <div class="var-name">cur char c</div>    <div class="var-value" id="vChar"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcFound"><div class="var-name">found</div>          <div class="var-value" id="vFound" style="color:var(--accent3)">0</div></div>
+      <div class="var-card" id="vcCur" style="grid-column:1/3">
+        <div class="var-name">cur (partial mnemonic)</div>
+        <div class="var-value" id="vCur" style="color:var(--accent4);letter-spacing:2px">—</div>
+      </div>
+    </div>
+
+    <div class="mnem-log-right">
+      <div class="mlr-title">Latest mnemonics</div>
+      <div class="mlr-rows" id="mlrRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Total Mnemonics</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ ALL MNEMONICS FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── KEYPAD MAP ────────────────────────────────────────────────────────────
+const PAD={'0':'0','1':'1','2':'abc','3':'def','4':'ghi','5':'jkl','6':'mno','7':'pqrs','8':'tuv','9':'wxyz'};
+const PAD_DISPLAY=[
+  {num:'1',letters:''},  {num:'2',letters:'abc'},{num:'3',letters:'def'},
+  {num:'4',letters:'ghi'},{num:'5',letters:'jkl'},{num:'6',letters:'mno'},
+  {num:'7',letters:'pqrs'},{num:'8',letters:'tuv'},{num:'9',letters:'wxyz'},
+  null,{num:'0',letters:''},null
+];
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{phone,idx,digit,char:ch,cur,found,choices,n}=args||{};
+  const total=phone?phone.split('').reduce((p,d)=>p*(PAD[d]?.length||1),1):0;
+
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">For each digit position idx, try every letter that digit maps to (from PAD). Place a letter into cur, recurse to idx+1. When idx==n, cur is a complete mnemonic — record it. Then backtrack (pop last char) and try the next letter. This generates all combinations: ∏ |PAD[digit[i]]| total mnemonics.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> At depth idx, cur contains exactly idx characters, one chosen per digit 0..idx-1. Every valid completion of cur is a valid mnemonic.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Digits 0 and 1</strong> map to themselves (no letters), so they appear as '0' or '1' in the mnemonic. All other digits map to 3 or 4 letters.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(4ⁿ·n) time:</strong> At most 4 choices per digit × n digits deep. Each complete mnemonic takes O(n) to copy. Total mnemonics ≤ 4ⁿ.`},
+    ]
+  };
+  if(type==='place') return {
+    why:`<div class="ep-why-block why-place">Digit '${digit}' maps to '${PAD[digit]}'. Placing letter '<strong>${ch}</strong>' at position idx=${idx}. cur = '${cur}'. Recurse to fill position ${(idx||0)+1}.</div>`,
+    inv:[
+      {icon:'📍',cls:'',text:`<strong>cur = '${cur}'</strong>. Depth = ${idx}. ${n-(idx||0)-1} positions remaining.`},
+    ]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block why-found">idx == phone.length. cur = '<strong>${cur}</strong>' is a complete mnemonic of length ${n}. Record it as result #${found}. Return and backtrack to try remaining letter choices.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Mnemonic #${found}:</strong> '${cur}'. Base case reached. Record and backtrack.`}]
+  };
+  if(type==='back') return {
+    why:`<div class="ep-why-block why-back">Pop '<strong>${ch}</strong>' from cur. cur = '${cur}'. Try next letter for digit '${digit}' at position ${idx}. Backtracking systematically explores all combinations.</div>`,
+    inv:[
+      {icon:'↩',cls:'inv-warn',text:`<strong>Backtrack:</strong> cur.pop_back(). Undo the choice of '${ch}' for digit '${digit}'. Try next letter in '${PAD[digit]}'.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${found} mnemonics found. The backtracking tree is fully explored — every combination of letters for each digit position was tried exactly once.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>${found} mnemonics</strong> = ${phone.split('').map(d=>`|${PAD[d]}|=${PAD[d].length}`).join(' × ')} = ${total}.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(4ⁿ·n) time, O(4ⁿ·n) space.</strong> Unavoidable — must output all mnemonics.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-map','cl-map2','cl-map3','cl-sig','cl-sg2'],cls:'hl-init'},
+  place:{ids:['cl-loop','cl-place','cl-rec'],cls:'hl-place'},
+  found:{ids:['cl-base','cl-push'],cls:'hl-found'},
+  back: {ids:['cl-back'],cls:'hl-back'},
+  done: {ids:['cl-push'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(phone){
+  const steps=[];
+  const n=phone.length;
+  const mnemonics=[];
+  const total=phone.split('').reduce((p,d)=>p*(PAD[d]?.length||1),1);
+
+  const snap=(type,desc,cur,idx,char,extra={})=>{
+    steps.push({type,desc,phone,n,cur,idx,char,
+      found:mnemonics.length,mnemonics:[...mnemonics],
+      result:null,...extra,
+      explain:makeExplain(type,{phone,idx,digit:phone[idx]??'',char,cur,found:mnemonics.length+(type==='found'?1:0),choices:PAD[phone[idx]]??'',n,total})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> Phone "${phone}", ${n} digits. Try every letter for each digit. 0,1 map to themselves.`,'',0,null,{choices:''});
+
+  function bt(cur,idx){
+    if(idx===n){
+      mnemonics.push(cur);
+      snap('found',`✅ <strong>Mnemonic found: "${cur}"</strong> (#${mnemonics.length})`,cur,idx,null,{choices:''});
+      return;
+    }
+    const digit=phone[idx];
+    const letters=PAD[digit]||digit;
+    for(const c of letters){
+      snap('place',`📍 digit[${idx}]='${digit}' → try '<strong>${c}</strong>'. cur="${cur+c}".`,cur,idx,c,{choices:letters});
+      bt(cur+c,idx+1);
+      snap('back',`↩ Backtrack: pop '${c}' from "${cur+c}". cur="${cur}". Try next.`,cur,idx,c,{choices:letters});
+    }
+  }
+
+  bt('',0);
+  snap('done',`🎉 <strong>Done!</strong> ${mnemonics.length} mnemonics for "${phone}".`,'',n,null,
+    {choices:'',result:{answer:mnemonics.length,mnemonics:[...mnemonics]}});
+  steps[steps.length-1].result={answer:mnemonics.length,mnemonics:[...mnemonics]};
+  return{steps,total,mnemonics};
+}
+
+// ─── BUILD KEYPAD ──────────────────────────────────────────────────────────
+function buildKeypad(){
+  const grid=document.getElementById('keypadGrid');
+  grid.innerHTML='';
+  PAD_DISPLAY.forEach(k=>{
+    const cell=document.createElement('div');
+    if(!k){cell.style.visibility='hidden';cell.className='key';grid.appendChild(cell);return;}
+    cell.className='key';cell.id=`key-${k.num}`;
+    cell.innerHTML=`<div class="key-num">${k.num}</div>${k.letters?`<div class="key-letters">${k.letters}</div>`:''}`;
+    grid.appendChild(cell);
+  });
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let phoneVal='', nVal=0, totalMnemonics=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  phoneVal=document.getElementById('inPhone').value.replace(/[^0-9]/g,'').slice(0,8);
+  if(!phoneVal)phoneVal='1905';
+  document.getElementById('inPhone').value=phoneVal;
+  nVal=phoneVal.length;
+
+  const res=computeSteps(phoneVal);
+  steps=res.steps; totalMnemonics=res.total;
+  currentStep=0;
+
+  document.getElementById('cxLen').textContent=nVal;
+  document.getElementById('cxTotal').textContent=totalMnemonics;
+  document.getElementById('galleryTotal').textContent=totalMnemonics;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('galleryChips').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">none yet…</span>';
+  document.getElementById('galleryCount').textContent='0';
+  document.getElementById('foundCount').textContent='0';
+  document.getElementById('mlrRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  buildKeypad();
+  buildDigitStrip();
+  buildMnemonicDisplay();
+  renderStep(0);
+}
+
+function buildDigitStrip(){
+  const strip=document.getElementById('digitStrip');
+  strip.innerHTML='';
+  for(let i=0;i<nVal;i++){
+    const d=phoneVal[i];
+    const letters=PAD[d]||d;
+    const slot=document.createElement('div');
+    slot.className='digit-slot';
+    slot.innerHTML=`<div class="ds-digit dsd-pending" id="ds-${i}">${d}</div>`
+      +`<div class="letter-choices" id="lc-${i}">`
+      +[...letters].map(c=>`<div class="lc-chip" id="lc-${i}-${c}">${c}</div>`).join('')
+      +`</div>`
+      +`<div class="ds-idx">pos ${i}</div>`;
+    strip.appendChild(slot);
+  }
+}
+
+function buildMnemonicDisplay(){
+  const md=document.getElementById('mnemonicDisplay');
+  md.innerHTML='';
+  for(let i=0;i<nVal;i++){
+    if(i>0){const a=document.createElement('div');a.className='mnem-arrow';a.textContent='→';md.appendChild(a);}
+    const mc=document.createElement('div');
+    mc.className='mchar mc-open';mc.id=`mc-${i}`;
+    mc.innerHTML=`<div class="mc-digit">${phoneVal[i]}</div><div id="mcv-${i}">_</div>`;
+    md.appendChild(mc);
+  }
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n;
+
+  // ── Keypad ──
+  document.querySelectorAll('.key').forEach(k=>k.classList.remove('k-active','k-done'));
+  if(st.idx<n&&phoneVal[st.idx]){
+    const activeKey=document.getElementById(`key-${phoneVal[st.idx]}`);
+    if(activeKey)activeKey.classList.add('k-active');
+  }
+  for(let i=0;i<st.idx&&i<n;i++){
+    const dk=document.getElementById(`key-${phoneVal[i]}`);
+    if(dk)dk.classList.add('k-done');
+  }
+
+  // ── Digit strip ──
+  for(let i=0;i<n;i++){
+    const ds=document.getElementById(`ds-${i}`);
+    if(!ds)continue;
+    if(isFinal){ds.className='ds-digit dsd-placed';}
+    else if(i<st.idx){ds.className='ds-digit dsd-placed';}
+    else if(i===st.idx&&st.type!=='found'){ds.className='ds-digit dsd-active';}
+    else{ds.className='ds-digit dsd-pending';}
+
+    // Letter choices highlight
+    const letters=PAD[phoneVal[i]]||phoneVal[i];
+    const curChar=i<(st.cur||'').length?(st.cur||'')[i]:null;
+    ;[...letters].forEach(c=>{
+      const chip=document.getElementById(`lc-${i}-${c}`);
+      if(!chip)return;
+      if(isFinal){chip.className='lc-chip lc-used';}
+      else if(i<st.idx){chip.className=curChar===c?'lc-chip lc-used':'lc-chip lc-future';}
+      else if(i===st.idx){chip.className=st.char===c?'lc-chip lc-chosen':'lc-chip';}
+      else{chip.className='lc-chip lc-future';}
+    });
+  }
+
+  // ── Mnemonic display ──
+  const bo=document.getElementById('builderOuter');
+  bo.className='builder-outer '+(isFinal?'bo-found':st.type==='found'?'bo-found':st.type==='back'?'bo-back':'bo-place');
+  for(let i=0;i<n;i++){
+    const mc=document.getElementById(`mc-${i}`);
+    const mcv=document.getElementById(`mcv-${i}`);
+    if(!mc||!mcv)continue;
+    const c=(st.cur||'')[i];
+    mcv.textContent=c||'_';
+    if(isFinal||st.type==='found'){mc.className='mchar mc-found';}
+    else if(c&&i<st.idx){mc.className='mchar mc-placed';}
+    else if(c&&i===st.idx&&st.type==='place'){mc.className='mchar mc-active';}
+    else if(c&&i===st.idx&&st.type==='back'){mc.className='mchar mc-back';}
+    else{mc.className='mchar mc-open';}
+  }
+  document.getElementById('foundCount').textContent=st.found;
+
+  // ── Gallery ──
+  const gc=document.getElementById('galleryChips');
+  const gcCount=document.getElementById('galleryCount');
+  gcCount.textContent=st.found;
+  document.getElementById('galleryOuter').className='gallery-outer'+(st.found>0?' go-active':'');
+  if(st.found===0){
+    gc.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">none yet…</span>';
+  } else {
+    const prevFound=idx>0?steps[idx-1].found:0;
+    gc.innerHTML='';
+    st.mnemonics.forEach((m,k)=>{
+      const chip=document.createElement('div');
+      const isNew=k>=prevFound&&st.type==='found';
+      chip.className=`mgc${isNew?' mgc-new':''} ${k===st.found-1&&st.type==='found'?' mgc-latest':''}`;
+      chip.textContent=m;
+      gc.appendChild(chip);
+    });
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='place'){
+    sp.className='step-panel sp-place';
+    spt.textContent=`Place '${st.char}' for digit '${phoneVal[st.idx]}' at pos ${st.idx}`;
+    spb.innerHTML=mkBox('digit',phoneVal[st.idx]??'—','current','spbox sb-blue')+
+      mkBox('letter',st.char??'—','chosen','spbox sb-yel')+
+      mkBox('cur',`"${st.cur}"?`,'partial','spbox sb-yel')+
+      mkBox('left',n-st.idx,'positions','spbox sb-blue');
+  } else if(st.type==='found'){
+    sp.className='step-panel sp-found';
+    spt.textContent=`Mnemonic #${st.found}: "${st.cur}"`;
+    spb.innerHTML=mkBox('mnemonic',`"${st.cur}"`,'complete','spbox sb-grn')+
+      mkBox('found',st.found,`of ${totalMnemonics}`,'spbox sb-grn');
+  } else if(st.type==='back'){
+    sp.className='step-panel sp-back';
+    spt.textContent=`Backtrack: pop '${st.char}' from pos ${st.idx}`;
+    spb.innerHTML=mkBox('pop',`'${st.char}'`,'removed','spbox sb-red')+
+      mkBox('cur',`"${st.cur}"`,'reverted','spbox sb-blue')+
+      mkBox('digit',phoneVal[st.idx]??'—','try next','spbox sb-yel');
+  } else {
+    sp.className=isFinal?'step-panel sp-done':'step-panel sp-place';
+    spt.textContent=isFinal?`Done! ${st.found} mnemonics`:'Initialised';
+    spb.innerHTML=mkBox('phone',`"${phoneVal}"`,'input','spbox sb-blue')+
+      mkBox('total',totalMnemonics,'combinations','spbox sb-grn');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:  `Phone "${phoneVal}". For each digit, try every mapped letter. Recurse one position deeper. When done → record. Backtrack to try next letter.`,
+    place: `Digit '${phoneVal[st.idx]}' → letters '${PAD[phoneVal[st.idx]]||phoneVal[st.idx]}'. Placing <strong>'${st.char}'</strong> at pos ${st.idx}. Recurse to pos ${(st.idx||0)+1}.`,
+    found: `✅ Complete mnemonic: <strong>"${st.cur}"</strong> (${st.found} of ${totalMnemonics}). Backtrack to explore remaining combinations.`,
+    back:  `↩ Backtrack: remove '${st.char}' from pos ${st.idx}. cur="${st.cur}". Try next letter for digit '${phoneVal[st.idx]}'.`,
+    done:  `✅ All ${st.found} mnemonics found. The backtracking tree is fully explored.`,
+  };
+  const narr=narrs[st.type]||'';
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={init:'var(--accent2)',place:'var(--accent4)',found:'var(--accent3)',back:'var(--accent)',done:'var(--accent3)'}[st.type]||'var(--accent2)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narr;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vIdx',  'vcIdx',  st.idx!=null?st.idx:'—');
+  setVar('vDigit','vcDigit',st.idx<n?phoneVal[st.idx]||'—':'—');
+  setVar('vChar', 'vcChar', st.char??'—');
+  setVar('vFound','vcFound',st.found);
+  setVar('vCur',  'vcCur',  st.cur?`"${st.cur}"`:'""');
+
+  // ── Mnemonic log right ──
+  const mlr=document.getElementById('mlrRows');
+  mlr.innerHTML='';
+  const prevFound2=idx>0?steps[idx-1].found:0;
+  [...st.mnemonics].reverse().slice(0,8).forEach((m,k)=>{
+    const isNew=k===0&&st.type==='found';
+    mlr.innerHTML+=`<div class="mlr-row ${isNew?'mlr-new':''}">"${m}"</div>`;
+  });
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ${st.result.answer} MNEMONICS FOR "${phoneVal}"`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`"${phoneVal}" · ${nVal} digits · ${totalMnemonics} combinations`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-place',place:'ep-place',found:'ep-found',back:'ep-back',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-place');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>
