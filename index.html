@@ -1,772 +1,1075 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>GBMvisuAL — Algorithm Visualizer</title>
-<meta name="description" content="Interactive visualizations for 47 DSA algorithms. Two Pointers to Suffix Arrays — see every algorithm think."/>
-<meta property="og:title" content="GBMvisuAL — Algorithm Visualizer"/>
-<meta property="og:description" content="See 47 DSA algorithms think in real time."/>
-<meta property="og:type" content="website"/>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GBMvisuAL — Algorithm Visualizer Library</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#080c10;
-  --bg2:#0d1117;
-  --bg3:#111820;
-  --ink:#e8edf3;
-  --ink2:#8b97a8;
-  --ink3:#4a5568;
-  --accent:#3b82f6;
-  --accent2:#06b6d4;
-  --accent3:#8b5cf6;
-  --green:#10b981;
-  --yellow:#f59e0b;
-  --red:#ef4444;
-  --border:rgba(255,255,255,0.07);
-  --border2:rgba(255,255,255,0.12);
-}
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;font-size:16px}
-body{
-  background:var(--bg);
-  color:var(--ink);
-  font-family:'JetBrains Mono',monospace;
-  overflow-x:hidden;
-  cursor:none;
-}
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:#000}
-::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px}
-
-/* ── CURSOR ── */
-#cur{position:fixed;width:8px;height:8px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .1s,background .2s;mix-blend-mode:screen}
-#cur-trail{position:fixed;width:24px;height:24px;border:1px solid rgba(59,130,246,.4);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:all .15s ease}
-
-/* ── CANVAS ── */
-#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.35}
-
-/* ── PAGE ── */
-#page{position:relative;z-index:1}
-
-/* ── NAV ── */
-nav{
-  position:fixed;top:0;left:0;right:0;z-index:100;
-  display:flex;justify-content:space-between;align-items:center;
-  padding:16px clamp(20px,5vw,80px);
-  border-bottom:1px solid transparent;
-  transition:all .3s;
-}
-nav.scrolled{
-  background:rgba(8,12,16,.85);
-  backdrop-filter:blur(12px);
-  border-color:var(--border);
-}
-.nav-logo{
-  font-family:'Syne',sans-serif;
-  font-size:18px;font-weight:800;
-  letter-spacing:1px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.nav-links{display:flex;gap:28px;list-style:none}
-.nav-links a{
-  font-size:12px;color:var(--ink2);letter-spacing:1px;
-  text-decoration:none;transition:color .2s;
-}
-.nav-links a:hover{color:var(--ink)}
-.nav-cta{
-  font-family:'JetBrains Mono',monospace;
-  font-size:11px;letter-spacing:2px;
-  padding:8px 18px;
-  background:transparent;
-  border:1px solid var(--accent);
-  color:var(--accent);
-  text-decoration:none;
-  transition:all .2s;
-}
-.nav-cta:hover{background:var(--accent);color:#000}
-
-/* ── HERO ── */
-#hero{
-  min-height:100vh;
-  display:flex;flex-direction:column;
-  justify-content:center;
-  padding:120px clamp(20px,5vw,80px) 80px;
-}
-.hero-eyebrow{
-  font-size:11px;color:var(--accent);letter-spacing:4px;
-  margin-bottom:24px;display:flex;align-items:center;gap:12px;
-}
-.hero-eyebrow::before{content:'';width:32px;height:1px;background:var(--accent)}
-.hero-title{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(44px,8vw,96px);
-  font-weight:800;
-  line-height:.92;
-  letter-spacing:-2px;
-  margin-bottom:24px;
-}
-.hero-title .line1{display:block;color:var(--ink)}
-.hero-title .line2{
-  display:block;
-  background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 50%,var(--accent3) 100%);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.hero-sub{
-  font-size:15px;color:var(--ink2);
-  line-height:1.7;max-width:520px;
-  margin-bottom:40px;font-weight:300;
-}
-.hero-sub strong{color:var(--ink);font-weight:400}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:60px}
-.btn-primary{
-  font-family:'JetBrains Mono',monospace;
-  font-size:12px;letter-spacing:2px;
-  padding:14px 28px;
-  background:var(--accent);color:#000;font-weight:600;
-  text-decoration:none;border:none;cursor:pointer;
-  transition:all .2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
-}
-.btn-primary:hover{background:#60a5fa;transform:translateY(-2px)}
-.btn-secondary{
-  font-family:'JetBrains Mono',monospace;
-  font-size:12px;letter-spacing:2px;
-  padding:14px 28px;
-  background:transparent;color:var(--ink2);
-  border:1px solid var(--border2);
-  text-decoration:none;cursor:pointer;
-  transition:all .2s;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
-}
-.btn-secondary:hover{border-color:var(--ink2);color:var(--ink)}
-
-/* ── HERO STATS ── */
-.hero-stats{
-  display:flex;gap:0;
-  border-top:1px solid var(--border);
-  padding-top:40px;
-}
-.stat{
-  flex:1;padding-right:32px;
-  border-right:1px solid var(--border);
-  margin-right:32px;
-}
-.stat:last-child{border:none;margin:0}
-.stat-num{
-  font-family:'Syne',sans-serif;
-  font-size:36px;font-weight:800;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.stat-lbl{font-size:11px;color:var(--ink3);letter-spacing:2px;margin-top:4px}
-
-/* ── SECTION COMMON ── */
-.section{
-  padding:clamp(60px,8vh,120px) clamp(20px,5vw,80px);
-  max-width:1280px;margin:0 auto;
-}
-.sec-label{
-  font-size:10px;color:var(--accent);letter-spacing:5px;
-  display:flex;align-items:center;gap:12px;
-  margin-bottom:48px;text-transform:uppercase;
-}
-.sec-label::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
-.sec-title{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(28px,4vw,48px);
-  font-weight:800;letter-spacing:-1px;
-  color:var(--ink);margin-bottom:12px;
-}
-.sec-desc{
-  font-size:13px;color:var(--ink2);
-  line-height:1.7;max-width:560px;
-  margin-bottom:48px;font-weight:300;
+:root {
+  --bg: #0d0d18;
+  --surface: #13131f;
+  --surface2: #1a1a2e;
+  --border: #2a2a3e;
+  --border2: #3a3a52;
+  --ink: #e2e8f0;
+  --muted: #6b7280;
+  --accent: #e63946;
+  --accent2: #2196f3;
+  --accent3: #06d6a0;
+  --accent4: #ffd166;
+  --pur: #c084fc;
+  --built-glow: rgba(6, 214, 160, 0.12);
+  --soon-bg: rgba(255, 255, 255, 0.02);
 }
 
-/* ── ALGORITHM GRID ── */
-.algo-categories{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
-  gap:1px;
-  background:var(--border);
-  border:1px solid var(--border);
-  margin-bottom:32px;
-}
-.algo-cat{
-  background:var(--bg2);
-  padding:20px 18px;
-  cursor:pointer;
-  transition:background .2s;
-  position:relative;overflow:hidden;
-}
-.algo-cat::before{
-  content:'';position:absolute;top:0;left:0;
-  width:0;height:2px;
-  background:linear-gradient(90deg,var(--accent),var(--accent2));
-  transition:width .3s;
-}
-.algo-cat:hover{background:var(--bg3)}
-.algo-cat:hover::before{width:100%}
-.cat-num{font-size:10px;color:var(--ink3);letter-spacing:2px;margin-bottom:8px}
-.cat-name{font-size:13px;color:var(--ink);font-weight:600;margin-bottom:4px;line-height:1.3}
-.cat-tag{
-  font-size:9px;letter-spacing:1px;padding:2px 7px;
-  border-radius:2px;display:inline-block;margin-top:6px;
-}
-.tag-arrays{background:rgba(59,130,246,.15);color:var(--accent)}
-.tag-graphs{background:rgba(6,182,212,.15);color:var(--accent2)}
-.tag-trees{background:rgba(139,92,246,.15);color:var(--accent3)}
-.tag-dp{background:rgba(16,185,129,.15);color:var(--green)}
-.tag-strings{background:rgba(245,158,11,.15);color:var(--yellow)}
-.tag-math{background:rgba(239,68,68,.15);color:var(--red)}
-.tag-geo{background:rgba(16,185,129,.15);color:var(--green)}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* featured row */
-.featured-grid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:16px;margin-bottom:16px;
-}
-@media(max-width:768px){.featured-grid{grid-template-columns:1fr}}
-.feat-card{
-  background:var(--bg2);
-  border:1px solid var(--border);
-  padding:28px 24px;
-  position:relative;overflow:hidden;
-  transition:border-color .25s,transform .25s;
-}
-.feat-card:hover{border-color:var(--border2);transform:translateY(-3px)}
-.feat-card .feat-icon{
-  font-size:28px;margin-bottom:16px;display:block;
-}
-.feat-card .feat-title{
-  font-family:'Syne',sans-serif;
-  font-size:18px;font-weight:700;
-  color:var(--ink);margin-bottom:8px;letter-spacing:-.5px;
-}
-.feat-card .feat-desc{font-size:12px;color:var(--ink2);line-height:1.7;font-weight:300}
-.feat-card .feat-link{
-  display:inline-flex;align-items:center;gap:6px;
-  font-size:11px;color:var(--accent);letter-spacing:1px;
-  margin-top:16px;text-decoration:none;transition:gap .2s;
-}
-.feat-card .feat-link:hover{gap:10px}
-.feat-card.highlight{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.05)}
-.feat-card.highlight::before{
-  content:'';position:absolute;top:0;right:0;
-  width:80px;height:80px;
-  background:radial-gradient(circle,rgba(59,130,246,.15),transparent 70%);
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* ── HOW IT WORKS ── */
-.steps-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
-  gap:24px;
-}
-.step-card{padding:24px 0;border-top:1px solid var(--border);position:relative}
-.step-card::before{
-  content:attr(data-n);
-  font-family:'Syne',sans-serif;
-  font-size:64px;font-weight:800;
-  color:rgba(255,255,255,.04);
-  position:absolute;top:-10px;right:0;
-  line-height:1;
-}
-.step-num-badge{
-  width:28px;height:28px;
-  background:var(--accent);
-  display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:700;color:#000;
-  margin-bottom:16px;
-  clip-path:polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%);
-}
-.step-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:8px}
-.step-desc{font-size:12px;color:var(--ink2);line-height:1.7;font-weight:300}
-
-/* ── FULL ALGO LIST ── */
-.algo-table{width:100%;border-collapse:collapse}
-.algo-table th{
-  text-align:left;font-size:10px;letter-spacing:3px;
-  color:var(--ink3);padding:12px 16px;
-  border-bottom:1px solid var(--border);font-weight:400;
-}
-.algo-table td{
-  padding:12px 16px;font-size:12px;color:var(--ink2);
-  border-bottom:1px solid var(--border);
-  transition:background .15s;
-}
-.algo-table tr:hover td{background:var(--bg3);color:var(--ink)}
-.algo-table td:first-child{color:var(--ink3);font-size:10px;letter-spacing:1px}
-.algo-table td:nth-child(2){color:var(--ink);font-weight:600}
-.algo-table td a{color:inherit;text-decoration:none}
-.complexity{
-  font-size:10px;padding:2px 8px;
-  background:var(--bg3);border:1px solid var(--border);
-  border-radius:2px;letter-spacing:1px;
-  font-family:'JetBrains Mono',monospace;
-}
-.complexity.green{border-color:rgba(16,185,129,.3);color:var(--green)}
-.complexity.yellow{border-color:rgba(245,158,11,.3);color:var(--yellow)}
-.complexity.red{border-color:rgba(239,68,68,.3);color:var(--red)}
-
-/* ── CTA ── */
-#cta{
-  border-top:1px solid var(--border);
-  padding:clamp(80px,10vh,140px) clamp(20px,5vw,80px);
-  text-align:center;
-}
-.cta-title{
-  font-family:'Syne',sans-serif;
-  font-size:clamp(32px,5vw,64px);
-  font-weight:800;letter-spacing:-2px;
-  margin-bottom:16px;
-}
-.cta-sub{font-size:14px;color:var(--ink2);max-width:480px;margin:0 auto 36px;line-height:1.7;font-weight:300}
-.cta-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
-
-/* ── FOOTER ── */
-footer{
-  border-top:1px solid var(--border);
-  padding:24px clamp(20px,5vw,80px);
-  display:flex;justify-content:space-between;align-items:center;
-  flex-wrap:wrap;gap:12px;
-  font-size:11px;color:var(--ink3);
-}
-footer a{color:var(--ink3);text-decoration:none;transition:color .2s}
-footer a:hover{color:var(--accent)}
-.footer-links{display:flex;gap:20px}
-
-/* ── DIVIDER ── */
-.glow-divider{
-  width:100%;height:1px;
-  background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);
-  opacity:.3;margin:0;
+/* NOISE OVERLAY */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
 }
 
-/* ── REVEAL ── */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
-.reveal.visible{opacity:1;transform:translateY(0)}
+/* ── HERO ─────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  padding: 80px 40px 60px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
 
-/* ── RESPONSIVE ── */
+.hero-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,209,102,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,209,102,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.hero-glow {
+  position: absolute;
+  top: -80px; left: 50%;
+  transform: translateX(-50%);
+  width: 600px; height: 300px;
+  background: radial-gradient(ellipse at center, rgba(255,209,102,.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hero-eyebrow {
+  font-family: 'Space Mono', monospace;
+  font-size: .62rem;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent4);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 28px; height: 1px;
+  background: var(--accent4);
+}
+
+.hero-title {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -3px;
+  margin-bottom: 20px;
+  color: var(--ink);
+}
+
+.hero-title span { color: var(--accent4); }
+
+.hero-sub {
+  font-size: 1.05rem;
+  color: var(--muted);
+  max-width: 560px;
+  line-height: 1.7;
+  margin-bottom: 36px;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.stat-num.sn-green { color: var(--accent3); }
+.stat-num.sn-gold  { color: var(--accent4); }
+
+.stat-label {
+  font-size: .72rem;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-family: 'Space Mono', monospace;
+}
+
+/* ── CONTROLS ─────────────────────────────────────────────────────────── */
+.controls-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(13,13,24,.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 40px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.search-wrap::before {
+  content: '⌕';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+
+#searchInput {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 8px 12px 8px 36px;
+  font-family: 'Space Mono', monospace;
+  font-size: .75rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color .2s;
+}
+
+#searchInput:focus { border-color: var(--accent4); }
+#searchInput::placeholder { color: var(--muted); }
+
+.filter-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fbtn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  font-size: .62rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+}
+.fbtn:hover { border-color: var(--accent4); color: var(--accent4); }
+.fbtn.active { background: var(--accent4); border-color: var(--accent4); color: #1a1a00; }
+.fbtn.fa-built.active { background: var(--accent3); border-color: var(--accent3); color: #001a10; }
+
+.results-count {
+  font-family: 'Space Mono', monospace;
+  font-size: .6rem;
+  color: var(--muted);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ── MAIN CONTENT ────────────────────────────────────────────────────── */
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 40px 80px;
+}
+
+/* ── SECTION ─────────────────────────────────────────────────────────── */
+.cat-section {
+  margin-bottom: 52px;
+}
+
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cat-num {
+  font-family: 'Space Mono', monospace;
+  font-size: .58rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.cat-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+}
+
+.cat-badge {
+  font-family: 'Space Mono', monospace;
+  font-size: .55rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+.cb-partial { background: rgba(255,209,102,.1); border: 1px solid rgba(255,209,102,.3); color: var(--accent4); }
+.cb-full    { background: rgba(6,214,160,.1);   border: 1px solid rgba(6,214,160,.3);   color: var(--accent3); }
+.cb-none    { background: rgba(107,114,128,.08); border: 1px solid rgba(107,114,128,.2); color: var(--muted); }
+
+/* ── CARDS GRID ──────────────────────────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+/* BASE CARD */
+.card {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  transition: all .2s;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* BUILT CARD */
+.card.built {
+  background: var(--built-glow);
+  border-color: rgba(6, 214, 160, .2);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.card.built:hover {
+  border-color: var(--accent3);
+  background: rgba(6, 214, 160, .16);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(6,214,160,.12);
+}
+
+.card.built::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--accent3);
+  border-radius: 8px 0 0 8px;
+}
+
+/* COMING SOON CARD */
+.card.soon {
+  background: var(--soon-bg);
+  border-color: var(--border);
+  cursor: default;
+  opacity: .55;
+}
+
+.card.soon:hover { opacity: .7; }
+
+/* CARD INTERNALS */
+.card-name {
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+
+.card.built .card-name { color: #a7f3d0; }
+.card.soon  .card-name { color: var(--muted); }
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.card-tag {
+  font-family: 'Space Mono', monospace;
+  font-size: .5rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.tag-built { background: rgba(6,214,160,.15); color: var(--accent3); border: 1px solid rgba(6,214,160,.25); }
+.tag-soon  { background: rgba(107,114,128,.1); color: #4b5563; border: 1px solid rgba(107,114,128,.15); }
+
+.card-arrow {
+  font-size: .8rem;
+  color: var(--accent3);
+  transition: transform .2s;
+}
+.card.built:hover .card-arrow { transform: translateX(3px); }
+
+/* ── FEATURED STRIP ──────────────────────────────────────────────────── */
+.featured-section {
+  margin-bottom: 56px;
+}
+
+.featured-title {
+  font-family: 'Space Mono', monospace;
+  font-size: .62rem;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent4);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.featured-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.feat-card {
+  display: block;
+  background: linear-gradient(135deg, rgba(6,214,160,.08) 0%, rgba(33,150,243,.06) 100%);
+  border: 1px solid rgba(6,214,160,.25);
+  border-radius: 10px;
+  padding: 18px 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: all .2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.feat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, var(--accent3), var(--accent2));
+}
+
+.feat-card:hover {
+  border-color: var(--accent3);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(6,214,160,.15);
+}
+
+.feat-cat {
+  font-family: 'Space Mono', monospace;
+  font-size: .52rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent3);
+  margin-bottom: 6px;
+}
+
+.feat-name {
+  font-family: 'Space Mono', monospace;
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.feat-desc {
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── EMPTY STATE ─────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  display: none;
+}
+.empty-state.show { display: block; }
+.empty-state p {
+  font-family: 'Space Mono', monospace;
+  font-size: .9rem;
+  color: var(--muted);
+  margin-top: 12px;
+}
+
+/* ── FOOTER ──────────────────────────────────────────────────────────── */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-brand {
+  font-family: 'Space Mono', monospace;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+
+.footer-brand span { color: var(--accent4); }
+
+.footer-note {
+  font-family: 'Space Mono', monospace;
+  font-size: .58rem;
+  color: #374151;
+  letter-spacing: 1px;
+}
+
+/* ── HIDDEN ──────────────────────────────────────────────────────────── */
+.cat-section.hidden { display: none; }
+.card.hidden { display: none; }
+
+/* ── SCROLL TO TOP ────────────────────────────────────────────────────── */
+.scroll-top {
+  position: fixed;
+  bottom: 28px; right: 28px;
+  width: 40px; height: 40px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 1rem;
+  transition: all .2s;
+  opacity: 0; pointer-events: none;
+}
+.scroll-top.visible { opacity: 1; pointer-events: all; }
+.scroll-top:hover { border-color: var(--accent4); color: var(--accent4); }
+
 @media(max-width:640px){
-  .hero-stats{flex-direction:column;gap:20px}
-  .stat{border:none;margin:0;padding:0;border-bottom:1px solid var(--border);padding-bottom:20px}
-  .stat:last-child{border:none;padding:0}
-  .nav-links{display:none}
+  .hero { padding: 48px 20px 40px; }
+  .controls-bar { padding: 12px 20px; }
+  .main-content { padding: 28px 20px 60px; }
+  .footer { padding: 20px; }
+  .hero-title { letter-spacing: -1px; }
 }
 </style>
 </head>
 <body>
 
-<div id="cur"></div>
-<div id="cur-trail"></div>
-<canvas id="bg-canvas"></canvas>
-
-<!-- NAV -->
-<nav id="nav">
-  <div class="nav-logo">GBMvisuAL</div>
-  <ul class="nav-links">
-    <li><a href="#algorithms">Algorithms</a></li>
-    <li><a href="#how">How it works</a></li>
-    <li><a href="#reference">Reference</a></li>
-  </ul>
-  <a class="nav-cta" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">VIEW SOURCE</a>
-</nav>
-
-<div id="page">
-
 <!-- HERO -->
-<section id="hero">
-  <div class="hero-eyebrow">ALGORITHM VISUALIZER</div>
-  <h1 class="hero-title">
-    <span class="line1">See every</span>
-    <span class="line2">algorithm think.</span>
-  </h1>
-  <p class="hero-sub">
-    <strong>47 DSA algorithms</strong> — visualized, step by step.
-    From Two Pointers to Suffix Arrays, Convex Hull to Aho-Corasick.
-    Built to make the invisible logic visible.
-  </p>
-  <div class="hero-actions">
-    <a class="btn-primary" href="#algorithms">EXPLORE ALGORITHMS</a>
-    <a class="btn-secondary" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">GITHUB REPO ↗</a>
+<header class="hero">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">GBMvisuAL · Algorithm Visualizers</div>
+    <h1 class="hero-title">Learn Algorithms<br><span>Visually.</span></h1>
+    <p class="hero-sub">
+      Interactive step-by-step visualizers for every major algorithm and data structure.
+      Watch code execute in real time — from Two Pointers to Heavy-Light Decomposition.
+    </p>
+    <div class="hero-stats">
+      <div class="stat">
+        <span class="stat-num" id="statTotal">470</span>
+        <span class="stat-label">Total Problems</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num sn-green" id="statBuilt">0</span>
+        <span class="stat-label">Live Visualizers</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num sn-gold">47</span>
+        <span class="stat-label">Categories</span>
+      </div>
+    </div>
   </div>
-  <div class="hero-stats">
-    <div class="stat"><div class="stat-num">47</div><div class="stat-lbl">ALGORITHMS</div></div>
-    <div class="stat"><div class="stat-num">9</div><div class="stat-lbl">CATEGORIES</div></div>
-    <div class="stat"><div class="stat-num">100%</div><div class="stat-lbl">CLIENT SIDE</div></div>
-    <div class="stat"><div class="stat-num">0</div><div class="stat-lbl">DEPENDENCIES</div></div>
+</header>
+
+<!-- STICKY CONTROLS -->
+<div class="controls-bar">
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Search algorithms…" autocomplete="off">
   </div>
-</section>
+  <div class="filter-btns">
+    <button class="fbtn active" data-filter="all">All</button>
+    <button class="fbtn fa-built" data-filter="built">✓ Live</button>
+    <button class="fbtn" data-filter="soon">Coming Soon</button>
+  </div>
+  <div class="results-count" id="resultsCount"></div>
+</div>
 
-<div class="glow-divider"></div>
+<!-- MAIN -->
+<main class="main-content">
 
-<!-- FEATURED -->
-<div class="section reveal" id="algorithms">
-  <div class="sec-label"><span>01</span> Highlights</div>
-  <h2 class="sec-title">Core algorithm families</h2>
-  <p class="sec-desc">Every visualization runs in your browser — no backend, no installs. Step through each algorithm at your own pace.</p>
-
+<!-- ── FEATURED (hand-picked highlights) ─────────────────────────── -->
+<section class="featured-section" id="featuredSection">
+  <div class="featured-title">Featured Visualizers</div>
   <div class="featured-grid">
-    <div class="feat-card highlight">
-      <span class="feat-icon">⟶</span>
-      <div class="feat-title">Arrays & Searching</div>
-      <p class="feat-desc">Two Pointers, Sliding Window, Binary Search — the foundation of interview prep, visualized with live pointer movement and window highlighting.</p>
-      <a class="feat-link" href="./01-Two-Pointer/">Explore →</a>
-    </div>
-    <div class="feat-card">
-      <span class="feat-icon">◈</span>
-      <div class="feat-title">Graphs & Trees</div>
-      <p class="feat-desc">DFS, BFS, Dijkstra, MST, SCC, Topological Sort — watch the frontier expand node by node through animated graph traversals.</p>
-      <a class="feat-link" href="./04-DFS/">Explore →</a>
-    </div>
-    <div class="feat-card">
-      <span class="feat-icon">▦</span>
-      <div class="feat-title">Dynamic Programming</div>
-      <p class="feat-desc">Classic DP, Bitmask DP, Divide & Conquer DP, Knuth Optimization — see the table fill cell by cell with dependency highlighting.</p>
-      <a class="feat-link" href="./06-Dynamic-Programming/">Explore →</a>
-    </div>
-  </div>
-</div>
-
-<!-- ALGO GRID -->
-<div class="section reveal">
-  <div class="sec-label"><span>02</span> All Topics</div>
-  <h2 class="sec-title">Every algorithm, organized</h2>
-  <p class="sec-desc">Click any card to jump straight to its visualization.</p>
-
-  <div class="algo-categories">
-    <div class="algo-cat" onclick="location.href='./01-Two-Pointer/'">
-      <div class="cat-num">01</div><div class="cat-name">Two Pointer</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./02-Sliding-Window/'">
-      <div class="cat-num">02</div><div class="cat-name">Sliding Window</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./03-Binary-Search/'">
-      <div class="cat-num">03</div><div class="cat-name">Binary Search</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./04-DFS/'">
-      <div class="cat-num">04</div><div class="cat-name">DFS</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./05-BFS/'">
-      <div class="cat-num">05</div><div class="cat-name">BFS</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./06-Dynamic-Programming/'">
-      <div class="cat-num">06</div><div class="cat-name">Dynamic Programming</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./07-Greedy/'">
-      <div class="cat-num">07</div><div class="cat-name">Greedy</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./08-Divide-and-Conquer/'">
-      <div class="cat-num">08</div><div class="cat-name">Divide & Conquer</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./09-Stack/'">
-      <div class="cat-num">09</div><div class="cat-name">Stack</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./10-Queue/'">
-      <div class="cat-num">10</div><div class="cat-name">Queue</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./11-Deque/'">
-      <div class="cat-num">11</div><div class="cat-name">Deque</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./12-Heap-Priority-Queue/'">
-      <div class="cat-num">12</div><div class="cat-name">Heap / Priority Queue</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./13-Hashing/'">
-      <div class="cat-num">13</div><div class="cat-name">Hashing</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./14-Union-Find-DSU/'">
-      <div class="cat-num">14</div><div class="cat-name">Union Find / DSU</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./15-Segment-Tree/'">
-      <div class="cat-num">15</div><div class="cat-name">Segment Tree</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./16-Fenwick-Tree-BIT/'">
-      <div class="cat-num">16</div><div class="cat-name">Fenwick Tree (BIT)</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./17-Trie/'">
-      <div class="cat-num">17</div><div class="cat-name">Trie</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./18-Bit-Manipulation/'">
-      <div class="cat-num">18</div><div class="cat-name">Bit Manipulation</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./19-Bitmask-DP/'">
-      <div class="cat-num">19</div><div class="cat-name">Bitmask DP</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./20-Topological-Sort/'">
-      <div class="cat-num">20</div><div class="cat-name">Topological Sort</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./21-Shortest-Path/'">
-      <div class="cat-num">21</div><div class="cat-name">Shortest Path</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./22-MST/'">
-      <div class="cat-num">22</div><div class="cat-name">MST</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./23-SCC/'">
-      <div class="cat-num">23</div><div class="cat-name">SCC</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./24-Network-Flow/'">
-      <div class="cat-num">24</div><div class="cat-name">Network Flow</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./25-Bipartite-Matching/'">
-      <div class="cat-num">25</div><div class="cat-name">Bipartite Matching</div><span class="cat-tag tag-graphs">Graphs</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./26-Sparse-Table-RMQ/'">
-      <div class="cat-num">26</div><div class="cat-name">Sparse Table / RMQ</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./27-Heavy-Light-Decomposition/'">
-      <div class="cat-num">27</div><div class="cat-name">Heavy Light Decomp.</div><span class="cat-tag tag-trees">Trees</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./28-Mos-Algorithm/'">
-      <div class="cat-num">28</div><div class="cat-name">Mo's Algorithm</div><span class="cat-tag tag-arrays">Arrays</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./29-KMP/'">
-      <div class="cat-num">29</div><div class="cat-name">KMP</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./30-Z-Algorithm/'">
-      <div class="cat-num">30</div><div class="cat-name">Z Algorithm</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./31-Rabin-Karp/'">
-      <div class="cat-num">31</div><div class="cat-name">Rabin-Karp</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./32-Aho-Corasick/'">
-      <div class="cat-num">32</div><div class="cat-name">Aho-Corasick</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./33-Suffix-Array/'">
-      <div class="cat-num">33</div><div class="cat-name">Suffix Array</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./34-Manachers-Algorithm/'">
-      <div class="cat-num">34</div><div class="cat-name">Manacher's Algorithm</div><span class="cat-tag tag-strings">Strings</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./35-Convex-Hull-Trick/'">
-      <div class="cat-num">35</div><div class="cat-name">Convex Hull Trick</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./36-Divide-Conquer-DP/'">
-      <div class="cat-num">36</div><div class="cat-name">Divide & Conquer DP</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./37-Knuth-Optimization/'">
-      <div class="cat-num">37</div><div class="cat-name">Knuth Optimization</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./38-Sieve-of-Eratosthenes/'">
-      <div class="cat-num">38</div><div class="cat-name">Sieve of Eratosthenes</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./39-Binary-Exponentiation/'">
-      <div class="cat-num">39</div><div class="cat-name">Binary Exponentiation</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./40-Modular-Arithmetic/'">
-      <div class="cat-num">40</div><div class="cat-name">Modular Arithmetic</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./41-Chinese-Remainder-Theorem/'">
-      <div class="cat-num">41</div><div class="cat-name">Chinese Remainder Thm.</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./42-Combinatorics/'">
-      <div class="cat-num">42</div><div class="cat-name">Combinatorics</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./43-Matrix-Exponentiation/'">
-      <div class="cat-num">43</div><div class="cat-name">Matrix Exponentiation</div><span class="cat-tag tag-math">Math</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./44-Convex-Hull-Geometry/'">
-      <div class="cat-num">44</div><div class="cat-name">Convex Hull Geometry</div><span class="cat-tag tag-geo">Geometry</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./45-Line-Sweep/'">
-      <div class="cat-num">45</div><div class="cat-name">Line Sweep</div><span class="cat-tag tag-geo">Geometry</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./46-Meet-in-the-Middle/'">
-      <div class="cat-num">46</div><div class="cat-name">Meet in the Middle</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-    <div class="algo-cat" onclick="location.href='./47-Backtracking-Bitmask-GameTheory/'">
-      <div class="cat-num">47</div><div class="cat-name">Backtracking & Game Theory</div><span class="cat-tag tag-dp">DP</span>
-    </div>
-  </div>
-</div>
-
-<!-- HOW IT WORKS -->
-<div class="section reveal" id="how">
-  <div class="sec-label"><span>03</span> How it works</div>
-  <h2 class="sec-title">Built different.</h2>
-  <p class="sec-desc">Pure HTML, CSS, and JavaScript. No frameworks, no dependencies. Every visualization runs entirely in the browser.</p>
-
-  <div class="steps-grid">
-    <div class="step-card" data-n="1">
-      <div class="step-num-badge">1</div>
-      <div class="step-title">Pick an algorithm</div>
-      <p class="step-desc">Choose from 47 algorithms across 9 categories — arrays, graphs, DP, strings, trees, math and geometry.</p>
-    </div>
-    <div class="step-card" data-n="2">
-      <div class="step-num-badge">2</div>
-      <div class="step-title">Set your input</div>
-      <p class="step-desc">Enter custom inputs or use presets. Each visualizer accepts real data so you can test your own cases.</p>
-    </div>
-    <div class="step-card" data-n="3">
-      <div class="step-num-badge">3</div>
-      <div class="step-title">Step through it</div>
-      <p class="step-desc">Use play, pause, and step controls. Watch pointers move, tables fill, trees expand — one operation at a time.</p>
-    </div>
-    <div class="step-card" data-n="4">
-      <div class="step-num-badge">4</div>
-      <div class="step-title">Read the code</div>
-      <p class="step-desc">Each visualization ships with annotated source code. The logic highlighted in sync with the animation.</p>
-    </div>
-  </div>
-</div>
-
-<!-- QUICK REFERENCE TABLE -->
-<div class="section reveal" id="reference">
-  <div class="sec-label"><span>04</span> Quick Reference</div>
-  <h2 class="sec-title">Complexity at a glance</h2>
-  <p class="sec-desc">Common complexities for each algorithm family.</p>
-
-  <table class="algo-table">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Algorithm</th>
-        <th>Time</th>
-        <th>Space</th>
-        <th>Category</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>01</td><td>Two Pointer</td><td><span class="complexity green">O(n)</span></td><td><span class="complexity green">O(1)</span></td><td>Arrays</td></tr>
-      <tr><td>02</td><td>Sliding Window</td><td><span class="complexity green">O(n)</span></td><td><span class="complexity green">O(k)</span></td><td>Arrays</td></tr>
-      <tr><td>03</td><td>Binary Search</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity green">O(1)</span></td><td>Arrays</td></tr>
-      <tr><td>04</td><td>DFS</td><td><span class="complexity yellow">O(V+E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
-      <tr><td>05</td><td>BFS</td><td><span class="complexity yellow">O(V+E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
-      <tr><td>06</td><td>Dynamic Programming</td><td><span class="complexity yellow">O(n²)</span></td><td><span class="complexity yellow">O(n)</span></td><td>DP</td></tr>
-      <tr><td>12</td><td>Heap / Priority Queue</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Trees</td></tr>
-      <tr><td>14</td><td>Union Find (DSU)</td><td><span class="complexity green">O(α(n))</span></td><td><span class="complexity yellow">O(n)</span></td><td>Graphs</td></tr>
-      <tr><td>15</td><td>Segment Tree</td><td><span class="complexity green">O(log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Trees</td></tr>
-      <tr><td>21</td><td>Dijkstra</td><td><span class="complexity yellow">O(E log V)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
-      <tr><td>22</td><td>Kruskal / Prim MST</td><td><span class="complexity yellow">O(E log E)</span></td><td><span class="complexity yellow">O(V)</span></td><td>Graphs</td></tr>
-      <tr><td>29</td><td>KMP</td><td><span class="complexity green">O(n+m)</span></td><td><span class="complexity green">O(m)</span></td><td>Strings</td></tr>
-      <tr><td>32</td><td>Aho-Corasick</td><td><span class="complexity yellow">O(n+m)</span></td><td><span class="complexity yellow">O(m·Σ)</span></td><td>Strings</td></tr>
-      <tr><td>38</td><td>Sieve of Eratosthenes</td><td><span class="complexity yellow">O(n log log n)</span></td><td><span class="complexity yellow">O(n)</span></td><td>Math</td></tr>
-      <tr><td>43</td><td>Matrix Exponentiation</td><td><span class="complexity red">O(k³ log n)</span></td><td><span class="complexity yellow">O(k²)</span></td><td>Math</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<!-- CTA -->
-<section id="cta">
-  <h2 class="cta-title reveal">Start visualizing.</h2>
-  <p class="cta-sub reveal">47 algorithms. Zero setup. Open the repo, pick a topic, and watch the logic unfold.</p>
-  <div class="cta-actions reveal">
-    <a class="btn-primary" href="#algorithms">BROWSE ALL 47 →</a>
-    <a class="btn-secondary" href="https://github.com/Surya97141/GBMvisuAL" target="_blank">STAR ON GITHUB</a>
+    <a href="48_GBMfamousalgorithms/09_GBMa_star.html" class="feat-card">
+      <div class="feat-cat">Shortest Path</div>
+      <div class="feat-name">A* Algorithm</div>
+      <div class="feat-desc">f=g+h heuristic search with live grid, open set heap, path reconstruction</div>
+    </a>
+    <a href="48_GBMfamousalgorithms/08_GBM_knuth_morris_pratt.html" class="feat-card">
+      <div class="feat-cat">Strings</div>
+      <div class="feat-name">KMP Algorithm</div>
+      <div class="feat-desc">Failure function build + search with smart jump arcs, no backtracking</div>
+    </a>
+    <a href="GBMgraphs/09GBMBoggleBoard.html" class="feat-card">
+      <div class="feat-cat">Trie · DFS</div>
+      <div class="feat-name">Boggle Board</div>
+      <div class="feat-desc">Trie + 8-directional DFS with path tracing, prefix pruning, word pop animation</div>
+    </a>
+    <a href="GBMgraphs/08GBMcycleingraph.html" class="feat-card">
+      <div class="feat-cat">Graph · DFS</div>
+      <div class="feat-name">Cycle In Graph</div>
+      <div class="feat-desc">3-color DFS (WHITE/GREY/BLACK), back-edge detection, recursion stack strip</div>
+    </a>
+    <a href="48_GBMfamousalgorithms/01_kadane.html" class="feat-card">
+      <div class="feat-cat">Arrays · DP</div>
+      <div class="feat-name">Kadane's Algorithm</div>
+      <div class="feat-desc">Max subarray with bar chart, extend-vs-reset decision, arc overlay</div>
+    </a>
+    <a href="GBMgraphs/10GBMRectangleMania.html" class="feat-card">
+      <div class="feat-cat">Geometry · Hashing</div>
+      <div class="feat-name">Rectangle Mania</div>
+      <div class="feat-desc">Cartesian canvas, diagonal-pair scanning, O(n²) hash set lookup</div>
+    </a>
   </div>
 </section>
+
+<div class="empty-state" id="emptyState">
+  <div style="font-size:2.5rem">🔍</div>
+  <p>No algorithms match your search.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     CATEGORIES — generated from file tree
+     Each .card.built links to the actual file.
+     Each .card.soon has no href.
+═══════════════════════════════════════════════════════════════════ -->
+
+<!-- 01 TWO POINTER -->
+<section class="cat-section" data-cat="Two Pointer">
+  <div class="cat-header">
+    <span class="cat-num">01</span>
+    <span class="cat-title">Two Pointer</span>
+    <span class="cat-badge cb-partial">1 / 11 live</span>
+  </div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Pair with Target Sum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Two Balances Cancel</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Triplet Sum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Three Debts Net Zero</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Container with Most Water</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Remove Duplicates In-Place</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Palindrome Check</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Partition Around Pivot</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Merge Two Sorted Arrays</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Subarray with Given Sum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <a href="01-Two-Pointer/11_Dutch_National_Flag.html" class="card built">
+      <div class="card-name">Dutch National Flag</div>
+      <div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div>
+    </a>
+  </div>
+</section>
+
+<!-- 02 SLIDING WINDOW -->
+<section class="cat-section" data-cat="Sliding Window">
+  <div class="cat-header">
+    <span class="cat-num">02</span>
+    <span class="cat-title">Sliding Window</span>
+    <span class="cat-badge cb-full">10 / 10 live</span>
+  </div>
+  <div class="cards-grid">
+    <a href="02-Sliding-Window/01_fixed-window-max-min.html" class="card built"><div class="card-name">Fixed Window Max/Min</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/02_best-k-day-stock-average.html" class="card built"><div class="card-name">Best K-Day Stock Average</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/03_variable-window-condition.html" class="card built"><div class="card-name">Variable Window Condition</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/04_smallest-subarray-sum-geq-x.html" class="card built"><div class="card-name">Smallest Subarray Sum ≥ X</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/05_longest-subarray-constraint.html" class="card built"><div class="card-name">Longest Subarray with Constraint</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/06_at-most-k-distinct.html" class="card built"><div class="card-name">At Most K Distinct</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/07_count-valid-subarrays.html" class="card built"><div class="card-name">Count Valid Subarrays</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/08_string-anagram-detection.html" class="card built"><div class="card-name">String Anagram Detection</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/09_max-sum-subarray-size-k.html" class="card built"><div class="card-name">Max Sum Subarray Size K</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="02-Sliding-Window/10_minimum-window-substring.html" class="card built"><div class="card-name">Minimum Window Substring</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+  </div>
+</section>
+
+<!-- 03 BINARY SEARCH -->
+<section class="cat-section" data-cat="Binary Search">
+  <div class="cat-header">
+    <span class="cat-num">03</span>
+    <span class="cat-title">Binary Search</span>
+    <span class="cat-badge cb-partial">9 / 10 live</span>
+  </div>
+  <div class="cards-grid">
+    <a href="03-Binary-Search/01_classic-search.html" class="card built"><div class="card-name">Classic Binary Search</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/02_lower-upper-bound.html" class="card built"><div class="card-name">Lower / Upper Bound</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/03_search-on-answer.html" class="card built"><div class="card-name">Search on Answer</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <div class="card soon"><div class="card-name">Peak Element Finder</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <a href="03-Binary-Search/05_rotated-sorted-array.html" class="card built"><div class="card-name">Rotated Sorted Array</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/06_matrix-binary-search.html" class="card built"><div class="card-name">Matrix Binary Search</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/07_minimum-in-rotated-array.html" class="card built"><div class="card-name">Minimum in Rotated Array</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/08_capacity-feasibility-check.html" class="card built"><div class="card-name">Capacity Feasibility Check</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/09_kth-smallest-sorted-matrix.html" class="card built"><div class="card-name">Kth Smallest in Sorted Matrix</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="03-Binary-Search/10_weighted-job-scheduling.html" class="card built"><div class="card-name">Weighted Job Scheduling</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+  </div>
+</section>
+
+<!-- 04 DFS -->
+<section class="cat-section" data-cat="DFS">
+  <div class="cat-header">
+    <span class="cat-num">04</span>
+    <span class="cat-title">Depth-First Search</span>
+    <span class="cat-badge cb-partial">7 / 10 live</span>
+  </div>
+  <div class="cards-grid">
+    <a href="04-DFS/01_connected-components.html" class="card built"><div class="card-name">Connected Components</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/02_cycle-detection.html" class="card built"><div class="card-name">Cycle Detection</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/03_path-existence.html" class="card built"><div class="card-name">Path Existence</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/04_tree-traversal.html" class="card built"><div class="card-name">Tree Traversal (DFS)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/05_flood-fill.html" class="card built"><div class="card-name">Flood Fill</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/06_island-counting.html" class="card built"><div class="card-name">Island Counting</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="04-DFS/07_topological-ordering.html" class="card built"><div class="card-name">Topological Ordering</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <div class="card soon"><div class="card-name">Strongly Connected Components</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Subtree Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Maze Solving</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 05 BFS -->
+<section class="cat-section" data-cat="BFS">
+  <div class="cat-header">
+    <span class="cat-num">05</span>
+    <span class="cat-title">Breadth-First Search</span>
+    <span class="cat-badge cb-none">0 / 10 live</span>
+  </div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Shortest Path (Unweighted)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Level-Order Traversal</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Multi-Source BFS</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">0-1 BFS</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Shortest Path in Grid</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Word Ladder</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Bipartite Check</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Min Steps to Reach State</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Nearest Cell Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Cycle Detection (Undirected)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 06 DYNAMIC PROGRAMMING -->
+<section class="cat-section" data-cat="Dynamic Programming">
+  <div class="cat-header">
+    <span class="cat-num">06</span>
+    <span class="cat-title">Dynamic Programming</span>
+    <span class="cat-badge cb-partial">10 / 19 live</span>
+  </div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">1D DP Fundamentals</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">2D Grid DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <a href="06-Dynamic-Programming/03_knapsack-01.html" class="card built"><div class="card-name">0/1 Knapsack</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <div class="card soon"><div class="card-name">Unbounded Knapsack</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Interval DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">String DP (LCS / Edit Dist.)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Bitmask DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Tree DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Digit DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Probability DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <a href="06-Dynamic-Programming/11_GBMMaximumSumSubmatrix.html" class="card built"><div class="card-name">Maximum Sum Submatrix</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/12_GBMMaximizeExpression.html" class="card built"><div class="card-name">Maximize Expression</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/13_GBMdicethrows.html" class="card built"><div class="card-name">Dice Throws</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/14_GBMJuiceBottling.html" class="card built"><div class="card-name">Juice Bottling</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/15_GBMmaxprofitwithktransactions.html" class="card built"><div class="card-name">Max Profit with K Transactions</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/16_GBMpartitionpalindromemincuts.html" class="card built"><div class="card-name">Palindrome Min Cuts</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <div class="card soon"><div class="card-name">Longest Increasing Subsequence</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <a href="06-Dynamic-Programming/18_GBMlongeststringchain.html" class="card built"><div class="card-name">Longest String Chain</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="06-Dynamic-Programming/19_GBMsquaresofzeroes.html" class="card built"><div class="card-name">Squares of Zeroes</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+  </div>
+</section>
+
+<!-- 07–47: ALL COMING SOON (full list) -->
+<section class="cat-section" data-cat="Greedy">
+  <div class="cat-header"><span class="cat-num">07</span><span class="cat-title">Greedy</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Interval Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Activity Selection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Fractional Knapsack</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Huffman Encoding</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Job Sequencing with Deadlines</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Minimum Platforms</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Gas Station Circular Tour</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Jump Game</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Candy Distribution</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Minimum Coins</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 08 Divide and Conquer -->
+<section class="cat-section" data-cat="Divide and Conquer">
+  <div class="cat-header"><span class="cat-num">08</span><span class="cat-title">Divide and Conquer</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Merge Sort</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Quick Sort</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Count Inversions</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Closest Pair of Points</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Binary Search D&C</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Maximum Subarray D&C</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Strassen Matrix Multiply</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Fast Fourier Transform</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Median of Medians</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Painting Fence Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 09–11 Stack / Queue / Deque — abbreviated for brevity, all soon -->
+<section class="cat-section" data-cat="Stack">
+  <div class="cat-header"><span class="cat-num">09</span><span class="cat-title">Stack</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Balanced Parentheses</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Next Greater Element</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Previous Smaller Element</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Largest Rectangle in Histogram</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Stock Span Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Monotonic Stack</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Expression Evaluation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Asteroid Collision</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Remove K Digits</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Decode Nested Strings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<section class="cat-section" data-cat="Queue">
+  <div class="cat-header"><span class="cat-num">10</span><span class="cat-title">Queue</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">BFS Traversal</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Level-Order Tree Traversal</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Sliding Window Maximum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">First Non-Repeating Character</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Circular Queue</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Task Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Snake and Ladder BFS</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Rotten Oranges</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Zigzag Level Order</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Generate Binary Numbers</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<section class="cat-section" data-cat="Deque">
+  <div class="cat-header"><span class="cat-num">11</span><span class="cat-title">Deque</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Sliding Window Maximum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Sliding Window Minimum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">0-1 BFS (Deque)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Palindrome Check</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Undo-Redo System</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Constrained Subarray</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Jump Game (Deque)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Stock Buy-Sell Cooldown</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Maximum All Subarrays</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Minimum Cost to Reach End</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 12 HEAP -->
+<section class="cat-section" data-cat="Heap Priority Queue">
+  <div class="cat-header"><span class="cat-num">12</span><span class="cat-title">Heap / Priority Queue</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Kth Largest / Smallest</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Merge K Sorted Lists</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Dijkstra (Heap)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Median of Stream</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Task Scheduler</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Top K Frequent Elements</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Min Cost Connect Ropes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Sliding Window Median</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Event-Based Simulation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">A* Pathfinding (Heap)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 13 HASHING -->
+<section class="cat-section" data-cat="Hashing">
+  <div class="cat-header"><span class="cat-num">13</span><span class="cat-title">Hashing</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Two Sum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Frequency Counting</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Subarray Sum Equals K</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Longest Consecutive Sequence</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Group Anagrams</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">First Unique Character</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Isomorphic Strings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Repeated DNA Sequences</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">LRU Cache</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Subarrays Equal 0s and 1s</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 14 UNION FIND -->
+<section class="cat-section" data-cat="Union Find DSU">
+  <div class="cat-header"><span class="cat-num">14</span><span class="cat-title">Union Find / DSU</span><span class="cat-badge cb-none">Coming Soon</span></div>
+  <div class="cards-grid">
+    <div class="card soon"><div class="card-name">Connected Components</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Cycle Detection (Undirected)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Kruskal's MST</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Dynamic Connectivity</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Number of Islands (Online)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Account Merging</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Redundant Connection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Smallest String Swaps</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Path Compression</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+    <div class="card soon"><div class="card-name">Weighted DSU</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div>
+  </div>
+</section>
+
+<!-- 15–47 REMAINING (compressed — all soon) -->
+<section class="cat-section" data-cat="Segment Tree"><div class="cat-header"><span class="cat-num">15</span><span class="cat-title">Segment Tree</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Range Sum Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Min/Max Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Point Update</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Update Point Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Lazy Propagation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range GCD/LCM Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Elements in Range</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Merge Sort Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Persistent Segment Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">2D Segment Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Fenwick Tree BIT"><div class="cat-header"><span class="cat-num">16</span><span class="cat-title">Fenwick Tree / BIT</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Prefix Sum with Updates</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Inversions</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Order Statistics</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Sum Point Update</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">2D Fenwick Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Frequency Table</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Rank Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Binary Lifting on BIT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Offline Inversion Counting</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Update Range Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Trie"><div class="cat-header"><span class="cat-num">17</span><span class="cat-title">Trie</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Word Insertion & Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Prefix Search / Autocomplete</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Word Break Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">XOR Maximization</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Distinct Substrings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Wildcard Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">IP Routing</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Boggle Word Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Replace Words with Roots</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Stream of Characters</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Bit Manipulation"><div class="cat-header"><span class="cat-num">18</span><span class="cat-title">Bit Manipulation</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Check Power of Two</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Set Bits</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Find Single Non-Duplicate</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Swap without Temp</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Turn Off Rightmost Set Bit</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Isolate Rightmost Set Bit</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Subset Generation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Two Non-Repeating Elements</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Reverse Bits</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range XOR Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Bitmask DP"><div class="cat-header"><span class="cat-num">19</span><span class="cat-title">Bitmask DP</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Travelling Salesman (TSP)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Assignment Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Min Cost Visit All Nodes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Broken Profile DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Set Cover DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Hamiltonian Path</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Game with Subset States</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Subsets with Property</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Profile DP on Grid</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum XOR Subset</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Topological Sort"><div class="cat-header"><span class="cat-num">20</span><span class="cat-title">Topological Sort</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Course Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Build System Ordering</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Kahn's Algorithm (BFS)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">DFS-Based Topological Sort</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Cycle Detection (Directed)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Path in DAG</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Alien Dictionary</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Task Dependency Resolution</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Parallel Job Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Recipe Dependency</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Shortest Path"><div class="cat-header"><span class="cat-num">21</span><span class="cat-title">Shortest Path</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Dijkstra's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Bellman-Ford</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Floyd-Warshall</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">0-1 BFS</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Shortest Path in DAG</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Bidirectional Dijkstra</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">A* Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Johnson's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Shortest Path K Stops</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Virtual Node Technique</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="MST"><div class="cat-header"><span class="cat-num">22</span><span class="cat-title">Minimum Spanning Tree</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Kruskal's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Prim's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Min Cost Connect All</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Maximum Spanning Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Min Bottleneck Spanning Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Second Minimum Spanning Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Steiner Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Online MST Updates</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">XOR MST</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Critical / Pseudo-Critical Edges</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="SCC"><div class="cat-header"><span class="cat-num">23</span><span class="cat-title">Strongly Connected Components</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Kosaraju's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Tarjan's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Condensation Graph</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">2-SAT Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Min Nodes to Reach All</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Feedback Vertex Set</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Dominance in Tournaments</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Detect Deadlock (OS)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Reachability Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Strongly Connected Subgraph</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Network Flow"><div class="cat-header"><span class="cat-num">24</span><span class="cat-title">Network Flow</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Maximum Flow</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Cut</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Bipartite Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Project Selection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Circulation with Demands</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Baseball Elimination</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Image Segmentation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Min Path Cover (DAG)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Vertex Capacity Flow</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Multi-Commodity Flow</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Bipartite Matching"><div class="cat-header"><span class="cat-num">25</span><span class="cat-title">Bipartite Matching</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Maximum Bipartite Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Vertex Cover</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Maximum Independent Set</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Stable Marriage Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Assignment Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Hall's Theorem Check</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Edge Coloring (Bipartite)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Edge Cover</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Scheduling Two Machines</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Deficiency Version</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+
+<!-- 26-47: Sparse/HLD/Mo/KMP/Z/RK/Aho/Suffix/Manacher/CHT/DnCDP/Knuth/Sieve/BinExp/ModArith/CRT/Comb/MatExp/ConvexHull/LineSweep/MitM/Backtracking -->
+<section class="cat-section" data-cat="Sparse Table RMQ"><div class="cat-header"><span class="cat-num">26</span><span class="cat-title">Sparse Table / RMQ</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Range Minimum Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Maximum Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range GCD Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">LCA via Sparse Table</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Binary Lifting on Trees</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range AND/OR Query</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Static Array Only</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Offline RMQ</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Cartesian Tree + Sparse Table</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Nearest Smaller Left/Right</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Heavy Light Decomposition"><div class="cat-header"><span class="cat-num">27</span><span class="cat-title">Heavy-Light Decomposition</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Path Sum Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Path Max/Min Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Path Update Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">LCA via HLD</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Subtree Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Edge Queries Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Dynamic Tree Paths</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Centroid Decomposition</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Color Change Paths</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Weighted Tree Path Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Mos Algorithm"><div class="cat-header"><span class="cat-num">28</span><span class="cat-title">Mo's Algorithm</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Offline Range Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Distinct in Range</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Frequency</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">XOR Queries Range</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Most Frequent in Range</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Mo's on Trees</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Mo's with Updates</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Contribution Technique</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Sorting Trick</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Range Palindrome Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="KMP"><div class="cat-header"><span class="cat-num">29</span><span class="cat-title">KMP Algorithm</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Pattern in Text Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Failure Function</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Shortest Period of String</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Occurrences of Pattern</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Palindromic Prefix</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Border Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Lexicographically Smallest Rotation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Repeated String Match</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Compression</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Border Array</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Z Algorithm"><div class="cat-header"><span class="cat-num">30</span><span class="cat-title">Z-Algorithm</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Pattern Search in Text</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Distinct Substrings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Period Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Lexicographically Smallest Rotation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Matching with Wildcards</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindrome Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum String Rotation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Online Pattern Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Border Array Equivalent</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Music Pattern Repetition</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Rabin Karp"><div class="cat-header"><span class="cat-num">31</span><span class="cat-title">Rabin-Karp</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Multiple Pattern Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Common Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Duplicate Substring Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Plagiarism Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">2D Pattern Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Equality O(1)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Anagram Detection Window</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Repeated Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Matching Don't Cares</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Distinct Substrings Count</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Aho Corasick"><div class="cat-header"><span class="cat-num">32</span><span class="cat-title">Aho-Corasick</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Multi-Pattern Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Total Pattern Occurrences</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Virus Signature Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">DNA Motif Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Failure Links (KMP)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Dictionary Matching</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Spam Filter</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Trie BFS Construction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">DP on Automaton States</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Streaming Text Scan</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Suffix Array"><div class="cat-header"><span class="cat-num">33</span><span class="cat-title">Suffix Array</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">All Occurrences of Pattern</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Common Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Longest Repeated Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Distinct Substrings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Lexicographically Kth Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">String Compression</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Burrows-Wheeler Transform</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Suffix Automaton Alternative</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Multiple String LCS</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindrome via Suffix Array</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Manachers Algorithm"><div class="cat-header"><span class="cat-num">34</span><span class="cat-title">Manacher's Algorithm</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Longest Palindromic Substring</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Palindromic Substrings</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindrome Centered Each Index</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Odd Length Palindromes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Even Length Palindromes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindrome Prefix/Suffix</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Split String into Palindromes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Cuts for Palindrome</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindromic Tree (Eertree)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Palindrome Circular String</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Convex Hull Trick"><div class="cat-header"><span class="cat-num">35</span><span class="cat-title">Convex Hull Trick</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">DP Linear Cost Functions</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Cost Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Maximum Cost Queries</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Static CHT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Dynamic CHT / Li Chao Tree</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Online CHT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Batch CHT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">1D Facility Location</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Slope Trick DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Cows Transport Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Divide Conquer DP"><div class="cat-header"><span class="cat-num">36</span><span class="cat-title">Divide &amp; Conquer DP</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Optimal Split Monotonicity</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Partition into K Segments</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Ciel and Gondolas</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Bakery Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Monotone Opt Property</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Speed Up O(n²) DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Knuth Optimization Prereq</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Hiring Cost DP</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">K-Clustering Sorted Array</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimization Template</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Knuth Optimization"><div class="cat-header"><span class="cat-num">37</span><span class="cat-title">Knuth Optimization</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Optimal BST Construction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Matrix Chain Multiplication</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Interval DP Speedup</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Huffman Optimal Merge</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">File Merge Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Stone Merging</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Paragraph Formatting</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Printing Neatly</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Reduce O(n³) to O(n²)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Quadrangle Inequality Check</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Sieve Eratosthenes"><div class="cat-header"><span class="cat-num">38</span><span class="cat-title">Sieve of Eratosthenes</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Find All Primes up to N</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Smallest Prime Factor (SPF)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Euler's Totient Sieve</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Linear Sieve</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Segmented Sieve</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Sum of Prime Factors</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Prime Factors</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Möbius Function Sieve</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Divisor Count Sieve</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Goldbach Verification</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Binary Exponentiation"><div class="cat-header"><span class="cat-num">39</span><span class="cat-title">Binary Exponentiation</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Fast Power Computation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Modular Inverse</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Matrix Exponentiation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Fibonacci in O(log n)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Linear Recurrence Speedup</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Large Number Modular Power</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Geometric Series Sum</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Permutation Exponentiation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Polynomial Exponentiation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Tower of Powers</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Modular Arithmetic"><div class="cat-header"><span class="cat-num">40</span><span class="cat-title">Modular Arithmetic</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Modular Addition/Subtraction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Modular Multiplication</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Modular Inverse</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Factorial mod p</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">nCr mod p</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Chinese Remainder Theorem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Lucas' Theorem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Fermat's Little Theorem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Extended Euclidean</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Overflow Prevention</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Chinese Remainder Theorem"><div class="cat-header"><span class="cat-num">41</span><span class="cat-title">Chinese Remainder Theorem</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Simultaneous Congruences</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Period Synchronization</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Garner's Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Large Number Reconstruction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Secret Sharing Schemes</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Competitive Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Extended CRT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">CRT + Binary Exponentiation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Hashing Collision Reduction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Factorization via CRT</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Combinatorics"><div class="cat-header"><span class="cat-num">42</span><span class="cat-title">Combinatorics</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Permutations nPr</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Combinations nCr</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Pascal's Triangle</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Stars and Bars</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Inclusion-Exclusion</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Catalan Numbers</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Derangements</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Burnside's Lemma</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Pigeonhole Principle</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Generating Functions</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Matrix Exponentiation"><div class="cat-header"><span class="cat-num">43</span><span class="cat-title">Matrix Exponentiation</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Fibonacci O(log n)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">General Linear Recurrence</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Counting Paths in Graph</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Tiling Problems</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Graph Reachability K Steps</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Population Growth Models</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Economic I/O Model</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Markov Chains</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Tribonacci / Custom Recurrences</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">DP Periodic Structure</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Convex Hull Geometry"><div class="cat-header"><span class="cat-num">44</span><span class="cat-title">Convex Hull / Geometry</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Graham Scan</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Andrew's Monotone Chain</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Jarvis March (Gift Wrapping)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Rotating Calipers</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimum Enclosing Circle</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Convex Hull Trick (CHT)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Point in Convex Polygon</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Intersection of Convex Polygons</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Maximum Area Triangle (Hull)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Closest Pair of Points</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Line Sweep"><div class="cat-header"><span class="cat-num">45</span><span class="cat-title">Line Sweep</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Interval Overlap Detection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Active Intervals at Point</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Union of Intervals Total Length</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Rectangle Union Area</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Skyline Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Closest Pair of Points</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Event-Based Simulation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Meeting Room Scheduling</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Segment Intersection</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Area Overlapping Circles</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Meet in the Middle"><div class="cat-header"><span class="cat-num">46</span><span class="cat-title">Meet in the Middle</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">Four Sum Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Subset Sum (Large N)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Knapsack (Large W)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Shortest Path (Bidirectional BFS)</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Cryptographic MitM Attack</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Count Pairs with Property</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Baby-Step Giant-Step</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Game Tree Search</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Closest Sum to Target</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Sequence Reconstruction</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+<section class="cat-section" data-cat="Backtracking Bitmask GameTheory"><div class="cat-header"><span class="cat-num">47</span><span class="cat-title">Backtracking / Bitmask / Game Theory</span><span class="cat-badge cb-none">Coming Soon</span></div><div class="cards-grid"><div class="card soon"><div class="card-name">N-Queens Problem</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Sudoku Solver</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Minimax Algorithm</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Alpha-Beta Pruning</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Nim Game Theory</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Grundy Numbers</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Subset Backtracking</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Permutation Generation</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Game with Bitmask State</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div><div class="card soon"><div class="card-name">Combinatorial Game Theory</div><div class="card-footer"><span class="card-tag tag-soon">Soon</span></div></div></div></section>
+
+<!-- 48 FAMOUS ALGORITHMS -->
+<section class="cat-section" data-cat="Famous Algorithms">
+  <div class="cat-header">
+    <span class="cat-num">48</span>
+    <span class="cat-title">Famous Algorithms</span>
+    <span class="cat-badge cb-full">9 / 9 live</span>
+  </div>
+  <div class="cards-grid">
+    <a href="48_GBMfamousalgorithms/01_kadane.html" class="card built"><div class="card-name">Kadane's Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/02_GBMstable_internships.html" class="card built"><div class="card-name">Stable Internships (Gale-Shapley)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/03_Dijkstra_algorithm.html" class="card built"><div class="card-name">Dijkstra's Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/04_union_find.html" class="card built"><div class="card-name">Union Find (DSU)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/05_GBMtopological_sort.html" class="card built"><div class="card-name">Topological Sort (Kahn's)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/06_GBMkruskal.html" class="card built"><div class="card-name">Kruskal's Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/07_GBM_Prim.html" class="card built"><div class="card-name">Prim's Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/08_GBM_knuth_morris_pratt.html" class="card built"><div class="card-name">KMP Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="48_GBMfamousalgorithms/09_GBMa_star.html" class="card built"><div class="card-name">A* Algorithm</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+  </div>
+</section>
+
+<!-- GBM GRAPHS COLLECTION -->
+<section class="cat-section" data-cat="GBM Graphs Collection">
+  <div class="cat-header">
+    <span class="cat-num" style="background:rgba(6,214,160,.1);border-color:rgba(6,214,160,.3);color:var(--accent3)">★</span>
+    <span class="cat-title">Graph Visualizers Collection</span>
+    <span class="cat-badge cb-full">10 / 10 live</span>
+  </div>
+  <div class="cards-grid">
+    <a href="GBMgraphs/01GBMsingle_cycle_check.html" class="card built"><div class="card-name">Single Cycle Check</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/02GBMremove_islands.html" class="card built"><div class="card-name">Remove Islands</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/03_GBMBFS.html" class="card built"><div class="card-name">Breadth-First Search (Tree)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/04GBMriver_Sizes.html" class="card built"><div class="card-name">River Sizes</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/05GBMyoungestcommonancestor.html" class="card built"><div class="card-name">Youngest Common Ancestor</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/06GBMminimumpassessofamatrix.html" class="card built"><div class="card-name">Minimum Passes of Matrix</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/07GBMtwocolorable.html" class="card built"><div class="card-name">Two-Colorable (Bipartite)</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/08GBMcycleingraph.html" class="card built"><div class="card-name">Cycle In Graph</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/09GBMBoggleBoard.html" class="card built"><div class="card-name">Boggle Board</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+    <a href="GBMgraphs/10GBMRectangleMania.html" class="card built"><div class="card-name">Rectangle Mania</div><div class="card-footer"><span class="card-tag tag-built">Live</span><span class="card-arrow">→</span></div></a>
+  </div>
+</section>
+
+</main>
 
 <!-- FOOTER -->
-<footer>
-  <div>GBMvisuAL — built by <a href="https://github.com/Surya97141" target="_blank">Surya97141</a></div>
-  <div class="footer-links">
-    <a href="https://github.com/Surya97141/GBMvisuAL" target="_blank">GitHub</a>
-    <a href="https://Surya97141.github.io" target="_blank">Portfolio</a>
-    <a href="https://linkedin.com/in/surya-singh-b575591b5" target="_blank">LinkedIn</a>
-  </div>
+<footer class="footer">
+  <div class="footer-brand"><span>GBM</span>visuAL</div>
+  <div class="footer-note">470 ALGORITHMS · 47 CATEGORIES · BUILT WITH ♥ FOR CP</div>
 </footer>
 
-</div>
+<!-- SCROLL TO TOP -->
+<div class="scroll-top" id="scrollTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</div>
 
 <script>
-/* ── CURSOR ── */
-const cur = document.getElementById('cur');
-const trail = document.getElementById('cur-trail');
-let mx=0,my=0,tx=0,ty=0;
-document.addEventListener('mousemove',e=>{
-  mx=e.clientX;my=e.clientY;
-  cur.style.left=mx+'px';cur.style.top=my+'px';
-});
-function animTrail(){
-  tx+=(mx-tx)*.18; ty+=(my-ty)*.18;
-  trail.style.left=tx+'px'; trail.style.top=ty+'px';
-  requestAnimationFrame(animTrail);
-}
-animTrail();
-document.querySelectorAll('a,button,.algo-cat,.feat-card').forEach(el=>{
-  el.addEventListener('mouseenter',()=>{
-    cur.style.transform='translate(-50%,-50%) scale(2)';
-    cur.style.background='var(--accent2)';
-    trail.style.transform='translate(-50%,-50%) scale(1.5)';
-  });
-  el.addEventListener('mouseleave',()=>{
-    cur.style.transform='translate(-50%,-50%) scale(1)';
-    cur.style.background='var(--accent)';
-    trail.style.transform='translate(-50%,-50%) scale(1)';
-  });
-});
+// ── COUNT BUILT ───────────────────────────────────────────────────────
+const builtCards = document.querySelectorAll('.card.built');
+document.getElementById('statBuilt').textContent = builtCards.length;
 
-/* ── NAV SCROLL ── */
-const nav = document.getElementById('nav');
-window.addEventListener('scroll',()=>{
-  nav.classList.toggle('scrolled',window.scrollY>40);
-});
+// ── SEARCH + FILTER ──────────────────────────────────────────────────
+const searchInput  = document.getElementById('searchInput');
+const filterBtns   = document.querySelectorAll('.fbtn');
+const catSections  = document.querySelectorAll('.cat-section');
+const allCards     = document.querySelectorAll('.card');
+const resultsCount = document.getElementById('resultsCount');
+const emptyState   = document.getElementById('emptyState');
+const featSec      = document.getElementById('featuredSection');
 
-/* ── BACKGROUND PARTICLE CANVAS ── */
-const canvas = document.getElementById('bg-canvas');
-const ctx = canvas.getContext('2d');
-let W,H,nodes=[];
-function resize(){
-  W=canvas.width=window.innerWidth;
-  H=canvas.height=window.innerHeight;
-}
-resize();
-window.addEventListener('resize',resize);
+let activeFilter = 'all';
 
-class Node{
-  constructor(){this.reset()}
-  reset(){
-    this.x=Math.random()*W; this.y=Math.random()*H;
-    this.vx=(Math.random()-.5)*.3; this.vy=(Math.random()-.5)*.3;
-    this.r=Math.random()*1.5+.5;
-    this.a=Math.random()*.6+.2;
-  }
-  update(){
-    this.x+=this.vx; this.y+=this.vy;
-    if(this.x<0||this.x>W||this.y<0||this.y>H) this.reset();
-  }
-  draw(){
-    ctx.beginPath();
-    ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
-    ctx.fillStyle=`rgba(59,130,246,${this.a})`;
-    ctx.fill();
-  }
-}
+function applyFilters() {
+  const q = searchInput.value.trim().toLowerCase();
+  let visibleCards = 0;
 
-for(let i=0;i<80;i++) nodes.push(new Node());
+  catSections.forEach(sec => {
+    const cards = sec.querySelectorAll('.card');
+    const catMatch = q === '' || sec.dataset.cat.toLowerCase().includes(q);
+    let secVisible = 0;
 
-function drawParticles(){
-  ctx.clearRect(0,0,W,H);
-  nodes.forEach(n=>{n.update();n.draw()});
-  for(let i=0;i<nodes.length;i++){
-    for(let j=i+1;j<nodes.length;j++){
-      const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
-      const d=Math.sqrt(dx*dx+dy*dy);
-      if(d<120){
-        ctx.beginPath();
-        ctx.moveTo(nodes[i].x,nodes[i].y);
-        ctx.lineTo(nodes[j].x,nodes[j].y);
-        ctx.strokeStyle=`rgba(59,130,246,${.15*(1-d/120)})`;
-        ctx.lineWidth=.5;
-        ctx.stroke();
+    cards.forEach(card => {
+      const nameEl = card.querySelector('.card-name');
+      const name = nameEl ? nameEl.textContent.toLowerCase() : '';
+      const isBuilt = card.classList.contains('built');
+
+      const textMatch = q === '' || name.includes(q) || catMatch;
+      const filterMatch =
+        activeFilter === 'all' ||
+        (activeFilter === 'built' && isBuilt) ||
+        (activeFilter === 'soon'  && !isBuilt);
+
+      if (textMatch && filterMatch) {
+        card.classList.remove('hidden');
+        secVisible++;
+        visibleCards++;
+      } else {
+        card.classList.add('hidden');
       }
-    }
-  }
-  requestAnimationFrame(drawParticles);
-}
-drawParticles();
+    });
 
-/* ── SCROLL REVEAL ── */
-const revEls = document.querySelectorAll('.reveal');
-const io = new IntersectionObserver(entries=>{
-  entries.forEach(e=>{
-    if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target);}
+    sec.classList.toggle('hidden', secVisible === 0);
   });
-},{threshold:.1});
-revEls.forEach(el=>io.observe(el));
+
+  // hide featured during search
+  featSec.style.display = q !== '' ? 'none' : '';
+
+  // empty state
+  emptyState.classList.toggle('show', visibleCards === 0);
+
+  // results count
+  resultsCount.textContent = q || activeFilter !== 'all'
+    ? `${visibleCards} result${visibleCards !== 1 ? 's' : ''}`
+    : '';
+}
+
+searchInput.addEventListener('input', applyFilters);
+
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    applyFilters();
+  });
+});
+
+// ── SCROLL TO TOP ────────────────────────────────────────────────────
+const scrollTopBtn = document.getElementById('scrollTop');
+window.addEventListener('scroll', () => {
+  scrollTopBtn.classList.toggle('visible', window.scrollY > 400);
+});
+
+// ── STAGGERED LOAD ANIMATION ─────────────────────────────────────────
+document.querySelectorAll('.cat-section').forEach((sec, i) => {
+  sec.style.opacity = '0';
+  sec.style.transform = 'translateY(16px)';
+  sec.style.transition = 'opacity .4s ease, transform .4s ease';
+  setTimeout(() => {
+    sec.style.opacity = '1';
+    sec.style.transform = 'none';
+  }, 80 + i * 25);
+});
 </script>
 </body>
 </html>
