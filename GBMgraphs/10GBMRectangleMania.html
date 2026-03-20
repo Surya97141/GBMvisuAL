@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rectangle Mania — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:340px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;}
+
+/* CANVAS */
+.canvas-section{margin-bottom:14px;}
+.canvas-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;transition:border-color .3s;}
+.canvas-outer.co-rect{border-color:var(--accent3);}
+.canvas-outer.co-check{border-color:var(--accent4);}
+
+/* PAIR STRIP */
+.pair-section{margin-bottom:14px;}
+.pair-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;transition:border-color .3s;}
+.pair-outer.po-check{border-color:var(--accent4);}
+.pair-outer.po-rect {border-color:var(--accent3);}
+.pair-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pair-box{display:flex;flex-direction:column;gap:4px;}
+.pair-label{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.pair-coord{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;padding:5px 12px;border-radius:6px;border:2px solid;transition:all .3s;}
+.pc-bl{border-color:var(--accent2);background:rgba(33,150,243,.1);color:#0d47a1;}
+.pc-tr{border-color:var(--pur);background:rgba(192,84,252,.1);color:var(--pur-dark);}
+.pc-tl{border-color:var(--accent4);background:rgba(255,209,102,.12);color:#7a4800;}
+.pc-br{border-color:var(--accent);background:rgba(230,57,70,.1);color:#7a0000;}
+.pc-ok {border-color:var(--accent3);border-width:2.5px;background:rgba(6,214,160,.15);color:#024d37;}
+.pc-missing{border-color:var(--accent);border-width:2.5px;background:rgba(230,57,70,.08);color:#7a0000;text-decoration:line-through;opacity:.7;}
+.pair-arrow{font-family:'Space Mono',monospace;font-size:1rem;color:var(--muted);align-self:center;}
+.check-result{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;padding:5px 14px;border-radius:6px;align-self:center;}
+.cr-yes{background:rgba(6,214,160,.18);border:2px solid var(--accent3);color:#024d37;}
+.cr-no {background:rgba(230,57,70,.1);border:2px solid rgba(230,57,70,.4);color:#7a0000;}
+
+/* COUNT BADGE */
+.count-badge{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;padding:8px 20px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.count-badge.cb-new{animation:cbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes cbnew{from{transform:scale(1.3);background:rgba(6,214,160,.3);}to{transform:none;background:rgba(6,214,160,.12);}}
+
+/* RECT LOG */
+.rect-log-section{margin-bottom:14px;}
+.rect-chips{display:flex;gap:5px;flex-wrap:wrap;min-height:32px;align-items:center;}
+.rchip{padding:3px 10px;border-radius:5px;border:1.5px solid var(--accent3);
+  font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;
+  background:rgba(6,214,160,.1);color:#024d37;transition:all .3s;}
+.rchip.rc-new{animation:rcnew .45s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rcnew{from{transform:scale(1.4);opacity:0;}to{transform:none;opacity:1;}}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-check{border-color:var(--accent4);}
+.step-panel.sp-rect {border-color:var(--accent3);}
+.step-panel.sp-miss {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:80px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.62rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-check{border-color:var(--accent4);}
+.explain-panel.ep-rect {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-check{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-rect{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-miss{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-seed {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-check{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-rect {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.rect-log-right{margin-bottom:12px;}
+.rl-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.rl-rows{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;}
+.rl-rows::-webkit-scrollbar{width:3px;}.rl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.rl-row{display:flex;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.6rem;align-items:center;color:#9ca3af;}
+.rl-row.rl-new{border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.07);animation:fadeUp .4s ease;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Rectangle Mania</h1>
+    <div class="sub">Point Set · Pair Scan · O(n²) · Hash Set Lookup</div>
+  </div>
+  <div class="family-badge">Geometry · Hashing</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Coordinates  (x,y pairs — semicolon separated)</label>
+      <input type="text" id="inCoords" value="0,0;0,1;1,1;1,0;2,1;2,0;3,1;3,0">
+      <div class="hint">Format: x1,y1;x2,y2;x3,y3 … (axis-aligned rectangles only)</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1200">0.5×</button>
+        <button class="speed-btn active" data-ms="550">1×</button>
+        <button class="speed-btn" data-ms="250">2×</button>
+        <button class="speed-btn" data-ms="90">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(200,195,180,.3);border-color:var(--border);"></div> point</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.25);border-color:#2196f3;"></div> bottom-left (p1)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.25);border-color:#c084fc;"></div> top-right (p2)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.3);border-color:#f5a623;"></div> checking corners</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.35);border-color:#06d6a0;"></div> rectangle ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.2);border-color:#e63946;"></div> missing corner ✗</div>
+  </div>
+
+  <!-- CARTESIAN CANVAS -->
+  <div class="canvas-section">
+    <div class="section-label">Cartesian plane — scanning every pair as diagonal corners</div>
+    <div class="canvas-outer" id="canvasOuter">
+      <canvas id="mainCanvas" height="300"></canvas>
+    </div>
+  </div>
+
+  <!-- CURRENT PAIR DISPLAY -->
+  <div class="pair-section">
+    <div class="section-label">Current pair — checking if all 4 corners exist in point set</div>
+    <div class="pair-outer" id="pairOuter">
+      <div class="pair-row" id="pairRow">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will appear as pairs are tested</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECTANGLE COUNT -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="count-badge" id="countBadge">Rectangles: 0</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      pair <span id="pairIdx">0</span> of <span id="pairTotal">—</span>
+    </div>
+  </div>
+
+  <!-- RECT LOG -->
+  <div class="rect-log-section">
+    <div class="section-label">Found rectangles</div>
+    <div class="rect-chips" id="rectChips">
+      <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">none yet</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n²)</div>
+      <div class="cx-sub">n² pairs × O(1) hash</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">hash set of points</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Rectangles</div>
+      <div class="cx-val" id="cxRects" style="color:#028a5b">—</div>
+      <div class="cx-sub">found</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Pairs tested</div>
+      <div class="cx-val" id="cxPairs" style="color:#7a5a00">—</div>
+      <div class="cx-sub">total</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-check" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Rectangle Mania</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-inc"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3"</span>)</span>
+<span class="code-line" id="cl-inc2"><span class="ck">#include</span><span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line" id="cl-us"><span class="ck">using namespace</span> std;</span>
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">rectangleMania</span>(</span>
+<span class="code-line" id="cl-sg2">    vector&lt;pair&lt;<span class="ck">int</span>,<span class="ck">int</span>&gt;&gt;&amp; coords){</span>
+<span class="code-line" id="cl-set">  set&lt;pair&lt;<span class="ck">int</span>,<span class="ck">int</span>&gt;&gt; pts(</span>
+<span class="code-line" id="cl-set2">    coords.begin(),coords.end());</span>
+<span class="code-line" id="cl-cnt">  <span class="ck">int</span> count=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-i">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">0</span>;i&lt;coords.size();i++)</span>
+<span class="code-line" id="cl-j">   <span class="ck">for</span>(<span class="ck">int</span> j=i+<span class="cn">1</span>;j&lt;coords.size();j++){</span>
+<span class="code-line" id="cl-p1">    <span class="ck">auto</span> [x1,y1]=coords[i]; <span class="cc">// p1</span></span>
+<span class="code-line" id="cl-p2">    <span class="ck">auto</span> [x2,y2]=coords[j]; <span class="cc">// p2</span></span>
+<span class="code-line" id="cl-same">    <span class="ck">if</span>(x1==x2 || y1==y2) <span class="ck">continue</span>;</span>
+<span class="code-line" id="cl-bl">    <span class="ck">int</span> bx=min(x1,x2),by=min(y1,y2);</span>
+<span class="code-line" id="cl-tr">    <span class="ck">int</span> tx=max(x1,x2),ty=max(y1,y2);</span>
+<span class="code-line" id="cl-chk">    <span class="ck">if</span>(pts.count({bx,ty}) &&</span>
+<span class="code-line" id="cl-ch2">       pts.count({tx,by}))</span>
+<span class="code-line" id="cl-inc3">     count++;</span>
+<span class="code-line" id="cl-end">   }</span>
+<span class="code-line" id="cl-div">  <span class="ck">return</span> count/<span class="cn">2</span>; <span class="cc">// each rect counted twice</span></span>
+<span class="code-line" id="cl-ret">}</span></pre>
+  </div>
+
+  <!-- EXTRA EXPLANATION -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ Why divide by 2?</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;overflow-y:auto;max-height:200px;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// Each rectangle is counted TWICE:
+// Once when (BL,TR) is the pair
+// Once when (TR,BL) is the pair
+// Since j > i, each pair appears once,
+// but both diagonals of a rectangle
+// are tested — so divide by 2.
+
+// unordered_set version (O(1) avg):
+</span>
+<span style="color:#c084fc">struct</span> PHash {
+  <span style="color:#c084fc">size_t</span> <span style="color:#67e8f9">operator()</span>(pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt; p)<span style="color:#c084fc">const</span>{
+    <span style="color:#c084fc">return</span> hash&lt;<span style="color:#c084fc">long long</span>&gt;()(((<span style="color:#c084fc">long long</span>)p.first&lt;&lt;<span style="color:#fda4af">32</span>)|p.second);
+  }
+};
+<span style="color:#c084fc">using</span> PSet=unordered_set&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;,PHash&gt;;
+
+<span style="color:#c084fc">int</span> <span style="color:#67e8f9">rectangleManiaFast</span>(
+    vector&lt;pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt;&gt;&amp; coords){
+  PSet pts(coords.begin(),coords.end());
+  <span style="color:#c084fc">int</span> cnt=<span style="color:#fda4af">0</span>;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> i=<span style="color:#fda4af">0</span>;i&lt;(int)coords.size();i++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> j=i+<span style="color:#fda4af">1</span>;j&lt;(int)coords.size();j++){
+      <span style="color:#c084fc">auto</span> [x1,y1]=coords[i];
+      <span style="color:#c084fc">auto</span> [x2,y2]=coords[j];
+      <span style="color:#c084fc">if</span>(x1==x2||y1==y2) <span style="color:#c084fc">continue</span>;
+      <span style="color:#c084fc">int</span> bx=min(x1,x2),by=min(y1,y2);
+      <span style="color:#c084fc">int</span> tx=max(x1,x2),ty=max(y1,y2);
+      <span style="color:#c084fc">if</span>(pts.count({bx,ty})&amp;&amp;pts.count({tx,by}))
+        cnt++;
+    }
+  <span style="color:#c084fc">return</span> cnt/<span style="color:#fda4af">2</span>;
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">O(n²) pairs</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">O(1) hash lookup</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">÷2 dedup</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">skip same row/col</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcP1">  <div class="var-name">p1 (i)</div>      <div class="var-value" id="vP1"   style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcP2">  <div class="var-name">p2 (j)</div>      <div class="var-value" id="vP2"   style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcBL">  <div class="var-name">BL corner</div>   <div class="var-value" id="vBL"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcTR">  <div class="var-name">TR corner</div>   <div class="var-value" id="vTR"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcTL">  <div class="var-name">TL (check)</div>  <div class="var-value" id="vTL"   style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcBR">  <div class="var-name">BR (check)</div>  <div class="var-value" id="vBR"   style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcCnt" style="grid-column:1/3">
+        <div class="var-name">count (pre-divide)</div>
+        <div class="var-value" id="vCnt" style="color:var(--accent3)">0</div>
+      </div>
+    </div>
+
+    <div class="rect-log-right">
+      <div class="rl-title">Rectangles found (÷2 = actual)</div>
+      <div class="rl-rows" id="rlRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Total Rectangles</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ RECTANGLE COUNT COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {p1,p2,bl,tr,tl,br,tlExists,brExists,count,n} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Key insight: for axis-aligned rectangles, any two points with different x AND different y could be diagonal corners. If we pick the bottom-left and top-right corners, we only need to check if the other two corners (top-left, bottom-right) exist in the point set. O(1) hash lookup per pair.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Store all points in a hash set.</strong> For each pair (i,j), derive BL=(minX,minY), TR=(maxX,maxY), TL=(minX,maxY), BR=(maxX,minY). If TL and BR both exist → rectangle!`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Skip same-row/column pairs:</strong> if x1==x2 or y1==y2, the points can't form a rectangle diagonal. Skip immediately.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why ÷2?</strong> Each rectangle has two diagonals (BL–TR and TR–BL). Our loop counts each rectangle twice (once for each diagonal pair). Divide by 2 at the end.`},
+    ]
+  };
+  if(type==='check') return {
+    why:`<div class="ep-why-block why-check">Testing pair p1=${JSON.stringify(p1)} and p2=${JSON.stringify(p2)} as diagonal corners. BL=(${bl}), TR=(${tr}). Need TL=(${tl}) and BR=(${br}) in the point set. TL: ${tlExists?'✓ EXISTS':'✗ missing'}. BR: ${brExists?'✓ EXISTS':'✗ missing'}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>BL=(${bl}), TR=(${tr}), TL=(${tl}), BR=(${br}).</strong> Only TL and BR need checking — BL and TR are already in the set (they're p1 and p2).`},
+    ]
+  };
+  if(type==='rect') return {
+    why:`<div class="ep-why-block why-rect">TL=(${tl}) ✓ AND BR=(${br}) ✓ both exist! This forms a rectangle. Raw count → ${count}. Remember: each rectangle is counted twice (once per diagonal), so final answer = ${count}/2 = ${Math.floor(count/2)}.</div>`,
+    inv:[
+      {icon:'🏆',cls:'',text:`<strong>Rectangle found!</strong> BL=(${bl}), TL=(${tl}), TR=(${tr}), BR=(${br}). Raw count=${count}, so ${Math.floor(count/2)} complete rectangles so far.`},
+    ]
+  };
+  if(type==='miss') return {
+    why:`<div class="ep-why-block why-miss">Missing corner(s): ${!tlExists?`TL=(${tl}) not in set`:''}${!tlExists&&!brExists?' and ':''}${!brExists?`BR=(${br}) not in set`:''}. Can't form a rectangle with this diagonal. Move to next pair.</div>`,
+    inv:[
+      {icon:'✂️',cls:'inv-pur',text:`O(1) hash set lookup confirmed missing corner(s). Skip immediately.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All C(${n},2) = ${n*(n-1)/2} pairs tested. Raw count = ${count}. Each rectangle counted twice → final answer = ${count}/2 = <strong>${Math.floor(count/2)}</strong>.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>${Math.floor(count/2)} rectangles</strong>. Tested ${n*(n-1)/2} pairs. O(n²) time, O(n) space.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:  {ids:['cl-set','cl-set2','cl-cnt','cl-i','cl-j'],cls:'hl-seed'},
+  check: {ids:['cl-p1','cl-p2','cl-same','cl-bl','cl-tr','cl-chk','cl-ch2'],cls:'hl-check'},
+  rect:  {ids:['cl-inc3'],cls:'hl-rect'},
+  miss:  {ids:['cl-chk','cl-ch2'],cls:'hl-check'},
+  done:  {ids:['cl-div','cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to start.',color:'var(--accent4)'};
+  const {type,p1,p2,bl,tr,tl,br,tlExists,brExists,count,n} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`${n} points loaded into a hash set. We'll test every pair as potential diagonal corners. For each pair with different x AND different y, check if the other two corners exist. O(1) hash lookup per check.`};
+  if(type==='check') return {color:'var(--accent4)',
+    text:`Testing pair (${p1}) and (${p2}). BL=(${bl}), TR=(${tr}). Need TL=(${tl}): ${tlExists?'✓':'✗'}, and BR=(${br}): ${brExists?'✓':'✗'}.`};
+  if(type==='rect') return {color:'var(--accent3)',
+    text:`🎉 Rectangle! BL=(${bl}) → TL=(${tl}) → TR=(${tr}) → BR=(${br}). Both missing corners exist! Raw count → <strong>${count}</strong> (÷2 = ${Math.floor(count/2)} rectangles so far).`};
+  if(type==='miss') return {color:'var(--muted)',
+    text:`No rectangle: missing ${!tlExists?`TL=(${tl})`:''}${!tlExists&&!brExists?' and ':''}${!brExists?`BR=(${br})`:''}. Moving to next pair.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Tested all pairs. Raw count = ${count}. Dividing by 2 (each rect counted for both diagonals) → <strong>${Math.floor(count/2)} rectangles</strong>.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(coords){
+  const n=coords.length;
+  const pointSet=new Set(coords.map(([x,y])=>`${x},${y}`));
+  const has=(x,y)=>pointSet.has(`${x},${y}`);
+  const steps=[];
+  let count=0;
+  const foundRects=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,n,coords,count,foundRects:[...foundRects],
+    result:null,...extra,
+    explain:makeExplain(type,{n,count,...extra})
+  });
+
+  snap('init',`📐 <strong>Start.</strong> ${n} points. Build hash set. Test all C(${n},2)=${n*(n-1)/2} pairs.`,{});
+
+  for(let i=0;i<n;i++){
+    for(let j=i+1;j<n;j++){
+      const [x1,y1]=coords[i], [x2,y2]=coords[j];
+      if(x1===x2||y1===y2) continue; // same row or col — skip
+
+      const bx=Math.min(x1,x2), by=Math.min(y1,y2);
+      const tx=Math.max(x1,x2), ty=Math.max(y1,y2);
+      const tlExists=has(bx,ty), brExists=has(tx,by);
+
+      const p1s=`${x1},${y1}`, p2s=`${x2},${y2}`;
+      const bls=`${bx},${by}`, trs=`${tx},${ty}`;
+      const tls=`${bx},${ty}`, brs=`${tx},${by}`;
+
+      if(tlExists&&brExists){
+        count++;
+        foundRects.push({bl:[bx,by],tl:[bx,ty],tr:[tx,ty],br:[tx,by]});
+        snap('rect',`✅ Rectangle! BL=(${bls}) TR=(${trs}) TL=(${tls}) BR=(${brs}). count=${count}`,
+          {p1:[x1,y1],p2:[x2,y2],bl:[bx,by],tr:[tx,ty],tl:[bx,ty],br:[tx,by],tlExists,brExists,pairI:i,pairJ:j});
+      } else {
+        snap('check',`Test (${p1s})↔(${p2s}): TL=${tlExists?'✓':'✗'} BR=${brExists?'✓':'✗'}`,
+          {p1:[x1,y1],p2:[x2,y2],bl:[bx,by],tr:[tx,ty],tl:[bx,ty],br:[tx,by],tlExists,brExists,pairI:i,pairJ:j});
+        if(!tlExists||!brExists){
+          snap('miss',`Missing corners — skip`,
+            {p1:[x1,y1],p2:[x2,y2],bl:[bx,by],tr:[tx,ty],tl:[bx,ty],br:[tx,by],tlExists,brExists,pairI:i,pairJ:j});
+        }
+      }
+    }
+  }
+
+  snap('done',`🎉 <strong>Done!</strong> count=${count} ÷ 2 = <strong>${Math.floor(count/2)}</strong>`,
+    {count,result:{answer:Math.floor(count/2),foundRects:[...foundRects]}});
+  steps[steps.length-1].result={answer:Math.floor(count/2),foundRects:[...foundRects]};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=550;
+let coords=[], pointSet=new Set();
+
+// ─── DRAW CANVAS ──────────────────────────────────────────────────────────────
+function drawCanvas(st){
+  const canvas=document.getElementById('mainCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=300;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,300);
+
+  if(!coords.length) return;
+
+  const xs=coords.map(c=>c[0]), ys=coords.map(c=>c[1]);
+  const minX=Math.min(...xs)-1, maxX=Math.max(...xs)+1;
+  const minY=Math.min(...ys)-1, maxY=Math.max(...ys)+1;
+  const PAD=28;
+  const scaleX=(W-2*PAD)/(maxX-minX||1);
+  const scaleY=(300-2*PAD)/(maxY-minY||1);
+  const scale=Math.min(scaleX,scaleY,40);
+  const ox=PAD+(W-2*PAD-(maxX-minX)*scale)/2;
+  const oy=300-PAD-(300-2*PAD-(maxY-minY)*scale)/2;
+  const px=(x)=>ox+(x-minX)*scale;
+  const py=(y)=>oy-(y-minY)*scale;
+
+  // Grid
+  ctx.strokeStyle='rgba(212,204,184,0.4)';ctx.lineWidth=0.5;
+  for(let x=Math.floor(minX);x<=Math.ceil(maxX);x++){
+    ctx.beginPath();ctx.moveTo(px(x),PAD);ctx.lineTo(px(x),300-PAD);ctx.stroke();
+  }
+  for(let y=Math.floor(minY);y<=Math.ceil(maxY);y++){
+    ctx.beginPath();ctx.moveTo(PAD,py(y));ctx.lineTo(W-PAD,py(y));ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle='rgba(26,26,46,0.3)';ctx.lineWidth=1;
+  if(minY<=0&&maxY>=0){ctx.beginPath();ctx.moveTo(PAD,py(0));ctx.lineTo(W-PAD,py(0));ctx.stroke();}
+  if(minX<=0&&maxX>=0){ctx.beginPath();ctx.moveTo(px(0),PAD);ctx.lineTo(px(0),300-PAD);ctx.stroke();}
+
+  // Draw found rectangles (all so far)
+  const isFinal=!!st.result;
+  const rectsToShow=isFinal?st.result.foundRects:st.foundRects;
+  // draw faded previous rects
+  (rectsToShow||[]).forEach(({bl,tl,tr,br},k)=>{
+    const isLast=k===(rectsToShow.length-1)&&!isFinal&&st.type==='rect';
+    ctx.fillStyle=isLast?'rgba(6,214,160,.15)':'rgba(6,214,160,.08)';
+    ctx.strokeStyle=isLast?'rgba(6,214,160,.7)':'rgba(6,214,160,.35)';
+    ctx.lineWidth=isLast?2:1;
+    ctx.beginPath();
+    ctx.rect(px(bl[0]),py(tl[1]),px(tr[0])-px(bl[0]),py(bl[1])-py(tl[1]));
+    ctx.fill(); ctx.stroke();
+  });
+
+  // Current pair rectangle outline (checking)
+  if(st.p1&&st.p2&&!isFinal&&st.type!=='done'){
+    const {bl,tl,tr,br,tlExists,brExists}=st;
+    const allExist=tlExists&&brExists;
+    ctx.strokeStyle=allExist?'rgba(6,214,160,0.8)':'rgba(255,209,102,0.6)';
+    ctx.lineWidth=2.5;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.rect(px(bl[0]),py(tl[1]),px(tr[0])-px(bl[0]),py(bl[1])-py(tl[1]));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw all points
+  coords.forEach(([x,y])=>{
+    const isPaiP1=st.p1&&st.p1[0]===x&&st.p1[1]===y;
+    const isPaiP2=st.p2&&st.p2[0]===x&&st.p2[1]===y;
+    const isTL=st.tl&&st.tl[0]===x&&st.tl[1]===y;
+    const isBR=st.br&&st.br[0]===x&&st.br[1]===y;
+
+    let fill='rgba(180,175,165,0.6)', stroke='rgba(140,130,120,0.8)', r=5.5;
+
+    if(isPaiP1)          {fill='rgba(33,150,243,.7)';stroke='#2196f3';r=8;}
+    else if(isPaiP2)     {fill='rgba(192,84,252,.7)';stroke='#c084fc';r=8;}
+    else if(isTL||isBR){
+      const exists=(isTL&&st.tlExists)||(isBR&&st.brExists);
+      fill=exists?'rgba(6,214,160,.7)':'rgba(230,57,70,.6)';
+      stroke=exists?'#06d6a0':'#e63946';r=7;
+    }
+
+    ctx.beginPath();ctx.arc(px(x),py(y),r,0,Math.PI*2);
+    ctx.fillStyle=fill;ctx.fill();
+    ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke();
+
+    // label
+    ctx.fillStyle='#1a1a2e';ctx.font='bold 9px Space Mono';
+    ctx.textAlign='center';ctx.fillText(`(${x},${y})`,px(x),py(y)-11);
+  });
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inCoords').value;
+  coords=raw.split(';').map(s=>{const[x,y]=s.trim().split(',').map(Number);return[x,y];}).filter(c=>!isNaN(c[0]));
+  pointSet=new Set(coords.map(([x,y])=>`${x},${y}`));
+
+  steps=computeSteps(coords);
+  currentStep=0;
+
+  document.getElementById('pairTotal').textContent=Math.floor(coords.length*(coords.length-1)/2);
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxRects').textContent='—';
+  document.getElementById('cxPairs').textContent='—';
+  document.getElementById('rectChips').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">none yet</span>';
+  document.getElementById('rlRows').innerHTML='';
+  document.getElementById('countBadge').textContent='Rectangles: 0';
+  document.getElementById('pairRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will appear as pairs are tested</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const rectCount=Math.floor(st.count/2);
+
+  // Count badge
+  const cb=document.getElementById('countBadge');
+  const prevCount=idx>0?Math.floor(steps[idx-1].count/2):0;
+  cb.textContent=`Rectangles: ${rectCount}`;
+  if(rectCount>prevCount){cb.classList.remove('cb-new');void cb.offsetWidth;cb.classList.add('cb-new');}
+
+  // Pair index
+  document.getElementById('pairIdx').textContent=st.pairI!=null?`${st.pairI*coords.length+st.pairJ||0}`:'—';
+
+  // Pair display
+  const pr=document.getElementById('pairRow');
+  const po=document.getElementById('pairOuter');
+  if(st.p1&&st.p2){
+    const tlCls=st.tlExists?'pc-ok':'pc-missing';
+    const brCls=st.brExists?'pc-ok':'pc-missing';
+    const isRect=st.type==='rect';
+    po.className=`pair-outer ${isRect?'po-rect':'po-check'}`;
+    pr.innerHTML=`
+      <div class="pair-box"><div class="pair-label">BL (bottom-left)</div>
+        <div class="pair-coord pc-bl">(${st.bl})</div></div>
+      <div class="pair-arrow">↗</div>
+      <div class="pair-box"><div class="pair-label">TR (top-right)</div>
+        <div class="pair-coord pc-tr">(${st.tr})</div></div>
+      <div class="pair-arrow">|</div>
+      <div class="pair-box"><div class="pair-label">TL (need)</div>
+        <div class="pair-coord ${tlCls}">(${st.tl}) ${st.tlExists?'✓':'✗'}</div></div>
+      <div class="pair-arrow">+</div>
+      <div class="pair-box"><div class="pair-label">BR (need)</div>
+        <div class="pair-coord ${brCls}">(${st.br}) ${st.brExists?'✓':'✗'}</div></div>
+      <div class="check-result ${isRect?'cr-yes':'cr-no'}">${isRect?'✅ RECT!':'❌ miss'}</div>
+    `;
+  } else {
+    po.className='pair-outer';
+    pr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">scanning pairs…</span>';
+  }
+
+  // Found rects chips
+  const rc=document.getElementById('rectChips');
+  const foundR=st.foundRects||[];
+  if(foundR.length>0){
+    rc.innerHTML=foundR.map(({bl,tr},k)=>{
+      const isNew=k===foundR.length-1&&st.type==='rect';
+      return `<div class="rchip ${isNew?'rc-new':''}">(${bl[0]},${bl[1]})↔(${tr[0]},${tr[1]})</div>`;
+    }).join('');
+  } else {
+    rc.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">none yet</span>';
+  }
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='rect'){
+    sp.className='step-panel sp-rect';
+    spt.textContent=`Rectangle! BL=(${st.bl}) TR=(${st.tr})`;
+    spb.innerHTML=mkBox('BL',`(${st.bl})`,'exists','spbox sb-blue')+
+      mkBox('TR',`(${st.tr})`,'exists','spbox sb-pur')+
+      mkBox('TL',`(${st.tl})`,'✓ found','spbox sb-grn')+
+      mkBox('BR',`(${st.br})`,'✓ found','spbox sb-grn')+
+      mkBox('count÷2',rectCount,'rects','spbox sb-grn');
+  } else if(st.type==='miss'||st.type==='check'){
+    sp.className=`step-panel ${st.type==='miss'?'sp-miss':'sp-check'}`;
+    spt.textContent=`Testing (${st.p1}) ↔ (${st.p2})`;
+    spb.innerHTML=mkBox('TL',`(${st.tl})`,st.tlExists?'✓ in set':'✗ missing',`spbox ${st.tlExists?'sb-grn':'sb-red'}`)+
+      mkBox('BR',`(${st.br})`,st.brExists?'✓ in set':'✗ missing',`spbox ${st.brExists?'sb-grn':'sb-red'}`)+
+      mkBox('result',st.tlExists&&st.brExists?'rect!':'miss','verdict',`spbox ${st.tlExists&&st.brExists?'sb-grn':'sb-red'}`);
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-rect';
+    spt.textContent=`Done! ${rectCount} rectangles`;
+    spb.innerHTML=mkBox('raw count',st.count,'pairs matched','spbox')+
+      mkBox('÷2',rectCount,'actual rects','spbox sb-grn');
+  } else {
+    sp.className='step-panel';spt.textContent='Initialising...';spb.innerHTML='';
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // Canvas outer
+  document.getElementById('canvasOuter').className='canvas-outer'+(st.type==='rect'?' co-rect':st.p1?' co-check':'');
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Draw
+  drawCanvas(st);
+
+  // Right vars
+  setVar('vP1','vcP1',st.p1?`(${st.p1})` :'—');
+  setVar('vP2','vcP2',st.p2?`(${st.p2})`:'—');
+  setVar('vBL','vcBL',st.bl?`(${st.bl})`:'—');
+  setVar('vTR','vcTR',st.tr?`(${st.tr})`:'—');
+  setVar('vTL','vcTL',st.tl?`(${st.tl}) ${st.tlExists!==undefined?(st.tlExists?'✓':'✗'):''}` :'—');
+  setVar('vBR','vcBR',st.br?`(${st.br}) ${st.brExists!==undefined?(st.brExists?'✓':'✗'):''}` :'—');
+  setVar('vCnt','vcCnt',`${st.count} (→${rectCount} rects)`);
+
+  // Rect log right panel
+  const rl=document.getElementById('rlRows');
+  rl.innerHTML='';
+  [...(st.foundRects||[])].reverse().slice(0,8).forEach(({bl,tl,tr,br},k)=>{
+    const isNew=k===0&&st.type==='rect';
+    rl.innerHTML+=`<div class="rl-row ${isNew?'rl-new':''}">
+      (${bl[0]},${bl[1]})→(${tl[0]},${tl[1]})→(${tr[0]},${tr[1]})→(${br[0]},${br[1]})
+    </div>`;
+  });
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ${st.result.answer} RECTANGLE${st.result.answer!==1?'S':''} FOUND`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`${coords.length} points · ${coords.length*(coords.length-1)/2} pairs tested`;
+    document.getElementById('cxRects').textContent=st.result.answer;
+    document.getElementById('cxPairs').textContent=steps.filter(s=>s.type==='check'||s.type==='rect').length;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-check',check:'ep-check',rect:'ep-rect',miss:'ep-check',done:'ep-rect'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-check');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)drawCanvas(steps[currentStep]);});
+buildUI();
+</script>
+</body>
+</html>
