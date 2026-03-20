@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Sum — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(192,84,252,.2);border:1px solid var(--pur);color:var(--pur-dark);font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:380px;transition:border-color .2s;}
+.field input:focus{border-color:var(--pur);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);color:white;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* TREE CANVAS */
+.canvas-section{margin-bottom:14px;}
+.canvas-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;overflow:hidden;transition:border-color .3s;}
+.canvas-outer.co-enter{border-color:var(--accent4);}
+.canvas-outer.co-return{border-color:var(--pur);}
+.canvas-outer.co-done{border-color:var(--accent3);}
+
+/* DEPTH BREAKDOWN PANEL */
+.breakdown-section{margin-bottom:14px;}
+.breakdown-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.breakdown-outer.bo-active{border-color:var(--pur);}
+.breakdown-outer.bo-done{border-color:var(--accent3);}
+.breakdown-rows{display:flex;flex-direction:column;gap:6px;}
+.bd-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);transition:all .3s;}
+.bd-row.bdr-active{border-color:var(--accent4);background:rgba(255,209,102,.08);}
+.bd-row.bdr-done  {border-color:var(--pur);background:rgba(192,84,252,.06);}
+.bd-depth{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;min-width:18px;}
+.bd-expr {font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted);flex:1;}
+.bd-eq   {font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;min-width:28px;text-align:right;}
+
+/* CALL STACK */
+.stack-section{margin-bottom:14px;}
+.stack-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+.stack-frames{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;min-height:48px;}
+.stack-frame{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:62px;padding:6px 10px;border-radius:8px;border:2px solid;
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+}
+.stack-frame.sf-top{transform:translateY(-4px);box-shadow:0 6px 16px rgba(192,84,252,.25);}
+.sf-d{font-size:.44rem;opacity:.7;margin-bottom:2px;text-transform:uppercase;letter-spacing:.5px;}
+.sf-sum{font-size:.78rem;font-weight:700;}
+.stack-arrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);margin-bottom:4px;}
+
+/* depth color palette */
+.d1{background:rgba(33,150,243,.12);  border-color:#2196f3;color:#0d47a1;}
+.d2{background:rgba(192,84,252,.12);  border-color:#c084fc;color:var(--pur-dark);}
+.d3{background:rgba(6,214,160,.12);   border-color:#06d6a0;color:#024d37;}
+.d4{background:rgba(255,159,67,.14);  border-color:#ff9f43;color:#7a3900;}
+.d5{background:rgba(255,107,129,.12); border-color:#ff6b81;color:#880e4f;}
+
+/* CURRENT ELEMENT PANEL */
+.elem-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.elem-panel.ep-int  {border-color:var(--accent2);}
+.elem-panel.ep-arr  {border-color:var(--pur);}
+.elem-panel.ep-ret  {border-color:var(--accent3);}
+.ep-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.ep-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.epbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.epbox.eb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.epbox.eb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.epbox.eb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.epbox.eb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.epb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.epb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.epb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* RESULT BADGE */
+.result-badge{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;padding:8px 20px;border-radius:8px;
+  background:rgba(192,84,252,.12);border:2px solid var(--pur);color:var(--pur-dark);
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-new{animation:rbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbnew{from{transform:scale(1.25);background:rgba(192,84,252,.3);}to{transform:none;background:rgba(192,84,252,.12);}}
+.result-badge.rb-done{background:rgba(6,214,160,.14);border-color:var(--accent3);color:#024d37;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--pur);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-enter{border-color:var(--accent4);}
+.explain-panel.ep-int  {border-color:var(--accent2);}
+.explain-panel.ep-ret  {border-color:var(--pur);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--pur);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-enter{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-int  {border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-ret  {border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--pur);color:white;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-enter{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-int  {background:rgba(33,150,243,.14); border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-arr  {background:rgba(192,84,252,.14); border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-ret  {background:rgba(192,84,252,.18); border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.call-stack-right{margin-bottom:12px;}
+.csr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.csr-rows{display:flex;flex-direction:column;gap:3px;}
+.csr-row{display:flex;gap:8px;padding:5px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.6rem;align-items:center;color:#9ca3af;transition:all .25s;}
+.csr-row.csr-top{border-color:rgba(192,84,252,.5);background:rgba(192,84,252,.07);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(192,84,252,.06);border:1px solid rgba(192,84,252,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--pur);color:white;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Product Sum</h1>
+    <div class="sub">Recursion · Nested Arrays · Depth Multiplier</div>
+  </div>
+  <div class="family-badge">Recursion · DFS</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Special Array  (use [] for nested arrays)</label>
+      <input type="text" id="inArray" value="[5, 2, [7, -1], 3, [6, [-13, 8], 4]]">
+      <div class="hint">Example: [5, 2, [7, -1], 3, [6, [-13, 8], 4]] → 12</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1200">0.5×</button>
+        <button class="speed-btn active" data-ms="600">1×</button>
+        <button class="speed-btn" data-ms="280">2×</button>
+        <button class="speed-btn" data-ms="100">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.2);border-color:#2196f3;"></div> depth 1</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.2);border-color:#c084fc;"></div> depth 2</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.2);border-color:#06d6a0;"></div> depth 3</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,159,67,.2);border-color:#ff9f43;"></div> depth 4+</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.3);border-color:#f5a623;"></div> currently visiting</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.35);border-color:#06d6a0;"></div> returned ✓</div>
+  </div>
+
+  <!-- TREE CANVAS -->
+  <div class="canvas-section">
+    <div class="section-label">Recursion tree — depth multiplies subtotals</div>
+    <div class="canvas-outer" id="canvasOuter">
+      <canvas id="mainCanvas" height="280"></canvas>
+    </div>
+  </div>
+
+  <!-- DEPTH BREAKDOWN PANEL -->
+  <div class="breakdown-section">
+    <div class="section-label">Depth × subtotal breakdown</div>
+    <div class="breakdown-outer" id="breakdownOuter">
+      <div class="breakdown-rows" id="breakdownRows">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">will fill as recursion returns…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALL STACK -->
+  <div class="stack-section">
+    <div class="section-label">Call stack  (depth, running sum at each level)</div>
+    <div class="stack-outer">
+      <div class="stack-frames" id="stackFrames">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURRENT ELEMENT -->
+  <div class="elem-panel" id="elemPanel">
+    <div class="ep-title" id="elemTitle">Press RUN to begin</div>
+    <div class="ep-body" id="elemBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">Product Sum: —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar" id="narrativeBar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n)</div>
+      <div class="cx-sub">n = total elements</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(d)</div>
+      <div class="cx-sub">d = max depth</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Max Depth</div>
+      <div class="cx-val" id="cxDepth" style="color:#028a5b">—</div>
+      <div class="cx-sub">nesting levels</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Total Elems</div>
+      <div class="cx-val" id="cxElems" style="color:#7a5a00">—</div>
+      <div class="cx-sub">int + array</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-enter" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Product Sum</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">productSum</span>(</span>
+<span class="code-line" id="cl-sg2">    vector&lt;any&gt;&amp; arr, <span class="ck">int</span> depth=<span class="cn">1</span>) {</span>
+<span class="code-line" id="cl-sum">  <span class="ck">int</span> sum = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">auto</span>&amp; elem : arr) {</span>
+<span class="code-line" id="cl-isarr">    <span class="ck">if</span> (holds_alternative&lt;vector&lt;any&gt;&gt;(elem))</span>
+<span class="code-line" id="cl-rec">      sum += <span class="cf">productSum</span>(</span>
+<span class="code-line" id="cl-rec2">          get&lt;vector&lt;any&gt;&gt;(elem), depth+<span class="cn">1</span>);</span>
+<span class="code-line" id="cl-isint">    <span class="ck">else</span></span>
+<span class="code-line" id="cl-add">      sum += get&lt;<span class="ck">int</span>&gt;(elem);</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> depth * sum;</span>
+<span class="code-line" id="cl-close">}</span>
+<span class="code-line" id="cl-blank"> </span>
+<span class="code-line" id="cl-ex"><span class="cc">// [5, 2, [7,-1], 3, [6,[-13,8],4]]</span></span>
+<span class="code-line" id="cl-ex2"><span class="cc">// = 1*(5+2+6+3) + 2*(7-1+6+4)</span></span>
+<span class="code-line" id="cl-ex3"><span class="cc">//             + 3*(-13+8)</span></span>
+<span class="code-line" id="cl-ex4"><span class="cc">// = 16 + 32 + (-15) = 12 ✓</span></span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcDepth"><div class="var-name">depth</div>     <div class="var-value" id="vDepth"  style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcSum">  <div class="var-name">sum (local)</div><div class="var-value" id="vSum"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcElem"> <div class="var-name">elem</div>      <div class="var-value" id="vElem"  style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcRet">  <div class="var-name">return val</div><div class="var-value" id="vRet"   style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcTot" style="grid-column:1/3">
+        <div class="var-name">running total (depth × sum)</div>
+        <div class="var-value" id="vTot" style="color:var(--accent3)">—</div>
+      </div>
+    </div>
+
+    <div class="call-stack-right">
+      <div class="csr-title">Call stack frames</div>
+      <div class="csr-rows" id="csrRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Product Sum</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ PRODUCT SUM COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── DEPTH COLORS ─────────────────────────────────────────────────────────────
+const DEPTH_COLORS=[
+  null,
+  {fill:'rgba(33,150,243,.18)',stroke:'#2196f3',text:'#0d47a1',sf:'d1'},
+  {fill:'rgba(192,84,252,.18)',stroke:'#c084fc', text:var_purd(),sf:'d2'},
+  {fill:'rgba(6,214,160,.18)', stroke:'#06d6a0', text:'#024d37',sf:'d3'},
+  {fill:'rgba(255,159,67,.18)',stroke:'#ff9f43', text:'#7a3900',sf:'d4'},
+  {fill:'rgba(255,107,129,.18)',stroke:'#ff6b81',text:'#880e4f',sf:'d5'},
+];
+function dc(d){return DEPTH_COLORS[Math.min(d,5)]||DEPTH_COLORS[5];}
+function var_purd(){return '#7a3fc0';}
+
+// ─── PARSE INPUT ──────────────────────────────────────────────────────────────
+function parseArray(str){
+  try{return JSON.parse(str.replace(/\[/g,'[').replace(/\]/g,']'));}
+  catch(e){return null;}
+}
+
+// ─── TREE LAYOUT ─────────────────────────────────────────────────────────────
+// Build a tree structure from the nested array for rendering
+function buildTree(arr, depth=1, id='0'){
+  const node={id, depth, isArray:true, children:[], label:`depth ${depth}`};
+  arr.forEach((elem,i)=>{
+    if(Array.isArray(elem)){
+      node.children.push(buildTree(elem,depth+1,`${id}.${i}`));
+    } else {
+      node.children.push({id:`${id}.${i}`,depth,isArray:false,value:elem,children:[],label:String(elem)});
+    }
+  });
+  return node;
+}
+
+// Assign x,y positions via simple BFS layout
+function layoutTree(root, W, H){
+  const PAD=30;
+  // Collect all nodes level by level
+  const levels=[];
+  const queue=[root];
+  while(queue.length){
+    const lvl=[];
+    const n=queue.length;
+    for(let i=0;i<n;i++){
+      const node=queue.shift();
+      lvl.push(node);
+      node.children.forEach(c=>queue.push(c));
+    }
+    levels.push(lvl);
+  }
+  const maxDepth=levels.length;
+  const rowH=(H-2*PAD)/Math.max(maxDepth,1);
+  levels.forEach((level,li)=>{
+    const cols=level.length;
+    level.forEach((node,ci)=>{
+      node.x=PAD+(W-2*PAD)*(ci+.5)/cols;
+      node.y=PAD+rowH*(li+.5);
+    });
+  });
+  return root;
+}
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{depth,sum,elem,retVal,stack,nodeId}=args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Product Sum recurses into every nested array, passing <code>depth+1</code> down. When we reach the bottom of recursion for any array, we return <code>depth × (sum of its elements)</code>. Integers at depth d contribute d × value. Arrays at depth d contribute d × (their own product sum).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Base intuition:</strong> An integer at depth d contributes exactly d × its value. A nested array at depth d contributes d × (product sum of its contents at depth d+1).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Return value invariant:</strong> productSum(arr, d) always returns d × (sum of product-sums of each element). Integers contribute d×val, sub-arrays contribute d×productSum(sub,d+1).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(n) time, O(d) space:</strong> Every element visited exactly once. Stack depth = maximum nesting level d. No extra data structures needed.`},
+    ]
+  };
+  if(type==='enter') return {
+    why:`<div class="ep-why-block why-enter">Entering productSum at depth=${depth}. Initialize sum=0. Iterate over each element: integers add directly to sum, sub-arrays recurse with depth+1. At the end multiply sum × depth and return.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Frame opened:</strong> depth=${depth}, sum=0. Stack depth = ${stack?stack.length:1}.`},
+      {icon:'💡',cls:'inv-warn',text:`<strong>Why pass depth?</strong> Each recursive call increases depth by 1. This is how the multiplier "accumulates" — deeper arrays get higher depth weights automatically.`},
+    ]
+  };
+  if(type==='int') return {
+    why:`<div class="ep-why-block why-int">Element is an integer: ${elem}. Add it directly to local sum. At this depth (${depth}), it will be multiplied by ${depth} when we return. sum is now ${sum}.</div>`,
+    inv:[
+      {icon:'➕',cls:'',text:`<strong>sum += ${elem}.</strong> Running sum at depth ${depth} = ${sum}. Will be multiplied by depth=${depth} at return → contributes ${depth*sum} so far at this level.`},
+    ]
+  };
+  if(type==='arr_enter') return {
+    why:`<div class="ep-why-block why-arr">Element is a nested array. Recurse with depth=${depth+1}. The result will be added to the current sum. Current sum before this sub-array = ${sum}.</div>`,
+    inv:[
+      {icon:'🔽',cls:'inv-pur',text:`<strong>Recurse deeper:</strong> depth ${depth} → ${depth+1}. The sub-array's product sum (already multiplied by depth+1 internally) gets added to our sum.`},
+    ]
+  };
+  if(type==='return') return {
+    why:`<div class="ep-why-block why-ret">All elements of this array at depth=${depth} processed. sum=${sum}. Return depth × sum = ${depth} × ${sum} = <strong>${retVal}</strong>. This value is added to the parent's sum.</div>`,
+    inv:[
+      {icon:'⬆️',cls:'',text:`<strong>Return ${depth} × ${sum} = ${retVal}.</strong> The depth multiplier is applied exactly once per array level, at the moment of return.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Why multiply at return (not entry)?</strong> We need the full sum of all children first, then multiply once. Multiplying at entry would require tracking partial products.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Recursion complete. The outermost call returns depth=1 × totalSum = <strong>${retVal}</strong>. This is the product sum of the entire special array.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Product Sum = ${retVal}.</strong> Each integer at depth d contributed d×value. Each sub-array's contribution was multiplied by its depth before being added to its parent.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n) time</strong> — visited every element once. <strong>O(d) space</strong> — recursion stack = max nesting depth.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:     {ids:['cl-sig','cl-sg2','cl-sum'],cls:'hl-enter'},
+  enter:    {ids:['cl-sig','cl-sg2','cl-sum','cl-loop'],cls:'hl-enter'},
+  int:      {ids:['cl-isint','cl-add'],cls:'hl-int'},
+  arr_enter:{ids:['cl-isarr','cl-rec','cl-rec2'],cls:'hl-arr'},
+  return:   {ids:['cl-ret'],cls:'hl-ret'},
+  done:     {ids:['cl-ret','cl-close'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── NARRATIVE ────────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st)return{text:'Press RUN.',color:'var(--pur)'};
+  const{type,depth,sum,elem,retVal,elemStr}=st;
+  const c='var(--pur)';
+  if(type==='init')   return{color:'var(--accent3)',text:`Parsed the special array. Building recursion tree. productSum starts at depth=1.`};
+  if(type==='enter')  return{color:'var(--accent4)',text:`Enter productSum(depth=${depth}). Initialize sum=0. Will iterate over ${elemStr}.`};
+  if(type==='int')    return{color:'var(--accent2)',text:`Integer ${elem} found at depth ${depth}. sum += ${elem} → sum=${sum}. Will be multiplied by ${depth} at return.`};
+  if(type==='arr_enter') return{color:c,text:`Sub-array found at depth ${depth}. Recurse deeper with depth=${depth+1}. sum before recursion = ${sum}.`};
+  if(type==='return') return{color:c,text:`✓ Returning from depth ${depth}: sum=${sum}. depth × sum = ${depth} × ${sum} = <strong>${retVal}</strong>. This goes into parent's sum.`};
+  if(type==='done')   return{color:'var(--accent3)',text:`✅ Done! productSum = <strong>${retVal}</strong>. Every integer multiplied by its depth and summed.`};
+  return{text:'',color:c};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const steps=[];
+  let totalElems=0, maxDepth=0;
+  const treeRoot=buildTree(arr,1,'0');
+  // node map for highlighting
+  const nodeMap={};
+  function mapNodes(n){nodeMap[n.id]=n;n.children.forEach(mapNodes);}
+  mapNodes(treeRoot);
+
+  // Count
+  function countElems(a,d=1){
+    maxDepth=Math.max(maxDepth,d);
+    a.forEach(e=>{totalElems++;if(Array.isArray(e))countElems(e,d+1);});
+  }
+  countElems(arr);
+
+  const callStack=[];
+  const depthSums={}; // depthSums[d] = returned value at that depth (for breakdown)
+  let finalAnswer=null;
+
+  const snap=(type,desc,extra={})=>{
+    steps.push({type,desc,callStack:[...callStack.map(f=>({...f}))],
+      nodeMap:{...nodeMap},depthSums:{...depthSums},
+      finalAnswer,result:null,...extra,
+      explain:makeExplain(type,{...extra,stack:callStack})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> Parse array. Max depth=${maxDepth}, total elements=${totalElems}.`,
+    {depth:1,sum:0,elemStr:JSON.stringify(arr)});
+
+  function recurse(a,depth,nodeId){
+    let sum=0;
+    callStack.push({depth,sum,nodeId,label:`d=${depth}`});
+    snap('enter',`▶ Enter productSum(depth=${depth}). sum=0. Array: ${JSON.stringify(a)}`,
+      {depth,sum,elemStr:JSON.stringify(a),nodeId});
+
+    a.forEach((elem,i)=>{
+      const childId=`${nodeId}.${i}`;
+      if(Array.isArray(elem)){
+        snap('arr_enter',`📂 Element [${i}] is sub-array. Recurse depth=${depth+1}.`,
+          {depth,sum,elem:JSON.stringify(elem),elemStr:JSON.stringify(elem),nodeId,childId});
+        const subResult=recurse(elem,depth+1,childId);
+        sum+=subResult;
+        callStack[callStack.length-1].sum=sum;
+        snap('int',`↩ Sub-array returned ${subResult}. sum += ${subResult} → sum=${sum}`,
+          {depth,sum,elem:subResult,elemStr:JSON.stringify(elem),nodeId,isSubReturn:true});
+      } else {
+        sum+=elem;
+        callStack[callStack.length-1].sum=sum;
+        snap('int',`🔢 Element [${i}] = ${elem} (int). sum += ${elem} → sum=${sum}`,
+          {depth,sum,elem,elemStr:String(elem),nodeId,childId});
+      }
+    });
+
+    const retVal=depth*sum;
+    depthSums[nodeId]={depth,sum,retVal};
+    callStack[callStack.length-1].retVal=retVal;
+    snap('return',`⬆ Return depth×sum = ${depth}×${sum} = <strong>${retVal}</strong>`,
+      {depth,sum,retVal,nodeId});
+    callStack.pop();
+
+    if(depth===1){
+      finalAnswer=retVal;
+      snap('done',`🎉 <strong>Product Sum = ${retVal}</strong>`,
+        {depth,sum,retVal,nodeId,result:{answer:retVal}});
+      steps[steps.length-1].result={answer:retVal};
+      steps[steps.length-1].finalAnswer=retVal;
+    }
+    return retVal;
+  }
+
+  recurse(arr,1,'0');
+  return{steps,treeRoot,totalElems,maxDepth};
+}
+
+// ─── DRAW TREE ────────────────────────────────────────────────────────────────
+function drawCanvas(st, treeRoot){
+  const canvas=document.getElementById('mainCanvas');
+  const W=canvas.parentElement.clientWidth-16;
+  canvas.width=W; canvas.height=280;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,280);
+  if(!treeRoot)return;
+
+  // Layout
+  layoutTree(treeRoot,W,280);
+
+  // Draw edges first
+  function drawEdges(node){
+    node.children.forEach(child=>{
+      ctx.beginPath();
+      ctx.moveTo(node.x,node.y);
+      ctx.lineTo(child.x,child.y);
+      ctx.strokeStyle='rgba(212,204,184,0.6)';
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+      drawEdges(child);
+    });
+  }
+  drawEdges(treeRoot);
+
+  // Current and returned node IDs from step
+  const curNodeId=st.nodeId||'0';
+  const returnedIds=new Set(Object.keys(st.depthSums||{}));
+
+  function drawNodes(node){
+    const col=dc(node.depth);
+    const isCur=node.id===curNodeId&&!st.result;
+    const isDone=returnedIds.has(node.id)||!!st.result;
+    const R=node.isArray?18:14;
+
+    // shadow for current
+    if(isCur){
+      ctx.beginPath();ctx.arc(node.x,node.y,R+5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,209,102,.25)`;ctx.fill();
+    }
+
+    ctx.beginPath();ctx.arc(node.x,node.y,R,0,Math.PI*2);
+    ctx.fillStyle=isDone?col.fill.replace('.18','.3'):isCur?'rgba(255,209,102,.35)':col.fill;
+    ctx.fill();
+    ctx.strokeStyle=isCur?'#ffd166':isDone?col.stroke:col.stroke;
+    ctx.lineWidth=isCur?3:2;
+    ctx.stroke();
+
+    ctx.fillStyle=isCur?'#7a5a00':col.text;
+    ctx.font=`bold ${node.isArray?10:11}px Space Mono`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    const label=node.isArray?`[ ]`:String(node.value);
+    ctx.fillText(label,node.x,node.y);
+
+    // depth badge for arrays
+    if(node.isArray){
+      ctx.fillStyle='rgba(0,0,0,0.5)';
+      ctx.font='8px Space Mono';
+      ctx.fillText(`d${node.depth}`,node.x,node.y+R+9);
+    }
+
+    // return value label
+    if(isDone&&st.depthSums&&st.depthSums[node.id]){
+      const{retVal}=st.depthSums[node.id];
+      ctx.fillStyle=col.text;
+      ctx.font='bold 9px Space Mono';
+      ctx.fillText(`→${retVal}`,node.x,node.y-R-8);
+    }
+
+    node.children.forEach(drawNodes);
+  }
+  drawNodes(treeRoot);
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=600;
+let treeRoot=null, totalElems=0, maxDepth=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inArray').value.trim();
+  const arr=parseArray(raw);
+  if(!arr||!Array.isArray(arr)){
+    document.getElementById('narrativeText').textContent='⚠ Invalid array. Use JSON format like [5, 2, [7, -1], 3]';
+    return;
+  }
+
+  const res=computeSteps(arr);
+  steps=res.steps; treeRoot=res.treeRoot;
+  totalElems=res.totalElems; maxDepth=res.maxDepth;
+  currentStep=0;
+
+  document.getElementById('cxDepth').textContent=maxDepth;
+  document.getElementById('cxElems').textContent=totalElems;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('resultBadge').textContent='Product Sum: —';
+  document.getElementById('resultBadge').className='result-badge';
+  document.getElementById('breakdownRows').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill as recursion returns…</span>';
+  document.getElementById('stackFrames').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  document.getElementById('csrRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Canvas outer border
+  document.getElementById('canvasOuter').className='canvas-outer'+(
+    st.type==='return'||st.type==='done'?' co-return':st.type==='int'?' co-enter':' co-enter');
+
+  // Draw tree
+  drawCanvas(st,treeRoot);
+
+  // Call stack frames
+  const sf=document.getElementById('stackFrames');
+  if(!st.callStack||st.callStack.length===0){
+    sf.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  } else {
+    sf.innerHTML='';
+    st.callStack.forEach((frame,i)=>{
+      const isTop=i===st.callStack.length-1;
+      const col=dc(frame.depth);
+      const fr=document.createElement('div');
+      fr.className=`stack-frame ${col.sf}${isTop?' sf-top':''}`;
+      fr.innerHTML=`<div class="sf-d">${isTop?'TOP':''} d=${frame.depth}</div>`
+        +`<div class="sf-sum">Σ${frame.sum!=null?frame.sum:'0'}</div>`;
+      sf.appendChild(fr);
+      if(!isTop){const a=document.createElement('div');a.className='stack-arrow';a.textContent='→';sf.appendChild(a);}
+    });
+  }
+
+  // Depth breakdown rows
+  const bdr=document.getElementById('breakdownRows');
+  const bo=document.getElementById('breakdownOuter');
+  const depSums=st.depthSums||{};
+  const entries=Object.values(depSums);
+  bo.className='breakdown-outer'+(isFinal?' bo-done':entries.length?' bo-active':'');
+  if(entries.length===0){
+    bdr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">will fill as recursion returns…</span>';
+  } else {
+    bdr.innerHTML='';
+    entries.forEach(({depth,sum,retVal},i)=>{
+      const col=dc(depth);
+      const isLatest=i===entries.length-1&&!isFinal;
+      const row=document.createElement('div');
+      row.className=`bd-row ${isLatest?'bdr-active':'bdr-done'}`;
+      row.innerHTML=`<div class="bd-depth" style="color:${col.stroke}">d${depth}</div>`
+        +`<div class="bd-expr">${depth} × ${sum}</div>`
+        +`<div class="bd-eq" style="color:${col.stroke}">${retVal}</div>`;
+      bdr.appendChild(row);
+    });
+  }
+
+  // Element panel
+  const ep=document.getElementById('elemPanel');
+  const et=document.getElementById('elemTitle');
+  const eb=document.getElementById('elemBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="epbox ${cls}"><div class="epb-lbl">${lbl}</div><div class="epb-val">${val}</div><div class="epb-sub">${sub}</div></div>`;
+
+  if(st.type==='enter'||st.type==='init'){
+    ep.className='elem-panel ep-arr';
+    et.textContent=`productSum(depth=${st.depth||1}) called`;
+    eb.innerHTML=mkBox('depth',st.depth||1,'current level','epbox eb-pur')+
+      mkBox('sum','0','initialised','epbox eb-yel')+
+      mkBox('type','[ ]','sub-array','epbox eb-pur');
+  } else if(st.type==='int'){
+    ep.className=`elem-panel ${st.isSubReturn?'ep-ret':'ep-int'}`;
+    et.textContent=st.isSubReturn?`Sub-array returned ${st.elem}`:`Integer element: ${st.elem}`;
+    eb.innerHTML=mkBox('elem',st.elem,st.isSubReturn?'sub-result':'integer','epbox eb-blue')+
+      mkBox('depth',st.depth,'multiplier','epbox eb-pur')+
+      mkBox('sum',st.sum,'after add','epbox eb-yel')+
+      mkBox('contrib',`${st.depth}×${st.sum}`,'so far','epbox eb-grn');
+  } else if(st.type==='arr_enter'){
+    ep.className='elem-panel ep-arr';
+    et.textContent=`Sub-array found — recurse depth=${st.depth+1}`;
+    eb.innerHTML=mkBox('depth',st.depth,'current','epbox eb-pur')+
+      mkBox('next',st.depth+1,'recurse to','epbox eb-yel')+
+      mkBox('sum',st.sum,'before recurse','epbox eb-blue');
+  } else if(st.type==='return'||st.type==='done'){
+    ep.className='elem-panel ep-ret';
+    et.textContent=`Return ${st.depth} × ${st.sum} = ${st.retVal}`;
+    eb.innerHTML=mkBox('depth',st.depth,'level','epbox eb-pur')+
+      mkBox('sum',st.sum,'subtotal','epbox eb-yel')+
+      mkBox('return',st.retVal,'depth × sum','epbox eb-grn');
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Right vars
+  setVar('vDepth','vcDepth',st.depth!=null?st.depth:'—');
+  setVar('vSum',  'vcSum',  st.sum!=null?st.sum:'—');
+  setVar('vElem', 'vcElem', st.elem!=null?String(st.elem):'—');
+  setVar('vRet',  'vcRet',  st.retVal!=null?st.retVal:'—');
+  setVar('vTot',  'vcTot',  st.retVal!=null?`${st.depth}×${st.sum}=${st.retVal}`:'—');
+
+  // Right call stack
+  const csr=document.getElementById('csrRows');
+  csr.innerHTML='';
+  [...(st.callStack||[])].reverse().slice(0,6).forEach((frame,k)=>{
+    const isTop=k===0;
+    const col=dc(frame.depth);
+    csr.innerHTML+=`<div class="csr-row ${isTop?'csr-top':''}">
+      <span style="color:${col.stroke};font-weight:700">d${frame.depth}</span>
+      <span>sum=${frame.sum!=null?frame.sum:0}</span>
+      ${frame.retVal!=null?`<span style="color:var(--accent3)">→${frame.retVal}</span>`:''}
+    </div>`;
+  });
+
+  // Result badge
+  const rb=document.getElementById('resultBadge');
+  if(isFinal||st.finalAnswer!=null){
+    const ans=st.finalAnswer||st.result?.answer;
+    const prevAns=idx>0&&steps[idx-1].finalAnswer;
+    rb.textContent=`Product Sum: ${ans}`;
+    rb.className=`result-badge rb-done${!prevAns?' rb-new':''}`;
+  }
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ PRODUCT SUM = ${st.result.answer}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`max depth ${maxDepth} · ${totalElems} elements`;
+    document.getElementById('cxDepth').textContent=maxDepth;
+    document.getElementById('cxElems').textContent=totalElems;
+    document.getElementById('breakdownOuter').className='breakdown-outer bo-done';
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-enter',enter:'ep-enter',int:'ep-int',arr_enter:'ep-ret',return:'ep-ret',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-enter');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)drawCanvas(steps[currentStep],treeRoot);});
+buildUI();
+</script>
+</body>
+</html>

@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Powerset — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:300px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent3);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#006d4e;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: SUBSET GRID ══
+   All subsets as chips, color-coded by
+   the "generation" (which element added them).
+   Chips appear in waves as algorithm progresses. */
+.subset-grid-section{margin-bottom:14px;}
+.subset-grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s;overflow:hidden;}
+.subset-grid-outer.sgo-active{border-color:var(--accent3);}
+.subset-grid-outer.sgo-new{border-color:var(--accent4);}
+.subset-grid-outer.sgo-done{border-color:var(--accent3);}
+.subset-grid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.sgh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.sgh-count{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--accent3);}
+.subset-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:32px;}
+.sc{
+  font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;
+  padding:4px 10px;border-radius:6px;border:1.5px solid;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  white-space:nowrap;
+}
+/* generation colors */
+.sc-g0{background:rgba(33,150,243,.1);   border-color:#2196f3;color:#0d47a1;}   /* base: [] */
+.sc-g1{background:rgba(6,214,160,.12);   border-color:#06d6a0;color:#024d37;}   /* elem 1 */
+.sc-g2{background:rgba(192,84,252,.12);  border-color:#c084fc;color:#5b1a9a;}   /* elem 2 */
+.sc-g3{background:rgba(255,209,102,.18); border-color:#ffd166;color:#7a4800;}   /* elem 3 */
+.sc-g4{background:rgba(230,57,70,.12);   border-color:#e63946;color:#7a0000;}   /* elem 4 */
+.sc-g5{background:rgba(255,159,67,.14);  border-color:#ff9f43;color:#7a3900;}   /* elem 5 */
+.sc-g6{background:rgba(72,219,251,.14);  border-color:#48dbfb;color:#006064;}   /* elem 6 */
+/* new subset animation */
+.sc-new{animation:scPop .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes scPop{from{transform:scale(0) translateY(6px);opacity:0}to{transform:none;opacity:1}}
+/* current element badge on chip */
+.sc-highlighted{transform:scale(1.08) translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.12);}
+
+/* ══ UNIQUE VISUAL 2: DOUBLING WAVE PANEL ══
+   For each element processed, shows the
+   "before | + copied with elem | = after" split */
+.doubling-section{margin-bottom:14px;}
+.doubling-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.doubling-outer.do-active{border-color:var(--accent4);}
+.doubling-outer.do-done{border-color:var(--accent3);}
+.doubling-rows{display:flex;flex-direction:column;gap:8px;}
+.dbl-row{
+  display:flex;align-items:stretch;gap:0;
+  border-radius:8px;overflow:hidden;border:1.5px solid var(--border);
+  transition:all .3s;
+}
+.dbl-row.dr-active{border-color:var(--accent4);box-shadow:0 2px 10px rgba(255,209,102,.2);}
+.dbl-row.dr-done  {border-color:var(--accent3);opacity:.8;}
+.dbl-cell{flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:3px;}
+.dbl-cell:not(:last-child){border-right:1px solid var(--border);}
+.dbl-cell-label{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+.dbl-cell-val  {font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--ink);}
+.dbl-cell-sub  {font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.dbl-op{display:flex;align-items:center;justify-content:center;padding:0 8px;font-family:'Space Mono',monospace;font-size:1.1rem;color:var(--muted);background:rgba(0,0,0,.02);}
+/* element badge */
+.elem-badge{display:inline-block;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;
+  padding:2px 8px;border-radius:5px;margin-left:4px;}
+
+/* ══ UNIQUE VISUAL 3: ELEMENT STRIP ══
+   Shows all input elements, highlights current one,
+   shows progress through the iteration */
+.elem-strip-section{margin-bottom:14px;}
+.elem-strip-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+.elem-strip-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.esh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.esh-formula{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--ink);}
+.elem-strip{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.elem-node{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:44px;padding:8px 6px;border-radius:8px;border:2px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;
+  background:var(--surface);color:var(--muted);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.en-val{font-size:.85rem;font-weight:700;}
+.en-before{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+.en-after {font-family:'Space Mono',monospace;font-size:.48rem;font-weight:700;}
+.elem-node.en-done{background:rgba(6,214,160,.1);border-color:var(--accent3);color:#024d37;}
+.elem-node.en-done .en-after{color:var(--accent3);}
+.elem-node.en-cur {background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;
+  transform:translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,.3);}
+.elem-node.en-cur .en-after{color:#7a4800;}
+.elem-node.en-wait{opacity:.5;}
+.elem-arrow{font-family:'Space Mono',monospace;font-size:1rem;color:var(--border);}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-init  {border-color:var(--accent3);}
+.step-panel.sp-copy  {border-color:var(--accent4);}
+.step-panel.sp-add   {border-color:var(--accent3);}
+.step-panel.sp-done  {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* COUNT BADGE */
+.count-badge{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.count-badge.cb-new{animation:cbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes cbnew{from{transform:scale(1.2);background:rgba(6,214,160,.3);}to{transform:none;background:rgba(6,214,160,.12);}}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-init{border-color:var(--accent3);}
+.explain-panel.ep-copy{border-color:var(--accent4);}
+.explain-panel.ep-add {border-color:var(--accent3);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-copy{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-add {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT PANEL */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*14+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-copy{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-add {background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.subset-log-right{margin-bottom:12px;}
+.slr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.slr-rows{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto;}
+.slr-rows::-webkit-scrollbar{width:3px;}.slr-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.slr-row{padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.6rem;color:#9ca3af;transition:all .25s;}
+.slr-row.slr-new{border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.07);animation:fadeUp .35s ease;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Powerset</h1>
+    <div class="sub">All Subsets · Iterative Doubling · O(n·2ⁿ)</div>
+  </div>
+  <div class="family-badge">Recursion · Subsets</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Array of unique integers</label>
+      <input type="text" id="inArray" value="1, 2, 3">
+      <div class="hint">Comma-separated unique integers. Max ~6 for readability.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.15);border-color:#2196f3;"></div> base [ ]</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;"></div> elem 1 added</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.15);border-color:#c084fc;"></div> elem 2 added</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;"></div> elem 3 added</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#ffd166;border-radius:50%"></div> current element</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: SUBSET GRID -->
+  <div class="subset-grid-section">
+    <div class="section-label">All subsets — growing with each element</div>
+    <div class="subset-grid-outer" id="subsetGridOuter">
+      <div class="subset-grid-header">
+        <div class="sgh-title">P(X) — powerset</div>
+        <div class="sgh-count"><span id="subsetCount">0</span> subsets</div>
+      </div>
+      <div class="subset-chips" id="subsetChips">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">[ ] will appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DOUBLING WAVE PANEL -->
+  <div class="doubling-section">
+    <div class="section-label">Doubling wave — each element doubles the collection</div>
+    <div class="doubling-outer" id="doublingOuter">
+      <div class="doubling-rows" id="doublingRows">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">doublings appear after each element…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: ELEMENT STRIP -->
+  <div class="elem-strip-section">
+    <div class="section-label">Element iteration</div>
+    <div class="elem-strip-outer">
+      <div class="elem-strip-header">
+        <div class="esh-title">for each elem: copy all, append elem, concat</div>
+        <div class="esh-formula" id="eshFormula">2⁰ = 1 subset</div>
+      </div>
+      <div class="elem-strip" id="elemStrip">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">elements appear here</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUNT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="count-badge" id="countBadge">|P(X)| = 1</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-init" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details appear here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n·2ⁿ)</div>
+      <div class="cx-sub">copy each subset per elem</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(n·2ⁿ)</div>
+      <div class="cx-sub">store all subsets</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">|P(X)|</div>
+      <div class="cx-val" id="cxSubsets" style="color:#028a5b">—</div>
+      <div class="cx-sub">= 2ⁿ subsets</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">n</div>
+      <div class="cx-val" id="cxN" style="color:#7a5a00">—</div>
+      <div class="cx-sub">input size</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">Python/C++ — Powerset</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">def</span> <span class="cf">powerset</span>(array):</span>
+<span class="code-line" id="cl-init">  subsets = [[]]</span>
+<span class="code-line" id="cl-blank"> </span>
+<span class="code-line" id="cl-for"><span class="ck">  for</span> elem <span class="ck">in</span> array:</span>
+<span class="code-line" id="cl-copy">    new = [s + [elem]</span>
+<span class="code-line" id="cl-copy2">           <span class="ck">for</span> s <span class="ck">in</span> subsets]</span>
+<span class="code-line" id="cl-concat">    subsets += new</span>
+<span class="code-line" id="cl-blank2"> </span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> subsets</span>
+<span class="code-line" id="cl-blank3"> </span>
+<span class="code-line" id="cl-c1"><span class="cc">// C++ equivalent:</span></span>
+<span class="code-line" id="cl-c2"><span class="cc">// for each elem in array:</span></span>
+<span class="code-line" id="cl-c3"><span class="cc">//   int sz = subsets.size();</span></span>
+<span class="code-line" id="cl-c4"><span class="cc">//   for (int i=0; i&lt;sz; i++) {</span></span>
+<span class="code-line" id="cl-c5"><span class="cc">//     auto copy = subsets[i];</span></span>
+<span class="code-line" id="cl-c6"><span class="cc">//     copy.push_back(elem);</span></span>
+<span class="code-line" id="cl-c7"><span class="cc">//     subsets.push_back(copy);</span></span>
+<span class="code-line" id="cl-c8"><span class="cc">//   }</span></span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcElem">  <div class="var-name">elem</div>          <div class="var-value" id="vElem"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcBefore"><div class="var-name">|subsets| before</div><div class="var-value" id="vBefore" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcNew">   <div class="var-name">|new| copies</div>  <div class="var-value" id="vNew"   style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcAfter"> <div class="var-name">|subsets| after</div><div class="var-value" id="vAfter" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcTotal" style="grid-column:1/3">
+        <div class="var-name">subsets (total = 2ⁿ)</div>
+        <div class="var-value" id="vTotal" style="color:var(--accent3)">1</div>
+      </div>
+    </div>
+
+    <div class="subset-log-right">
+      <div class="slr-title">Latest subsets added</div>
+      <div class="slr-rows" id="slrRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Total Subsets</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ POWERSET COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── GENERATION COLORS ─────────────────────────────────────────────────────
+const GEN_CLASSES=['sc-g0','sc-g1','sc-g2','sc-g3','sc-g4','sc-g5','sc-g6'];
+function genClass(g){return GEN_CLASSES[Math.min(g,6)];}
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{elem,before,after,newCount,subsets,array,n}=args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Start with <code>subsets = [[]]</code> — the only subset of the empty set is the empty set itself. Then iterate over each element. For each element, we take every existing subset, copy it, append the element to the copy, and add it to subsets. This doubles the collection each time, giving us 2ⁿ subsets total.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Loop invariant:</strong> After processing the first k elements, <code>subsets</code> contains exactly all 2ᵏ subsets of those k elements.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why copy+append?</strong> For each existing subset S, we need both S (doesn't include elem) and S∪{elem} (includes elem). The copy-and-append produces S∪{elem} without mutating the original S.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(n·2ⁿ) time:</strong> At step k, there are 2ᵏ subsets to copy. Total copies = 2⁰+2¹+…+2ⁿ⁻¹ = 2ⁿ−1. Each copy takes O(k) time → total O(n·2ⁿ).`},
+    ]
+  };
+  if(type==='copy') return {
+    why:`<div class="ep-why-block why-copy">Processing element <strong>${elem}</strong>. There are ${before} existing subsets. We create ${before} new copies, each with <strong>${elem}</strong> appended. Then we concatenate: subsets = old (${before}) + new (${before}) = ${after} subsets.</div>`,
+    inv:[
+      {icon:'📋',cls:'',text:`<strong>Copy phase:</strong> new = [s + [${elem}] for s in subsets]. Creates ${newCount} new subsets.`},
+      {icon:'➕',cls:'inv-warn',text:`<strong>Concat phase:</strong> subsets += new. ${before} → ${after} subsets. Each element exactly doubles the collection.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All ${n} elements processed. |P(X)| = 2ⁿ = 2^${n} = ${Math.pow(2,n)} subsets. Every possible inclusion/exclusion combination is represented exactly once.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Completeness:</strong> Each element was independently included or excluded → 2 choices × 2 choices × … = 2ⁿ unique subsets.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n·2ⁿ) time, O(n·2ⁿ) space</strong> — unavoidable since we must output all 2ⁿ subsets, each of length up to n.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-init','cl-for'],cls:'hl-init'},
+  copy: {ids:['cl-copy','cl-copy2','cl-concat'],cls:'hl-copy'},
+  done: {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── NARRATIVE ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  const{type,elem,before,after,newCount,elemIdx,n}=st;
+  if(type==='init')  return{color:'var(--accent3)',text:`Start: subsets = [[]] — just the empty set. Now iterate over each of the ${n} elements, doubling the collection each time.`};
+  if(type==='copy')  return{color:'var(--accent4)',text:`Element <strong>${elem}</strong> (${elemIdx+1}/${n}): copy each of the ${before} existing subsets, append ${elem} to each copy → ${newCount} new subsets. Total: ${before}+${newCount} = <strong>${after}</strong>.`};
+  if(type==='done')  return{color:'var(--accent3)',text:`✅ Done! All ${n} elements processed. 2^${n} = <strong>${Math.pow(2,n)} subsets</strong> in the powerset.`};
+  return{text:'',color:'var(--accent3)'};
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(array){
+  const n=array.length;
+  const steps=[];
+  let subsets=[[]];
+  // generation: which element "created" this subset (0=base, 1=first elem, etc)
+  let generations=[0];
+
+  const snap=(type,desc,extra={})=>{
+    steps.push({type,desc,n,array,
+      subsets:subsets.map(s=>[...s]),
+      generations:[...generations],
+      result:null,...extra,
+      explain:makeExplain(type,{n,array,...extra})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> subsets=[[]], the powerset of the empty set. Will process ${n} elements one by one.`,
+    {before:1,after:1,elem:null,elemIdx:-1,newCount:0});
+
+  array.forEach((elem,i)=>{
+    const before=subsets.length;
+    const newSubs=subsets.map(s=>[...s,elem]);
+    const newGens=subsets.map(()=>i+1);
+    subsets=[...subsets,...newSubs];
+    generations=[...generations,...newGens];
+    const after=subsets.length;
+    const newCount=newSubs.length;
+
+    snap('copy',
+      `➕ elem=<strong>${elem}</strong>: copy ${before} subsets, append ${elem} to each. <strong>${before}→${after}</strong> subsets.`,
+      {elem,elemIdx:i,before,after,newCount,
+       newSubsets:newSubs.map(s=>[...s]),newGens:[...newGens]});
+  });
+
+  snap('done',`🎉 <strong>Done!</strong> 2^${n} = ${Math.pow(2,n)} subsets.`,
+    {before:subsets.length,after:subsets.length,elem:null,elemIdx:n,newCount:0,
+     result:{answer:subsets.length,subsets:subsets.map(s=>[...s])}});
+  steps[steps.length-1].result={answer:subsets.length,subsets:subsets.map(s=>[...s])};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let inputArr=[];
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  const raw=document.getElementById('inArray').value;
+  inputArr=raw.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x));
+  if(!inputArr.length)return;
+  const n=inputArr.length;
+
+  steps=computeSteps(inputArr);
+  currentStep=0;
+
+  document.getElementById('cxN').textContent=n;
+  document.getElementById('cxSubsets').textContent=`2^${n}=${Math.pow(2,n)}`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('subsetChips').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">[ ] will appear here…</span>';
+  document.getElementById('subsetCount').textContent='0';
+  document.getElementById('doublingRows').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">doublings appear after each element…</span>';
+  document.getElementById('countBadge').textContent='|P(X)| = 1';
+  document.getElementById('slrRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build element strip
+  const es=document.getElementById('elemStrip');
+  es.innerHTML='';
+  inputArr.forEach((elem,i)=>{
+    const node=document.createElement('div');
+    node.className='elem-node en-wait';node.id=`en-${i}`;
+    node.innerHTML=`<div class="en-val">${elem}</div>`
+      +`<div class="en-before">×1→</div>`
+      +`<div class="en-after" id="ena-${i}">×2</div>`;
+    es.appendChild(node);
+    if(i<inputArr.length-1){
+      const arr=document.createElement('div');arr.className='elem-arrow';arr.textContent='→';es.appendChild(arr);
+    }
+  });
+
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function subsetLabel(s){return s.length===0?'[]':'['+s.join(',')+']';}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n;
+
+  // ── Subset grid ──
+  const sc=document.getElementById('subsetChips');
+  const sgo=document.getElementById('subsetGridOuter');
+  sgo.className='subset-grid-outer'+(isFinal?' sgo-done':st.type==='copy'?' sgo-new':' sgo-active');
+  document.getElementById('subsetCount').textContent=st.subsets.length;
+
+  const prevCount=idx>0?steps[idx-1].subsets.length:0;
+  sc.innerHTML='';
+  st.subsets.forEach((sub,k)=>{
+    const chip=document.createElement('div');
+    const gen=st.generations[k]||0;
+    const isNew=k>=prevCount&&st.type==='copy';
+    chip.className=`sc ${genClass(gen)}${isNew?' sc-new':''}`;
+    chip.textContent=subsetLabel(sub);
+    // highlight if current element's subset
+    if(st.type==='copy'&&gen===st.elemIdx+1){
+      chip.classList.add('sc-highlighted');
+    }
+    sc.appendChild(chip);
+  });
+
+  // ── Doubling rows ──
+  const dr=document.getElementById('doublingRows');
+  const dbo=document.getElementById('doublingOuter');
+  // Collect all copy steps so far
+  const copySteps=steps.slice(0,idx+1).filter(s=>s.type==='copy');
+  dbo.className='doubling-outer'+(isFinal?' do-done':copySteps.length?' do-active':'');
+  if(copySteps.length===0){
+    dr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">doublings appear after each element…</span>';
+  } else {
+    dr.innerHTML='';
+    copySteps.forEach((cs,k)=>{
+      const isLatest=k===copySteps.length-1&&!isFinal&&st.type==='copy';
+      const gen=cs.elemIdx+1;
+      const genColors=['#2196f3','#06d6a0','#c084fc','#ffd166','#e63946','#ff9f43','#48dbfb'];
+      const col=genColors[Math.min(gen-1,6)];
+      const row=document.createElement('div');
+      row.className=`dbl-row ${isLatest?'dr-active':'dr-done'}`;
+      row.innerHTML=
+        `<div class="dbl-cell" style="background:rgba(33,150,243,.03)">
+          <div class="dbl-cell-label">Before</div>
+          <div class="dbl-cell-val">${cs.before} subsets</div>
+          <div class="dbl-cell-sub">all without ${cs.elem}</div>
+        </div>
+        <div class="dbl-op">+</div>
+        <div class="dbl-cell" style="background:rgba(6,214,160,.03)">
+          <div class="dbl-cell-label">Copies + <span style="color:${col};font-weight:700">${cs.elem}</span></div>
+          <div class="dbl-cell-val">${cs.newCount} subsets</div>
+          <div class="dbl-cell-sub">each with ${cs.elem} appended</div>
+        </div>
+        <div class="dbl-op">=</div>
+        <div class="dbl-cell" style="background:rgba(192,84,252,.03)">
+          <div class="dbl-cell-label">After</div>
+          <div class="dbl-cell-val">${cs.after} subsets</div>
+          <div class="dbl-cell-sub">×2 doubled</div>
+        </div>`;
+      dr.appendChild(row);
+    });
+  }
+
+  // ── Element strip ──
+  inputArr.forEach((elem,i)=>{
+    const node=document.getElementById(`en-${i}`);
+    if(!node)return;
+    const isDone=st.elemIdx>i||(st.type==='done');
+    const isCur=st.elemIdx===i&&st.type==='copy';
+    node.className=`elem-node ${isDone?'en-done':isCur?'en-cur':'en-wait'}`;
+    const afterEl=document.getElementById(`ena-${i}`);
+    if(afterEl){
+      if(isDone||isCur){
+        const csForElem=steps.find(s=>s.type==='copy'&&s.elemIdx===i);
+        if(csForElem){afterEl.textContent=`→${csForElem.after}`;}
+      } else {
+        afterEl.textContent=`×2`;
+      }
+    }
+  });
+  // formula
+  const processed=st.elemIdx>=0?st.elemIdx+1:0;
+  document.getElementById('eshFormula').textContent=`2^${processed} = ${Math.pow(2,processed)} subsets`;
+
+  // ── Count badge ──
+  const cb=document.getElementById('countBadge');
+  const prevC=idx>0?steps[idx-1].subsets.length:1;
+  cb.textContent=`|P(X)| = ${st.subsets.length}`;
+  if(st.subsets.length>prevC){cb.classList.remove('cb-new');void cb.offsetWidth;cb.classList.add('cb-new');}
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  if(st.type==='copy'){
+    sp.className='step-panel sp-copy';
+    spt.textContent=`Element: ${st.elem} (step ${st.elemIdx+1}/${n})`;
+    spb.innerHTML=mkBox('elem',st.elem,'current','spbox sb-yel')+
+      mkBox('before',st.before,'existing subsets','spbox sb-blue')+
+      mkBox('new copies',st.newCount,'appended','spbox sb-pur')+
+      mkBox('after',st.after,'= before×2','spbox sb-grn');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=`Complete! ${st.subsets.length} subsets`;
+    spb.innerHTML=mkBox('n',n,'elements','spbox sb-blue')+
+      mkBox('2^n',Math.pow(2,n),'subsets','spbox sb-grn');
+  } else {
+    sp.className='step-panel sp-init';
+    spt.textContent='Initialised — subsets = [[]]';
+    spb.innerHTML=mkBox('start','[[]]','empty set','spbox sb-grn')+
+      mkBox('|P|','1','2^0 subsets','spbox sb-blue');
+  }
+
+  // ── Narrative ──
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar').style.borderLeftColor=narr.color;
+  document.getElementById('narrativeText').innerHTML=narr.text;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vElem',  'vcElem',  st.elem!=null?st.elem:'—');
+  setVar('vBefore','vcBefore',st.before!=null?st.before:'—');
+  setVar('vNew',   'vcNew',   st.newCount!=null?st.newCount:'—');
+  setVar('vAfter', 'vcAfter', st.after!=null?st.after:'—');
+  setVar('vTotal', 'vcTotal', st.subsets.length);
+
+  // ── Subset log right ──
+  const slr=document.getElementById('slrRows');
+  slr.innerHTML='';
+  const toShow=st.type==='copy'?(st.newSubsets||[]):[[]];
+  const showList=st.type==='done'?st.subsets:toShow;
+  [...showList].slice(-8).reverse().forEach((sub,k)=>{
+    const isNew=st.type==='copy'&&k<(st.newSubsets||[]).length;
+    slr.innerHTML+=`<div class="slr-row ${k===0&&isNew?'slr-new':''}">
+      ${subsetLabel(sub)}
+    </div>`;
+  });
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ${st.result.answer} SUBSETS — POWERSET COMPLETE`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`n=${n} · 2^${n}=${Math.pow(2,n)} · O(n·2ⁿ)`;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',copy:'ep-copy',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>
