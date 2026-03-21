@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interweaving Strings — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(192,84,252,.2);border:1px solid var(--pur);color:#5b1a9a;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.75rem;color:var(--ink);outline:none;width:200px;transition:border-color .2s;letter-spacing:1px;}
+.field input:focus{border-color:var(--pur);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: 2D DP GRID ══
+   rows = i (chars consumed from one), cols = j (chars from two).
+   Each cell (i,j) = can we build three[0..i+j-1] using one[0..i-1] + two[0..j-1]? */
+.grid-section{margin-bottom:14px;}
+.grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px;overflow:auto;transition:border-color .3s;}
+.grid-outer.go-true {border-color:var(--accent3);}
+.grid-outer.go-false{border-color:var(--accent);}
+.grid-outer.go-cur  {border-color:var(--pur);}
+.grid-table{border-collapse:separate;border-spacing:3px;margin:0 auto;}
+.grid-hdr{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-align:center;padding:2px 4px;min-width:32px;}
+.grid-cell{
+  width:34px;height:34px;border-radius:5px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;
+  text-align:center;vertical-align:middle;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  cursor:default;
+}
+/* cell states */
+.gc-empty  {background:rgba(0,0,0,.02);color:#ccc;border-style:dashed;}
+.gc-true   {background:rgba(6,214,160,.15);border-color:#06d6a0;color:#024d37;}
+.gc-false  {background:rgba(230,57,70,.1); border-color:#e63946;color:#b71c1c;}
+.gc-cur    {background:rgba(192,84,252,.2);border-color:#c084fc;color:#5b1a9a;
+            transform:scale(1.12);box-shadow:0 4px 14px rgba(192,84,252,.35);}
+.gc-check1 {background:rgba(33,150,243,.1);border-color:#2196f3;color:#0d47a1;}
+.gc-check2 {background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+/* char row/col labels */
+.char-lbl-row{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;padding:0 4px;color:var(--ink);}
+.char-lbl-col{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;color:var(--ink);}
+
+/* ══ UNIQUE VISUAL 2: CHARACTER MATCH PANEL ══
+   Shows the three strings with current pointers + match state. */
+.match-section{margin-bottom:14px;}
+.match-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.match-outer.mo-true {border-color:var(--accent3);}
+.match-outer.mo-false{border-color:var(--accent);}
+.match-outer.mo-cur  {border-color:var(--pur);}
+.match-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.mh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.mh-state{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;}
+.ms-true {color:var(--accent3);}
+.ms-false{color:var(--accent);}
+/* String display */
+.str-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.str-label{font-family:'Space Mono',monospace;font-size:.58rem;font-weight:700;min-width:50px;color:var(--muted);text-align:right;}
+.str-chars{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;}
+.sc{
+  width:22px;height:26px;border-radius:4px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  color:var(--muted);background:var(--surface);transition:all .25s;flex-shrink:0;
+}
+.sc-used   {background:rgba(6,214,160,.12);border-color:#06d6a0;color:#024d37;}
+.sc-cur1   {background:rgba(33,150,243,.2); border-color:#2196f3;color:#0d47a1;transform:scale(1.1);}
+.sc-cur2   {background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;transform:scale(1.1);}
+.sc-match  {background:rgba(6,214,160,.25); border-color:#06d6a0;color:#024d37;box-shadow:0 0 8px rgba(6,214,160,.3);}
+.sc-nomatch{background:rgba(230,57,70,.12); border-color:#e63946;color:#b71c1c;}
+.sc-three-used{background:rgba(192,84,252,.1);border-color:#c084fc;color:#5b1a9a;}
+.sc-three-cur {background:rgba(192,84,252,.2);border-color:#c084fc;color:#5b1a9a;transform:scale(1.1);}
+
+/* ══ UNIQUE VISUAL 3: DECISION PANEL ══
+   Two candidate branches shown side by side:
+   - Take from one (if one[i] == three[i+j])
+   - Take from two (if two[j] == three[i+j]) */
+.decision-section{margin-bottom:14px;}
+.decision-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.decision-outer.do-active{border-color:var(--pur);}
+.dec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.dec-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.dec-next{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--pur-dark);}
+.dec-row{display:flex;gap:8px;}
+.dec-branch{
+  flex:1;border:1.5px solid var(--border);border-radius:8px;padding:10px;text-align:center;
+  transition:all .3s;
+}
+.dec-branch.db-try  {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.dec-branch.db-match{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.dec-branch.db-nomatch{border-color:var(--border);background:rgba(0,0,0,.02);opacity:.5;}
+.dec-source{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;}
+.dec-char  {font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;margin-bottom:4px;}
+.dec-eq    {font-family:'Space Mono',monospace;font-size:.68rem;color:var(--muted);}
+.dec-result{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;margin-top:4px;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-init {border-color:var(--pur);}
+.step-panel.sp-check{border-color:var(--pur);}
+.step-panel.sp-true {border-color:var(--accent3);}
+.step-panel.sp-false{border-color:var(--accent);}
+.step-panel.sp-done {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--pur);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* CX */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-check{border-color:var(--pur);}
+.explain-panel.ep-true {border-color:var(--accent3);}
+.explain-panel.ep-false{border-color:var(--accent);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--pur);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init {border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-check{border-left-color:var(--pur);background:rgba(192,84,252,.06);}
+.ep-why-block.why-true {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-false{border-left-color:var(--accent); background:rgba(230,57,70,.05);}
+.ep-why-block.why-done {border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+.done-banner.db-true {background:var(--accent3);color:#012a1e;}
+.done-banner.db-false{background:var(--accent); color:white;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-check{background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-true {background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-false{background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.memo-right{margin-bottom:12px;}
+.mr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.mr-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.mr-rows::-webkit-scrollbar{width:3px;}.mr-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.mr-row{padding:3px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.58rem;color:#9ca3af;display:flex;justify-content:space-between;}
+.mr-row.mrr-true {border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.07);animation:fadeUp .3s;}
+.mr-row.mrr-false{border-color:rgba(230,57,70,.5); background:rgba(230,57,70,.07);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;}
+.best-box.show{opacity:1;}
+.best-box.bb-true {background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.bb-false{background:rgba(230,57,70,.06); border:1px solid rgba(230,57,70,.2);}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bb-true  .best-label{color:var(--accent3);}
+.bb-false .best-label{color:var(--accent);}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show.dbt{display:block;background:var(--accent3);color:#012a1e;animation:fadeUp .4s ease;}
+.done-bar.show.dbf{display:block;background:var(--accent);color:white;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Interweaving Strings</h1>
+    <div class="sub">2D DP · Memoized Recursion · O(nm) time</div>
+  </div>
+  <div class="family-badge">Recursion · 2D DP</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>String one</label>
+      <input type="text" id="inOne" value="abc" maxlength="8">
+    </div>
+    <div class="field">
+      <label>String two</label>
+      <input type="text" id="inTwo" value="123" maxlength="8">
+    </div>
+    <div class="field">
+      <label>String three</label>
+      <input type="text" id="inThree" value="a1b2c3" maxlength="16">
+      <div class="hint">must = len(one)+len(two)</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.2);border-color:#c084fc;border-radius:3px"></div> currently checking (i,j)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.1);border-color:#2196f3;border-radius:3px"></div> checking from one[i]</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> checking from two[j]</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;border-radius:3px"></div> true ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.1);border-color:#e63946;border-radius:3px"></div> false ✗</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: 2D DP GRID -->
+  <div class="grid-section">
+    <div class="section-label">2D memo grid  dp[i][j] = can interweave one[i:] + two[j:] into three[i+j:]</div>
+    <div class="grid-outer" id="gridOuter">
+      <table class="grid-table" id="gridTable"></table>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: CHARACTER MATCH PANEL -->
+  <div class="match-section">
+    <div class="section-label">Current pointers — what character must match next?</div>
+    <div class="match-outer" id="matchOuter">
+      <div class="match-header">
+        <div class="mh-title">three[i+j] must come from one[i] or two[j]</div>
+        <div class="mh-state" id="mhState">—</div>
+      </div>
+      <div class="str-row">
+        <div class="str-label">one:</div>
+        <div class="str-chars" id="strOne"></div>
+      </div>
+      <div class="str-row">
+        <div class="str-label">two:</div>
+        <div class="str-chars" id="strTwo"></div>
+      </div>
+      <div class="str-row">
+        <div class="str-label">three:</div>
+        <div class="str-chars" id="strThree"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: DECISION BRANCHES -->
+  <div class="decision-section">
+    <div class="section-label">Two branches — take from one or two?</div>
+    <div class="decision-outer" id="decisionOuter">
+      <div class="dec-header">
+        <div class="dec-title">next char in three to match</div>
+        <div class="dec-next" id="decNext">three[?] = ?</div>
+      </div>
+      <div class="dec-row">
+        <div class="dec-branch" id="decBranch1">
+          <div class="dec-source">from one[i]</div>
+          <div class="dec-char" id="decChar1">?</div>
+          <div class="dec-eq" id="decEq1">— == —</div>
+          <div class="dec-result" id="decRes1">—</div>
+        </div>
+        <div style="display:flex;align-items:center;padding:0 8px;font-family:'Space Mono',monospace;font-size:.9rem;color:var(--muted);">OR</div>
+        <div class="dec-branch" id="decBranch2">
+          <div class="dec-source">from two[j]</div>
+          <div class="dec-char" id="decChar2">?</div>
+          <div class="dec-eq" id="decEq2">— == —</div>
+          <div class="dec-result" id="decRes2">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-check" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n·m)</div>
+      <div class="cx-sub">n=|one|, m=|two|</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(n·m)</div>
+      <div class="cx-sub">2D memo table</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">States</div>
+      <div class="cx-val" id="cxStates" style="color:#7a5a00">—</div>
+      <div class="cx-sub">unique (i,j) pairs</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">interweaves?</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-check" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Interweaving Strings</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">bool</span> <span class="cf">interweaving</span>(</span>
+<span class="code-line" id="cl-sg2">    string one, string two, string three,</span>
+<span class="code-line" id="cl-sg3">    <span class="ck">int</span> i, <span class="ck">int</span> j, map&lt;pair&lt;<span class="ck">int</span>,<span class="ck">int</span>&gt;,<span class="ck">bool</span>&gt;&amp; m){</span>
+<span class="code-line" id="cl-len">  <span class="ck">if</span>(i+j==three.size()) <span class="ck">return true</span>;</span>
+<span class="code-line" id="cl-memo">  <span class="ck">if</span>(m.count({i,j})) <span class="ck">return</span> m[{i,j}];</span>
+<span class="code-line" id="cl-one">  <span class="ck">bool</span> res = <span class="cn">false</span>;</span>
+<span class="code-line" id="cl-one2">  <span class="ck">if</span>(i&lt;one.size()&amp;&amp;one[i]==three[i+j])</span>
+<span class="code-line" id="cl-rec1">    res = <span class="cf">interweaving</span>(one,two,three,i+<span class="cn">1</span>,j,m);</span>
+<span class="code-line" id="cl-two">  <span class="ck">if</span>(!res&amp;&amp;j&lt;two.size()&amp;&amp;two[j]==three[i+j])</span>
+<span class="code-line" id="cl-rec2">    res = <span class="cf">interweaving</span>(one,two,three,i,j+<span class="cn">1</span>,m);</span>
+<span class="code-line" id="cl-store">  <span class="ck">return</span> m[{i,j}] = res;</span>
+<span class="code-line" id="cl-end">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">    <div class="var-name">i (one ptr)</div> <div class="var-value" id="vI"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcJ">    <div class="var-name">j (two ptr)</div> <div class="var-value" id="vJ"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcIJ">   <div class="var-name">i+j (three ptr)</div><div class="var-value" id="vIJ"  style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcRes">  <div class="var-name">result</div>      <div class="var-value" id="vRes"  style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcOnec"> <div class="var-name">one[i]</div>      <div class="var-value" id="vOnec" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcTwoc"> <div class="var-name">two[j]</div>      <div class="var-value" id="vTwoc" style="color:var(--accent4)">—</div></div>
+    </div>
+
+    <div class="memo-right">
+      <div class="mr-title">Memo entries filled</div>
+      <div class="mr-rows" id="mrRows"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Interweaves?</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar"></div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{one,two,three,i,j,oneC,twoC,threeC,res,memo}=args||{};
+  const n=one.length,m=two.length;
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">State (i,j) means: "can we form three[i+j:] by interweaving one[i:] and two[j:]?" Two choices at each state: take one[i] if it matches three[i+j], or take two[j] if it matches. Memoize each (i,j) to avoid recomputation.<br><br>The 2D grid has (n+1)×(m+1) cells. We start at (0,0) and aim to reach (n,m) — the bottom-right corner where all characters are consumed.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Base case:</strong> i+j == len(three) → true (all chars matched). Also false if no valid choice.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why 2D?</strong> The state is fully determined by (i,j) — how many chars consumed from each string. Same (i,j) reached from different paths gives same answer → memoize.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(n×m) states</strong> each computed once. Each state does O(1) work → total O(n×m) time and space.`},
+    ]
+  };
+  if(type==='base') return {
+    why:`<div class="ep-why-block why-true">i+j=${i+j} == len(three)=${three.length}. All characters of three have been matched! This path successfully interweaves one and two into three. Return true.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Base case hit.</strong> i=${i}, j=${j}, i+j=${i+j}=len(three). Return true.`}]
+  };
+  if(type==='memo_hit') return {
+    why:`<div class="ep-why-block why-check">State (${i},${j}) already in memo with value=${res?'true':'false'}. Return cached result instantly — no recomputation.</div>`,
+    inv:[{icon:'⚡',cls:'inv-pur',text:`<strong>Memo HIT (${i},${j})=${res?'true':'false'}.</strong> Avoids reexploring this subproblem.`}]
+  };
+  if(type==='check') return {
+    why:`<div class="ep-why-block why-check">At (i=${i},j=${j}): need to match three[${i+j}]='${threeC}'. Check one[${i}]='${oneC}' → ${oneC===threeC?'✓ MATCH!':'✗ no match'}. Check two[${j}]='${twoC}' → ${twoC===threeC?'✓ MATCH!':'✗ no match'}. Try matching branches.</div>`,
+    inv:[
+      {icon:'🔍',cls:'',text:`<strong>Must match three[${i+j}]='${threeC}'.</strong> one[${i}]='${oneC}' ${oneC===threeC?'✓':'✗'}, two[${j}]='${twoC}' ${twoC===threeC?'✓':'✗'}.`},
+    ]
+  };
+  if(type==='store') return {
+    why:`<div class="ep-why-block why-${res?'true':'false'}">Result for (${i},${j}): ${res?'true — a valid interweaving path exists through this state!':'false — no valid interweaving path from this state.'}. Store in memo[${i}][${j}]=${res?'true':'false'}.`,
+    inv:[{icon:res?'✅':'✗',cls:res?'':'inv-red',text:`<strong>memo[${i}][${j}]=${res?'true':'false'}.</strong> Memoized for future hits.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-${res?'true':'false'}">Answer: ${res?`"${three}" CAN be formed by interweaving "${one}" and "${two}".`:`"${three}" CANNOT be formed by interweaving "${one}" and "${two}".`}</div>`,
+    inv:[
+      {icon:res?'✅':'✗',cls:res?'':'inv-red',text:`<strong>interweavingStrings = ${res?'true':'false'}.</strong> ${Object.keys(memo||{}).length} unique states explored.`},
+      {icon:'📐',cls:'inv-warn',text:`O(n×m) time and space. n=${n}, m=${m}, states=${(n+1)*(m+1)}.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:    {ids:['cl-sig','cl-sg2','cl-sg3','cl-len'],cls:'hl-init'},
+  base:    {ids:['cl-len'],cls:'hl-true'},
+  memo_hit:{ids:['cl-memo'],cls:'hl-true'},
+  check:   {ids:['cl-one','cl-one2','cl-rec1','cl-two','cl-rec2'],cls:'hl-check'},
+  store:   {ids:['cl-store'],cls:'hl-true'},
+  done:    {ids:['cl-store','cl-end'],cls:'hl-done'},
+};
+function highlightCode(type,res){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  const cls=(type==='store'||type==='done')?(res?'hl-true':'hl-false'):e.cls;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(one,two,three){
+  const steps=[];
+  const n=one.length,m=two.length;
+  const memo={};
+
+  const snap=(type,desc,i,j,extra={})=>{
+    steps.push({type,desc,one,two,three,i,j,
+      memo:{...memo},result:null,...extra,
+      explain:makeExplain(type,{one,two,three,i,j,memo:{...memo},...extra})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> one="${one}", two="${two}", three="${three}". Check if three can be formed by interweaving. State (i,j) = pointers into one and two.`,0,0);
+
+  function rec(i,j){
+    if(i+j===three.length){
+      snap('base',`✅ <strong>Base case!</strong> i+j=${i+j}=len(three). All matched → true.`,i,j,
+        {oneC:i<n?one[i]:'∅',twoC:j<m?two[j]:'∅',threeC:'∅',res:true});
+      return true;
+    }
+    const key=`${i},${j}`;
+    if(memo[key]!==undefined){
+      snap('memo_hit',`⚡ Memo hit (${i},${j})=${memo[key]}. Return cached.`,i,j,
+        {oneC:i<n?one[i]:'∅',twoC:j<m?two[j]:'∅',threeC:three[i+j],res:memo[key]});
+      return memo[key];
+    }
+
+    const threeC=three[i+j];
+    const oneC=i<n?one[i]:'∅';
+    const twoC=j<m?two[j]:'∅';
+    const oneMatch=i<n&&one[i]===threeC;
+    const twoMatch=j<m&&two[j]===threeC;
+    snap('check',`🔍 Check (i=${i},j=${j}): three[${i+j}]='${threeC}'. one[${i}]='${oneC}'${oneMatch?'✓':'✗'} two[${j}]='${twoC}'${twoMatch?'✓':'✗'}`,
+      i,j,{oneC,twoC,threeC,oneMatch,twoMatch,res:null});
+
+    let res=false;
+    if(oneMatch) res=rec(i+1,j);
+    if(!res&&twoMatch) res=rec(i,j+1);
+
+    memo[key]=res;
+    snap('store',`💾 (${i},${j})=${res}. Store in memo.`,i,j,
+      {oneC,twoC,threeC,oneMatch,twoMatch,res});
+    return res;
+  }
+
+  if(one.length+two.length!==three.length){
+    snap('done',`✗ <strong>Length mismatch!</strong> |one|+|two|=${one.length+two.length} ≠ |three|=${three.length}. Cannot interweave.`,0,0,{res:false,result:{answer:false}});
+    steps[steps.length-1].result={answer:false};
+    return steps;
+  }
+
+  const ans=rec(0,0);
+  snap('done',`${ans?'✅':'✗'} <strong>Answer: ${ans}.</strong> "${three}" ${ans?'can':'cannot'} be formed by interweaving "${one}" and "${two}".`,0,0,
+    {res:ans,result:{answer:ans}});
+  steps[steps.length-1].result={answer:ans};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let oneVal='', twoVal='', threeVal='';
+
+// ─── BUILD GRID ────────────────────────────────────────────────────────────
+function buildGrid(one,two){
+  const n=one.length,m=two.length;
+  const tbl=document.getElementById('gridTable');
+  tbl.innerHTML='';
+
+  // Header row: j = 0..m, cols labeled with two chars
+  const hr=document.createElement('tr');
+  hr.appendChild(Object.assign(document.createElement('td'),{className:'grid-hdr'}));
+  hr.appendChild(Object.assign(document.createElement('td'),{className:'grid-hdr',textContent:'ε'}));
+  for(let j=0;j<m;j++){
+    const th=document.createElement('td');th.className='char-lbl-col';th.textContent=two[j];hr.appendChild(th);
+  }
+  tbl.appendChild(hr);
+
+  // j indices row
+  const jr=document.createElement('tr');
+  jr.appendChild(Object.assign(document.createElement('td'),{className:'grid-hdr'}));
+  for(let j=0;j<=m;j++){
+    const td=document.createElement('td');td.className='grid-hdr';td.textContent=j;jr.appendChild(td);
+  }
+  tbl.appendChild(jr);
+
+  for(let i=0;i<=n;i++){
+    const tr=document.createElement('tr');
+    // Row label: i index
+    const ri=document.createElement('td');ri.className='grid-hdr';ri.textContent=i;tr.appendChild(ri);
+    // Row char label
+    const rc=document.createElement('td');rc.className='char-lbl-row';rc.textContent=i<n?one[i]:'ε';tr.appendChild(rc);
+    for(let j=0;j<=m;j++){
+      const td=document.createElement('td');td.className='grid-cell gc-empty';td.id=`gc-${i}-${j}`;
+      td.textContent='?';tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  oneVal=document.getElementById('inOne').value;
+  twoVal=document.getElementById('inTwo').value;
+  threeVal=document.getElementById('inThree').value;
+  const n=oneVal.length,m=twoVal.length;
+
+  steps=computeSteps(oneVal,twoVal,threeVal);
+  currentStep=0;
+
+  document.getElementById('cxStates').textContent=`${(n+1)*(m+1)}`;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('mrRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  buildGrid(oneVal,twoVal);
+  buildStrDisplay();
+  renderStep(0);
+}
+
+function buildStrDisplay(){
+  const renderStr=(containerId,str,klass)=>{
+    const c=document.getElementById(containerId);c.innerHTML='';
+    for(let i=0;i<str.length;i++){
+      const sc=document.createElement('div');sc.className=`sc ${klass}`;sc.id=`${containerId}-${i}`;
+      sc.textContent=str[i];c.appendChild(sc);
+    }
+    if(!str.length){const e=document.createElement('div');e.className='sc';e.textContent='ε';c.appendChild(e);}
+  };
+  renderStr('strOne',oneVal,'');
+  renderStr('strTwo',twoVal,'');
+  renderStr('strThree',threeVal,'');
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=oneVal.length,m=twoVal.length;
+  const curI=st.i, curJ=st.j;
+
+  // ── Grid ──
+  const go=document.getElementById('gridOuter');
+  const finalRes=isFinal?st.result.answer:null;
+  go.className='grid-outer '+(isFinal?(finalRes?'go-true':'go-false'):'go-cur');
+
+  // Reset all cells
+  for(let i=0;i<=n;i++) for(let j=0;j<=m;j++){
+    const cell=document.getElementById(`gc-${i}-${j}`);if(!cell)continue;
+    const key=`${i},${j}`;
+    const isCur=i===curI&&j===curJ&&!isFinal;
+    const val=st.memo[key];
+    if(isCur){cell.className='grid-cell gc-cur';cell.textContent='?';}
+    else if(val===true){cell.className='grid-cell gc-true';cell.textContent='✓';}
+    else if(val===false){cell.className='grid-cell gc-false';cell.textContent='✗';}
+    else{cell.className='grid-cell gc-empty';cell.textContent='?';}
+  }
+
+  // ── Char match display ──
+  const mo=document.getElementById('matchOuter');
+  const mhState=document.getElementById('mhState');
+  mo.className='match-outer '+(isFinal?(finalRes?'mo-true':'mo-false'):'mo-cur');
+  // one string
+  for(let k=0;k<oneVal.length;k++){
+    const el=document.getElementById(`strOne-${k}`);if(!el)continue;
+    const isCur=k===curI&&!isFinal&&(st.type==='check'||st.type==='store');
+    el.className=`sc ${k<curI?'sc-used':isCur?'sc-cur1':''}`;
+  }
+  // two string
+  for(let k=0;k<twoVal.length;k++){
+    const el=document.getElementById(`strTwo-${k}`);if(!el)continue;
+    const isCur=k===curJ&&!isFinal&&(st.type==='check'||st.type==='store');
+    el.className=`sc ${k<curJ?'sc-used':isCur?'sc-cur2':''}`;
+  }
+  // three string
+  for(let k=0;k<threeVal.length;k++){
+    const el=document.getElementById(`strThree-${k}`);if(!el)continue;
+    const ij=curI+curJ;
+    const isCur=k===ij&&!isFinal;
+    el.className=`sc ${k<ij?'sc-three-used':isCur?'sc-three-cur':''}`;
+  }
+  // state label
+  if(isFinal){
+    mhState.className=`mh-state ms-${finalRes?'true':'false'}`;
+    mhState.textContent=finalRes?'✓ interweaves!':'✗ cannot interweave';
+  } else {
+    mhState.textContent=`(i=${curI}, j=${curJ})`;mhState.className='mh-state';
+  }
+
+  // ── Decision branches ──
+  const deo=document.getElementById('decisionOuter');
+  deo.className='decision-outer '+(st.type==='check'?'do-active':'');
+  const ij=curI+curJ;
+  const threeC=ij<threeVal.length?threeVal[ij]:'∅';
+  const oneC=curI<n?oneVal[curI]:'∅';
+  const twoC=curJ<m?twoVal[curJ]:'∅';
+  document.getElementById('decNext').textContent=`three[${ij}] = '${threeC}'`;
+
+  const branch1=document.getElementById('decBranch1');
+  const branch2=document.getElementById('decBranch2');
+  const oneMatch=oneC!=='∅'&&oneC===threeC;
+  const twoMatch=twoC!=='∅'&&twoC===threeC;
+  branch1.className=`dec-branch ${st.type==='check'?(oneMatch?'db-match':'db-nomatch'):''}`;
+  branch2.className=`dec-branch ${st.type==='check'?(twoMatch?'db-match':'db-nomatch'):''}`;
+  document.getElementById('decChar1').textContent=`one[${curI}]='${oneC}'`;
+  document.getElementById('decChar2').textContent=`two[${curJ}]='${twoC}'`;
+  document.getElementById('decEq1').textContent=`'${oneC}' == '${threeC}' ?`;
+  document.getElementById('decEq2').textContent=`'${twoC}' == '${threeC}' ?`;
+  document.getElementById('decRes1').textContent=st.type==='check'?(oneMatch?'✓ match → recurse (i+1,j)':'✗ no match'):'—';
+  document.getElementById('decRes2').textContent=st.type==='check'?(twoMatch?'✓ match → recurse (i,j+1)':'✗ no match'):'—';
+  document.getElementById('decRes1').style.color=oneMatch?'var(--accent3)':'var(--muted)';
+  document.getElementById('decRes2').style.color=twoMatch?'var(--accent3)':'var(--muted)';
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const typeClass={init:'sp-init',base:'sp-true',memo_hit:'sp-check',check:'sp-check',store:st.res?'sp-true':'sp-false',done:isFinal&&finalRes?'sp-true':'sp-false'};
+  sp.className=`step-panel ${typeClass[st.type]||'sp-check'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(st.type==='check'){
+    spb.innerHTML=mkBox('i',curI,'one ptr','spbox sb-blue')+
+      mkBox('j',curJ,'two ptr','spbox sb-yel')+
+      mkBox('i+j',ij,'three ptr','spbox sb-pur')+
+      mkBox('three[i+j]',`'${threeC}'`,'need','spbox sb-pur');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('answer',finalRes?'true':'false','result',finalRes?'spbox sb-grn':'spbox sb-red')+
+      mkBox('states',Object.keys(st.memo).length,'computed','spbox sb-pur');
+  } else {
+    spb.innerHTML=mkBox('i',curI,'one','spbox sb-blue')+mkBox('j',curJ,'two','spbox sb-yel');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:   `Checking if "${threeVal}" can be formed by interweaving "${oneVal}" and "${twoVal}". Start at (0,0) — pointers into one and two.`,
+    base:   `✅ i+j=${curI+curJ}=len(three). All of three has been matched! This is a valid interleaving path.`,
+    memo_hit:`⚡ (${curI},${curJ}) already in memo → ${st.res?'true':'false'}. Skip recomputation.`,
+    check:  `At (${curI},${curJ}): need three[${ij}]='${threeC}'. Try one[${curI}]='${oneC}' (${oneMatch?'✓ match!':'✗ no match'}), try two[${curJ}]='${twoC}' (${twoMatch?'✓ match!':'✗ no match'}).`,
+    store:  `memo[${curI}][${curJ}] = ${st.res?'<strong>true</strong>':'<strong>false</strong>'}. ${st.res?'A valid path exists from this state!':'No valid path from this state.'}`,
+    done:   `${finalRes?'✅':'✗'} <strong>${finalRes?'CAN':'CANNOT'} interweave</strong>. "${threeVal}" ${finalRes?'can':'cannot'} be formed from "${oneVal}" + "${twoVal}".`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={init:'var(--pur)',base:'var(--accent3)',memo_hit:'var(--pur)',check:'var(--pur)',store:st.res?'var(--accent3)':'var(--accent)',done:isFinal&&finalRes?'var(--accent3)':'var(--accent)'}[st.type]||'var(--pur)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type, st.res);
+
+  // ── Right vars ──
+  setVar('vI',    'vcI',    curI);
+  setVar('vJ',    'vcJ',    curJ);
+  setVar('vIJ',   'vcIJ',   curI+curJ);
+  setVar('vRes',  'vcRes',  st.res!=null?String(st.res):'—');
+  setVar('vOnec', 'vcOnec', curI<n?`'${oneVal[curI]}'`:'∅');
+  setVar('vTwoc', 'vcTwoc', curJ<m?`'${twoVal[curJ]}'`:'∅');
+
+  // Memo log
+  const mr=document.getElementById('mrRows');
+  mr.innerHTML='';
+  const entries=Object.entries(st.memo);
+  [...entries].reverse().slice(0,10).forEach(([k,v],idx2)=>{
+    const isNew=idx2===0&&(st.type==='store'||st.type==='base');
+    mr.innerHTML+=`<div class="mr-row ${isNew?(v?'mrr-true':'mrr-false'):''}">
+      <span>(${k})</span><span style="color:${v?'#06d6a0':'#e63946'};font-weight:700">${v?'true':'false'}</span>
+    </div>`;
+  });
+
+  // Done
+  if(isFinal){
+    const db=document.getElementById('doneBanner');
+    db.className=`done-banner show ${finalRes?'db-true':'db-false'}`;
+    db.textContent=finalRes?'✓ STRINGS CAN INTERWEAVE':'✗ STRINGS CANNOT INTERWEAVE';
+    const bar=document.getElementById('doneBar');
+    bar.className=`done-bar show ${finalRes?'dbt':'dbf'}`;
+    bar.textContent=finalRes?'★ TRUE — VALID INTERWEAVING':'★ FALSE — INVALID';
+    const bb=document.getElementById('bestBox');
+    bb.className=`best-box show ${finalRes?'bb-true':'bb-false'}`;
+    document.getElementById('bestVal').textContent=finalRes?'true':'false';
+    document.getElementById('bestMeta').textContent=`|one|=${n}, |two|=${m} · ${Object.keys(st.memo).length} states explored`;
+    document.getElementById('cxAnswer').textContent=finalRes?'true':'false';
+    document.getElementById('cxAnswer').style.color=finalRes?'var(--accent3)':'var(--accent)';
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-check',base:'ep-true',memo_hit:'ep-check',check:'ep-check',store:st.res?'ep-true':'ep-false',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-check');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

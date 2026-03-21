@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blackjack Probability — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a4800;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:100px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#7a4800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: CARD DRAW PROBABILITY BAR ══
+   Shows 10 card slots (1-10), each 0.1 probability.
+   Cards colored by outcome: bust/stand/recurse */
+.cardbar-section{margin-bottom:14px;}
+.cardbar-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s;}
+.cardbar-outer.cbo-active{border-color:var(--accent4);}
+.cardbar-outer.cbo-done  {border-color:var(--accent3);}
+.cardbar-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.cbh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.cbh-hand{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;}
+/* Card row */
+.card-row{display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px;}
+.card-slot{
+  display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;
+  min-width:48px;
+}
+.card-box{
+  width:48px;height:54px;border-radius:8px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+}
+.cb-val{font-size:.88rem;font-weight:700;}
+.cb-new{font-size:.52rem;color:var(--muted);}
+.cb-prob{font-size:.48rem;color:var(--muted);margin-top:1px;}
+.card-slot .cs-label{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+/* card states */
+.card-box.cb-bust   {background:rgba(230,57,70,.15);  border-color:#e63946;color:#b71c1c;}
+.card-box.cb-bust   .cb-new{color:#e63946;}
+.card-box.cb-stand  {background:rgba(6,214,160,.15);  border-color:#06d6a0;color:#024d37;}
+.card-box.cb-stand  .cb-new{color:#06d6a0;}
+.card-box.cb-recurse{background:rgba(255,209,102,.2); border-color:#ffd166;color:#7a4800;}
+.card-box.cb-recurse .cb-new{color:#ffd166;}
+.card-box.cb-active {background:rgba(192,84,252,.15); border-color:#c084fc;color:#5b1a9a;
+  transform:scale(1.1) translateY(-3px);box-shadow:0 6px 16px rgba(192,84,252,.3);}
+.card-box.cb-active .cb-new{color:var(--pur);}
+/* Probability breakdown bar */
+.prob-bar-wrap{height:10px;background:#e8e2d4;border-radius:5px;overflow:hidden;display:flex;margin-top:4px;}
+.pb-bust   {background:#e63946;height:100%;transition:width .4s;}
+.pb-stand  {background:#06d6a0;height:100%;transition:width .4s;}
+.pb-recurse{background:#ffd166;height:100%;transition:width .4s;}
+
+/* ══ UNIQUE VISUAL 2: RECURSION MEMO TABLE ══
+   dp[hand] = bust probability for each hand value.
+   Shows the memo filling up as recursion resolves. */
+.memo-section{margin-bottom:14px;}
+.memo-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.memo-outer.mo-active{border-color:var(--pur);}
+.memo-outer.mo-done  {border-color:var(--accent3);}
+.memo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.mh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.mh-count{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--pur-dark);}
+.memo-grid{display:flex;flex-wrap:wrap;gap:5px;}
+.memo-cell{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  min-width:52px;padding:6px 7px;border-radius:7px;border:1.5px solid var(--border);
+  font-family:'Space Mono',monospace;transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  background:var(--surface);
+}
+.memo-cell .mc-hand{font-size:.5rem;color:var(--muted);}
+.memo-cell .mc-prob{font-size:.78rem;font-weight:700;color:var(--muted);}
+.memo-cell.mm-computing{border-color:var(--pur);background:rgba(192,84,252,.1);transform:translateY(-2px);}
+.memo-cell.mm-computing .mc-prob{color:var(--pur-dark);}
+.memo-cell.mm-done{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.memo-cell.mm-done .mc-prob{color:#024d37;}
+.memo-cell.mm-zero{border-color:var(--accent3);background:rgba(6,214,160,.14);}
+.memo-cell.mm-zero .mc-prob{color:#024d37;}
+.memo-cell.mm-one{border-color:var(--accent);background:rgba(230,57,70,.1);}
+.memo-cell.mm-one .mc-prob{color:#b71c1c;}
+.memo-cell.mm-cur{border-color:var(--accent4);background:rgba(255,209,102,.18);transform:scale(1.08);}
+.memo-cell.mm-cur .mc-prob{color:#7a4800;}
+
+/* ══ UNIQUE VISUAL 3: CALL STACK (RECURSION DEPTH) ══ */
+.callstack-section{margin-bottom:14px;}
+.callstack-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.callstack-outer.co-active{border-color:var(--accent4);}
+.cs-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.cs-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.cs-depth{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--accent4);}
+.cs-frames{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;min-height:40px;}
+.cs-frame{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:54px;padding:5px 8px;border-radius:7px;border:2px solid;
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+}
+.cs-frame.csf-top{transform:translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,.3);}
+.cs-frame.csf-active{background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+.cs-frame.csf-done  {background:rgba(6,214,160,.1); border-color:#06d6a0;color:#024d37;}
+.csf-sub{font-size:.44rem;opacity:.7;margin-bottom:1px;}
+.cs-arrow{font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);margin-bottom:4px;}
+
+/* RESULT BADGE */
+.result-badge{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;padding:8px 20px;border-radius:8px;
+  border:2px solid var(--accent4);background:rgba(255,209,102,.1);color:#7a4800;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-done{border-color:var(--accent3);background:rgba(6,214,160,.12);color:#024d37;}
+.result-badge.rb-new{animation:rbNew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbNew{from{transform:scale(1.15);background:rgba(6,214,160,.3);}to{transform:none;}}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-call  {border-color:var(--pur);}
+.step-panel.sp-card  {border-color:var(--accent4);}
+.step-panel.sp-bust  {border-color:var(--accent);}
+.step-panel.sp-stand {border-color:var(--accent3);}
+.step-panel.sp-ret   {border-color:var(--accent4);}
+.step-panel.sp-done  {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* CX */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-call {border-color:var(--pur);}
+.explain-panel.ep-card {border-color:var(--accent4);}
+.explain-panel.ep-done {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-call  {border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-card  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-red{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.2);}
+.inv-row.inv-red .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-call {background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-card {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-bust {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-stand{background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+/* DP table mini */
+.dp-mini-wrap{margin-bottom:12px;overflow-x:auto;}
+.dp-mini-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.dp-mini-row{display:flex;gap:3px;flex-wrap:wrap;}
+.dp-chip{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;padding:3px 6px;border-radius:5px;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all .22s;}
+.dp-chip.dpc-done{border-color:#06d6a0;background:rgba(6,214,160,.15);color:#06d6a0;}
+.dp-chip.dpc-cur {border-color:#ffd166;background:rgba(255,209,102,.2);color:#ffd166;}
+.dp-chip.dpc-zero{border-color:#06d6a0;background:rgba(6,214,160,.25);color:#06d6a0;}
+.dp-chip.dpc-one {border-color:#e63946;background:rgba(230,57,70,.2);color:#ff6b6b;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.3);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent4);color:#3a2800;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Blackjack Probability</h1>
+    <div class="sub">Recursive DP · P(bust) · Cards 1–10 Uniform</div>
+  </div>
+  <div class="family-badge">Probability DP</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Target</label>
+      <input type="number" id="inTarget" value="21" min="1" max="30">
+      <div class="hint">dealer stands at target-4</div>
+    </div>
+    <div class="field">
+      <label>Starting Hand</label>
+      <input type="number" id="inHand" value="15" min="1">
+      <div class="hint">≤ target</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="380">2×</button>
+        <button class="speed-btn" data-ms="150">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;border-radius:3px"></div> BUST (> target)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;border-radius:3px"></div> STAND (target-4 to target)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> RECURSE (draw again)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.15);border-color:#c084fc;border-radius:50%"></div> currently processing</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: CARD DRAW PROBABILITY BAR -->
+  <div class="cardbar-section">
+    <div class="section-label">Card draw outcomes for current hand</div>
+    <div class="cardbar-outer" id="cardbarOuter">
+      <div class="cardbar-header">
+        <div class="cbh-title">10 cards, each prob = 0.1</div>
+        <div class="cbh-hand" id="cbhHand">hand = —</div>
+      </div>
+      <div class="card-row" id="cardRow"></div>
+      <!-- Probability breakdown bar -->
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <div style="font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);flex-shrink:0">P(bust)=</div>
+        <div class="prob-bar-wrap" style="flex:1;">
+          <div class="pb-bust"    id="pbBust"    style="width:0%"></div>
+          <div class="pb-stand"   id="pbStand"   style="width:0%"></div>
+          <div class="pb-recurse" id="pbRecurse" style="width:0%"></div>
+        </div>
+        <div style="font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--accent);min-width:44px;" id="probDisplay">—</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px;font-family:'Space Mono',monospace;font-size:.55rem;color:var(--muted);">
+        <span>■ bust</span><span style="color:#06d6a0">■ stand (safe)</span><span style="color:#ffd166">■ recurse</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: MEMO TABLE -->
+  <div class="memo-section">
+    <div class="section-label">Memoization table  dp[hand] = P(bust | hand)</div>
+    <div class="memo-outer" id="memoOuter">
+      <div class="memo-header">
+        <div class="mh-title">each entry computed once</div>
+        <div class="mh-count"><span id="memoFilled">0</span> / <span id="memoTotal">—</span> filled</div>
+      </div>
+      <div class="memo-grid" id="memoGrid"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: CALL STACK -->
+  <div class="callstack-section">
+    <div class="section-label">Recursion call stack</div>
+    <div class="callstack-outer" id="callstackOuter">
+      <div class="cs-header">
+        <div class="cs-title">← bottom &nbsp; top →</div>
+        <div class="cs-depth">depth: <span id="csDepth">0</span></div>
+      </div>
+      <div class="cs-frames" id="csFrames">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">P(bust) = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-call" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(T·10)</div>
+      <div class="cx-sub">T = target, 10 cards</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(T)</div>
+      <div class="cx-sub">memo table</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Stand range</div>
+      <div class="cx-val" id="cxStand" style="color:#7a5a00">—</div>
+      <div class="cx-sub">target-4 to target</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">P(bust)</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">final answer</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-call" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Blackjack Probability</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">float</span> <span class="cf">blackjackProb</span>(</span>
+<span class="code-line" id="cl-sg2">    <span class="ck">int</span> target, <span class="ck">int</span> hand,</span>
+<span class="code-line" id="cl-sg3">    unordered_map&lt;<span class="ck">int</span>,<span class="ck">float</span>&gt;&amp; memo) {</span>
+<span class="code-line" id="cl-bust">  <span class="ck">if</span> (hand > target) <span class="ck">return</span> <span class="cn">1.0</span>; <span class="cc">// bust</span></span>
+<span class="code-line" id="cl-stand">  <span class="ck">if</span> (hand >= target-<span class="cn">4</span>) <span class="ck">return</span> <span class="cn">0.0</span>; <span class="cc">// stand</span></span>
+<span class="code-line" id="cl-memo">  <span class="ck">if</span> (memo.count(hand)) <span class="ck">return</span> memo[hand];</span>
+<span class="code-line" id="cl-init">  <span class="ck">float</span> p = <span class="cn">0.0</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">int</span> card=<span class="cn">1</span>; card&lt;=<span class="cn">10</span>; card++)</span>
+<span class="code-line" id="cl-acc">    p += <span class="cn">0.1</span> * <span class="cf">blackjackProb</span>(</span>
+<span class="code-line" id="cl-acc2">           target, hand+card, memo);</span>
+<span class="code-line" id="cl-store">  <span class="ck">return</span> memo[hand] = p;</span>
+<span class="code-line" id="cl-end">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcHand">  <div class="var-name">hand</div>       <div class="var-value" id="vHand"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcTarget"><div class="var-name">target</div>     <div class="var-value" id="vTarget" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcCard">  <div class="var-name">card drawn</div> <div class="var-value" id="vCard"   style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcP">     <div class="var-name">p (accum)</div>  <div class="var-value" id="vP"     style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcDepth"> <div class="var-name">stack depth</div><div class="var-value" id="vDepth" style="color:var(--accent4)">0</div></div>
+      <div class="var-card" id="vcFilled"><div class="var-name">memo entries</div><div class="var-value" id="vFilled" style="color:var(--accent3)">0</div></div>
+    </div>
+
+    <!-- DP mini table -->
+    <div class="dp-mini-wrap">
+      <div class="dp-mini-title">Memo table dp[hand]</div>
+      <div class="dp-mini-row" id="dpMiniRow"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">P(bust | hand=<span id="bbHand">—</span>)</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ BUST PROBABILITY COMPUTED</div>
+</div>
+</div>
+
+<script>
+// ─── HELPERS ───────────────────────────────────────────────────────────────
+function fmt(p){return p===1?'1.000':p===0?'0.000':p.toFixed(3);}
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{hand,target,card,p,bustCards,standCards,recurseCards}=args||{};
+  const standMin=target-4;
+
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Three base cases define the recursion:<br>1) hand > target → BUST, return 1.0<br>2) target-4 ≤ hand ≤ target → STAND (dealer stops), return 0.0<br>3) hand < target-4 → draw another card, recurse. P(bust|hand) = Σ 0.1 × P(bust|hand+card) for cards 1–10.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>target=${target}, stand range=[${standMin},${target}].</strong> Cards 1–10 each with prob 0.1. Infinite deck assumption.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Memoization key = hand value.</strong> Since cards are drawn from an infinite uniform deck, P(bust|hand) depends only on the current hand total, not history.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(T×10) time:</strong> At most T distinct hand values, each computed once with 10 recursive sub-calls → O(10T) total.`},
+    ]
+  };
+  if(type==='bust') return {
+    why:`<div class="ep-why-block why-card">hand=${hand} > target=${target}. The dealer has ALREADY busted. Return 1.0 (100% bust probability — it already happened).</div>`,
+    inv:[{icon:'💥',cls:'inv-red',text:`<strong>Base case: bust.</strong> hand=${hand} > ${target}. P(bust)=1.0.`}]
+  };
+  if(type==='stand') return {
+    why:`<div class="ep-why-block why-card">hand=${hand} is in the stand range [${standMin}, ${target}]. Dealer stops drawing. Return 0.0 — dealer stood safely, no bust.</div>`,
+    inv:[{icon:'✋',cls:'',text:`<strong>Base case: stand.</strong> ${standMin} ≤ hand=${hand} ≤ ${target}. P(bust)=0.0.`}]
+  };
+  if(type==='memo_hit') return {
+    why:`<div class="ep-why-block why-card">hand=${hand} already in memo! Return cached value ${fmt(p)} instantly — no recomputation needed.</div>`,
+    inv:[{icon:'⚡',cls:'inv-pur',text:`<strong>Memo HIT:</strong> dp[${hand}]=${fmt(p)} already computed. Return immediately.`}]
+  };
+  if(type==='draw') return {
+    why:`<div class="ep-why-block why-card">Drawing card ${card} from hand ${hand}. New hand = ${hand+card}. Adding 0.1 × P(bust|${hand+card}) to accumulator p.</div>`,
+    inv:[{icon:'🃏',cls:'inv-warn',text:`<strong>Card ${card}:</strong> new hand = ${hand}+${card}=${hand+card}. Contribution = 0.1 × P(bust|${hand+card}).`}]
+  };
+  if(type==='store') return {
+    why:`<div class="ep-why-block why-card">All 10 cards processed for hand=${hand}. p = ${fmt(p)}. Store dp[${hand}]=${fmt(p)} in memo. Return ${fmt(p)}.</div>`,
+    inv:[{icon:'💾',cls:'',text:`<strong>dp[${hand}] = ${fmt(p)}.</strong> Memoized for future lookups.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Recursion complete. P(bust | hand=${hand}, target=${target}) = ${fmt(p)}. Rounded to 3 decimal places.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Final answer:</strong> ${fmt(p)}. All unique hand values computed exactly once.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(T×10) time, O(T) space.</strong> T=target, 10 cards each iteration.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:    {ids:['cl-sig','cl-sg2','cl-sg3','cl-bust','cl-stand'],cls:'hl-call'},
+  bust:    {ids:['cl-bust'],cls:'hl-bust'},
+  stand:   {ids:['cl-stand'],cls:'hl-stand'},
+  memo_hit:{ids:['cl-memo'],cls:'hl-stand'},
+  draw:    {ids:['cl-loop','cl-acc','cl-acc2'],cls:'hl-card'},
+  store:   {ids:['cl-store'],cls:'hl-stand'},
+  done:    {ids:['cl-store','cl-end'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(target, startHand){
+  const steps=[];
+  const memo={};
+  const callStack=[];
+  const standMin=target-4;
+
+  const snap=(type,desc,hand,extra={})=>{
+    steps.push({type,desc,hand,target,callStack:[...callStack],
+      memo:{...memo},result:null,...extra,
+      explain:makeExplain(type,{hand,target,standMin,...extra})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> target=${target}, startingHand=${startHand}. Stand range=[${standMin},${target}]. Draw cards 1–10 each with prob 0.1.`,
+    startHand,{card:null,p:null});
+
+  function rec(hand){
+    if(hand>target){
+      snap('bust',`💥 hand=${hand} > target=${target}. <strong>BUST</strong>. Return 1.0.`,hand,{p:1.0,card:null});
+      return 1.0;
+    }
+    if(hand>=standMin){
+      snap('stand',`✋ hand=${hand} ∈ [${standMin},${target}]. <strong>STAND</strong>. Return 0.0.`,hand,{p:0.0,card:null});
+      return 0.0;
+    }
+    if(memo[hand]!==undefined){
+      snap('memo_hit',`⚡ dp[${hand}]=${fmt(memo[hand])} already computed. <strong>Memo HIT</strong>!`,hand,{p:memo[hand],card:null});
+      return memo[hand];
+    }
+
+    callStack.push(hand);
+    snap('draw',`🎴 Computing P(bust|hand=${hand}). Start p=0. Drawing cards 1–10…`,hand,{p:0,card:null});
+
+    let p=0;
+    for(let card=1;card<=10;card++){
+      snap('draw',`🃏 Card ${card}: new hand=${hand}+${card}=${hand+card}. Adding 0.1×P(bust|${hand+card}).`,hand,{p,card,newHand:hand+card});
+      const sub=rec(hand+card);
+      p+=0.1*sub;
+      snap('draw',`✓ Card ${card} contributed 0.1×${fmt(sub)}=${fmt(0.1*sub)}. Running p=${fmt(p)}.`,hand,{p,card,newHand:hand+card,subP:sub});
+    }
+
+    memo[hand]=p;
+    callStack.pop();
+    snap('store',`💾 dp[${hand}]=${fmt(p)}. All 10 cards done. Return ${fmt(p)}.`,hand,{p,card:null});
+    return p;
+  }
+
+  const ans=rec(startHand);
+
+  snap('done',`🎉 <strong>P(bust | hand=${startHand}, target=${target}) = <span style="color:var(--accent3)">${fmt(ans)}</span></strong>`,
+    startHand,{p:ans,card:null,result:{answer:ans}});
+  steps[steps.length-1].result={answer:ans};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let targetVal=21, handVal=15;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  targetVal=Math.max(1,parseInt(document.getElementById('inTarget').value)||21);
+  handVal=Math.max(1,Math.min(targetVal,parseInt(document.getElementById('inHand').value)||15));
+  document.getElementById('inTarget').value=targetVal;
+  document.getElementById('inHand').value=handVal;
+
+  const standMin=targetVal-4;
+  steps=computeSteps(targetVal,handVal);
+  currentStep=0;
+
+  // Complexity
+  document.getElementById('cxStand').textContent=`${standMin}–${targetVal}`;
+
+  // Memo range: hand values from startHand to target+10
+  const maxHand=targetVal+10;
+  document.getElementById('memoTotal').textContent=maxHand-handVal+1;
+  document.getElementById('bbHand').textContent=handVal;
+
+  // Build memo grid
+  const mg=document.getElementById('memoGrid');
+  mg.innerHTML='';
+  for(let h=handVal;h<=maxHand;h++){
+    const cell=document.createElement('div');
+    cell.className='memo-cell';cell.id=`mc-${h}`;
+    cell.innerHTML=`<div class="mc-hand">${h}</div><div class="mc-prob" id="mcp-${h}">?</div>`;
+    mg.appendChild(cell);
+  }
+
+  // Build dp mini
+  const dmr=document.getElementById('dpMiniRow');
+  dmr.innerHTML='';
+  for(let h=handVal;h<=maxHand;h++){
+    const chip=document.createElement('div');
+    chip.className='dp-chip';chip.id=`dpc-${h}`;chip.textContent=`${h}:?`;
+    dmr.appendChild(chip);
+  }
+
+  // Reset UI
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('resultBadge').textContent='P(bust) = —';
+  document.getElementById('resultBadge').className='result-badge';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('memoFilled').textContent='0';
+  document.getElementById('csFrames').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  document.getElementById('cardRow').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const standMin=targetVal-4;
+  const maxHand=targetVal+10;
+
+  // ── Card bar ──
+  const cbo=document.getElementById('cardbarOuter');
+  cbo.className='cardbar-outer '+(isFinal?'cbo-done':'cbo-active');
+  document.getElementById('cbhHand').textContent=`hand = ${st.hand}`;
+
+  const cr=document.getElementById('cardRow');
+  cr.innerHTML='';
+  let bustCount=0,standCount=0,recurseCount=0;
+  for(let c=1;c<=10;c++){
+    const newH=st.hand+c;
+    const isBust=newH>targetVal;
+    const isStand=!isBust&&newH>=standMin;
+    const isRecurse=!isBust&&!isStand;
+    if(isBust)bustCount++;else if(isStand)standCount++;else recurseCount++;
+    const isActive=st.card===c&&!isFinal;
+
+    const slot=document.createElement('div');slot.className='card-slot';
+    const box=document.createElement('div');
+    box.className=`card-box ${isActive?'cb-active':isBust?'cb-bust':isStand?'cb-stand':'cb-recurse'}`;
+    box.innerHTML=`<div class="cb-val">+${c}</div><div class="cb-new">${newH}</div><div class="cb-prob">0.1</div>`;
+    slot.appendChild(box);
+    const lbl=document.createElement('div');
+    lbl.className='cs-label';
+    lbl.textContent=isBust?'BUST':isStand?'STAND':'DRAW';
+    slot.appendChild(lbl);
+    cr.appendChild(slot);
+  }
+
+  // Probability bar
+  const bustPct=bustCount*10, standPct=standCount*10, recursePct=recurseCount*10;
+  document.getElementById('pbBust').style.width=bustPct+'%';
+  document.getElementById('pbStand').style.width=standPct+'%';
+  document.getElementById('pbRecurse').style.width=recursePct+'%';
+  const pDisp=st.p!=null?`${fmt(st.p)}`:'—';
+  document.getElementById('probDisplay').textContent=pDisp;
+
+  // ── Memo grid ──
+  const filled=Object.keys(st.memo).length;
+  document.getElementById('memoFilled').textContent=filled;
+  for(let h=handVal;h<=maxHand;h++){
+    const cell=document.getElementById(`mc-${h}`);
+    const valEl=document.getElementById(`mcp-${h}`);
+    const chip=document.getElementById(`dpc-${h}`);
+    if(!cell||!valEl)continue;
+    const v=st.memo[h];
+    const isCur=st.hand===h&&!isFinal&&(st.type==='draw'||st.type==='store');
+    const isBase=h>targetVal||(h>=standMin&&h<=targetVal);
+    if(v!==undefined){
+      const probStr=fmt(v);
+      valEl.textContent=probStr;
+      cell.className=`memo-cell ${v===0?'mm-zero':v===1?'mm-one':'mm-done'}`;
+      if(chip){chip.textContent=`${h}:${probStr}`;chip.className=`dp-chip ${v===0?'dpc-zero':v===1?'dpc-one':'dpc-done'}`;}
+    } else {
+      valEl.textContent=isCur?'…':'?';
+      cell.className=`memo-cell ${isCur?'mm-cur':''}`;
+      if(chip){chip.textContent=`${h}:?`;chip.className=`dp-chip ${isCur?'dpc-cur':''}`;}
+    }
+  }
+
+  // ── Call stack ──
+  const csf=document.getElementById('csFrames');
+  document.getElementById('csDepth').textContent=st.callStack.length;
+  document.getElementById('callstackOuter').className='callstack-outer'+(st.callStack.length?'co-active':'');
+  if(!st.callStack||st.callStack.length===0){
+    csf.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">stack empty</span>';
+  } else {
+    csf.innerHTML='';
+    st.callStack.forEach((h,i)=>{
+      const isTop=i===st.callStack.length-1;
+      const fr=document.createElement('div');
+      fr.className=`cs-frame ${isTop?'csf-active csf-top':'csf-done'}`;
+      fr.innerHTML=`<div class="csf-sub">${isTop?'TOP':''}</div>h=${h}`;
+      csf.appendChild(fr);
+      if(!isTop){const a=document.createElement('div');a.className='cs-arrow';a.textContent='→';csf.appendChild(a);}
+    });
+  }
+
+  // ── Result badge ──
+  const rb=document.getElementById('resultBadge');
+  if(isFinal||st.p!=null){
+    const p=isFinal?st.result.answer:st.p;
+    const prev=idx>0?steps[idx-1].result?.answer:null;
+    rb.textContent=`P(bust) = ${fmt(p)}`;
+    rb.className=`result-badge rb-done${isFinal&&!prev?' rb-new':''}`;
+    document.getElementById('cxAnswer').textContent=isFinal?fmt(p):'…';
+  } else {
+    rb.textContent='P(bust) = —';rb.className='result-badge';
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const typeClass={init:'sp-call',bust:'sp-bust',stand:'sp-stand',memo_hit:'sp-stand',draw:'sp-card',store:'sp-ret',done:'sp-done'};
+  sp.className=`step-panel ${typeClass[st.type]||'sp-call'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+
+  if(st.type==='draw'&&st.card&&st.newHand!=null){
+    spb.innerHTML=mkBox('hand',st.hand,'current','spbox sb-yel')+
+      mkBox('+card',st.card,'drawn','spbox sb-pur')+
+      mkBox('new',st.newHand,'=sum','spbox sb-blue')+
+      mkBox('p',fmt(st.p??0),'accum','spbox sb-grn');
+  } else if(st.type==='bust'){
+    spb.innerHTML=mkBox('hand',st.hand,'over target','spbox sb-red')+mkBox('return','1.000','bust!','spbox sb-red');
+  } else if(st.type==='stand'){
+    spb.innerHTML=mkBox('hand',st.hand,'in stand zone','spbox sb-grn')+mkBox('return','0.000','stand','spbox sb-grn');
+  } else if(st.type==='store'||st.type==='done'){
+    spb.innerHTML=mkBox('hand',st.hand,'computed','spbox sb-yel')+
+      mkBox('p(bust)',fmt(st.p??0),'result','spbox sb-grn')+
+      mkBox('memo',filled,'entries','spbox sb-pur');
+  } else {
+    spb.innerHTML=mkBox('hand',st.hand,'current','spbox sb-yel')+
+      mkBox('target',targetVal,'goal','spbox sb-blue')+
+      mkBox('stand',`${standMin}+`,'range','spbox sb-grn');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:   `P(bust | hand=${st.hand}, target=${targetVal}). Stand range: [${standMin},${targetVal}]. Each of 10 cards has P=0.1.`,
+    bust:   `💥 hand=${st.hand} > ${targetVal}. Already bust → return 1.0 (certainty).`,
+    stand:  `✋ hand=${st.hand} in [${standMin},${targetVal}]. Dealer stands safely → return 0.0.`,
+    memo_hit:`⚡ dp[${st.hand}]=${fmt(st.p??0)} already computed — instant return! No redundant work.`,
+    draw:   st.card?`🃏 Drawing card ${st.card}: ${st.hand}+${st.card}=${st.newHand}. Accumulating 0.1×P(bust|${st.newHand}). Running p=${fmt(st.p??0)}.`:`🎴 Starting computation for hand=${st.hand}. Drawing all 10 cards…`,
+    store:  `💾 dp[${st.hand}]=${fmt(st.p??0)}. Stored in memo for future hits.`,
+    done:   `✅ Final answer: P(bust | ${handVal}) = <strong>${fmt(st.result?.answer??0)}</strong>.`,
+  };
+  const narr=narrs[st.type]||'';
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={bust:'var(--accent)',stand:'var(--accent3)',draw:'var(--accent4)',store:'var(--pur)',memo_hit:'var(--pur)',done:'var(--accent3)',init:'var(--accent2)'}[st.type]||'var(--accent4)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narr;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vHand',  'vcHand',  st.hand);
+  setVar('vTarget','vcTarget',targetVal);
+  setVar('vCard',  'vcCard',  st.card!=null?st.card:'—');
+  setVar('vP',     'vcP',     st.p!=null?fmt(st.p):'—');
+  setVar('vDepth', 'vcDepth', st.callStack.length);
+  setVar('vFilled','vcFilled',filled);
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ P(BUST) = ${fmt(st.result.answer)}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=fmt(st.result.answer);
+    document.getElementById('bestMeta').textContent=`hand=${handVal}, target=${targetVal} · ${steps.length} steps`;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-call',bust:'ep-card',stand:'ep-card',memo_hit:'ep-card',draw:'ep-card',store:'ep-call',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-call');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

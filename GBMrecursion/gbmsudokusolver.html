@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku Solver — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field textarea{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;resize:none;width:280px;height:100px;transition:border-color .2s;}
+.field textarea:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.57rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:3px;border:1.5px solid;flex-shrink:0;}
+
+/* ── SUDOKU GRID ──────────────────────────────────────────── */
+.grid-section{margin-bottom:14px;}
+.grid-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px;display:flex;justify-content:center;}
+
+.sudoku-grid{
+  display:grid;
+  grid-template-columns:repeat(9,1fr);
+  gap:0;
+  border:3px solid var(--ink);
+  border-radius:4px;
+  overflow:hidden;
+  width:360px;
+  height:360px;
+}
+
+.scell{
+  width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;font-size:.95rem;
+  border-right:1px solid #ccc;
+  border-bottom:1px solid #ccc;
+  transition:all .2s;
+  position:relative;
+  background:var(--surface);
+  color:var(--ink);
+  user-select:none;
+}
+
+/* thick box borders */
+.scell.col2,.scell.col5{border-right:3px solid var(--ink);}
+.scell.row2,.scell.row5{border-bottom:3px solid var(--ink);}
+
+/* cell states */
+.scell.cs-given   {background:#f0ede4;color:#1a1a2e;font-weight:900;}
+.scell.cs-empty   {background:var(--surface);color:var(--muted);}
+.scell.cs-try     {
+  background:#fff8c5;color:#7a4800;border-color:#f5a623!important;
+  animation:stry .6s ease infinite alternate;
+}
+@keyframes stry{from{background:#fff8c5;}to{background:#ffe090;}}
+.scell.cs-place   {background:rgba(6,214,160,.2);color:#024d37;border-color:var(--accent3)!important;
+  animation:splace .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes splace{from{transform:scale(1.18);opacity:.5;}to{transform:none;opacity:1;}}
+.scell.cs-backtrack{background:rgba(230,57,70,.15);color:#7a0000;border-color:var(--accent)!important;
+  animation:sback .35s ease;}
+@keyframes sback{0%,100%{transform:scale(1)}50%{transform:scale(1.1);}}
+.scell.cs-done    {background:rgba(6,214,160,.18);color:#024d37;}
+.scell.cs-conflict{background:rgba(230,57,70,.1);border-color:rgba(230,57,70,.4)!important;}
+
+/* row/col/box highlight */
+.scell.hl-row{background:rgba(33,150,243,.06)!important;}
+.scell.hl-box{background:rgba(192,84,252,.06)!important;}
+.scell.hl-both{background:rgba(255,209,102,.1)!important;}
+
+/* STATS BAR */
+.stats-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.stat-chip{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;text-align:center;min-width:70px;}
+.sc-num{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);}
+.sc-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-try{border-color:var(--accent4);}
+.step-panel.sp-place{border-color:var(--accent3);}
+.step-panel.sp-back{border-color:var(--accent);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:75px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.spbox.sb-try{border-color:var(--accent4);background:rgba(255,209,102,.07);}
+.spbox.sb-ok{border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.spbox.sb-bad{border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--ink);}
+
+/* CONSTRAINT BOXES */
+.constraint-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.cbox{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;min-width:90px;}
+.cbox-title{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.cbox-nums{display:flex;gap:3px;flex-wrap:wrap;}
+.cnum{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;background:var(--surface);color:var(--muted);transition:all .2s;}
+.cnum.cn-used{background:rgba(230,57,70,.15);border-color:rgba(230,57,70,.4);color:#7a0000;}
+.cnum.cn-free{background:rgba(6,214,160,.12);border-color:rgba(6,214,160,.4);color:#028a5b;}
+.cnum.cn-try{background:rgba(255,209,102,.2);border-color:var(--accent4);color:#7a4800;font-weight:900;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-try{border-color:var(--accent4);}
+.explain-panel.ep-back{border-color:var(--accent);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-try{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-back{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*18+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-find {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-try  {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-place{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-back {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Sudoku Solver</h1>
+    <div class="sub">Backtracking · Constraint Propagation · O(9^m)</div>
+  </div>
+  <div class="family-badge">Backtracking · Recursion</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Board  (9 rows, 0=empty, semicolon separated)</label>
+      <textarea id="inBoard">0,0,3,0,2,0,6,0,0;9,0,0,3,0,5,0,0,1;0,0,1,8,0,6,4,0,0;0,0,8,1,0,2,9,0,0;7,0,0,0,0,0,0,0,8;0,0,6,7,0,8,2,0,0;0,0,2,6,0,9,5,0,0;8,0,0,2,0,3,0,0,9;0,0,5,0,1,0,3,0,0</textarea>
+      <div class="hint">9 rows, semicolon-separated. 0 = empty cell.</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="800">0.5×</button>
+        <button class="speed-btn active" data-ms="180">1×</button>
+        <button class="speed-btn" data-ms="60">2×</button>
+        <button class="speed-btn" data-ms="12">4×</button>
+        <button class="speed-btn" data-ms="2">MAX</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:#f0ede4;border-color:#aaa;"></div> given</div>
+    <div class="legend-item"><div class="ldot" style="background:#fff8c5;border-color:#f5a623;"></div> trying digit</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.2);border-color:#06d6a0;"></div> placed ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;"></div> backtrack ✗</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.06);border-color:#2196f3;"></div> same row</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.06);border-color:#c084fc;"></div> same box</div>
+  </div>
+
+  <!-- SUDOKU GRID -->
+  <div class="grid-section">
+    <div class="section-label">Sudoku board — live solving</div>
+    <div class="grid-outer">
+      <div class="sudoku-grid" id="sudokuGrid"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-chip"><div class="sc-num" id="statTries">0</div><div class="sc-lbl">Tries</div></div>
+    <div class="stat-chip"><div class="sc-num" id="statBacks">0</div><div class="sc-lbl">Backtracks</div></div>
+    <div class="stat-chip"><div class="sc-num" id="statDepth">0</div><div class="sc-lbl">Depth</div></div>
+    <div class="stat-chip"><div class="sc-num" id="statFilled">0</div><div class="sc-lbl">Filled</div></div>
+  </div>
+
+  <!-- CONSTRAINT BOXES -->
+  <div class="constraint-row" id="constraintRow">
+    <div class="cbox">
+      <div class="cbox-title">Row used</div>
+      <div class="cbox-nums" id="rowUsed"></div>
+    </div>
+    <div class="cbox">
+      <div class="cbox-title">Col used</div>
+      <div class="cbox-nums" id="colUsed"></div>
+    </div>
+    <div class="cbox">
+      <div class="cbox-title">Box used</div>
+      <div class="cbox-nums" id="boxUsed"></div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch the solver think.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(230,57,70,.3)">
+      <div class="cx-lbl">Worst Case</div><div class="cx-val" style="color:var(--accent)">O(9^m)</div>
+      <div class="cx-sub">m = empty cells</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(m)</div>
+      <div class="cx-sub">recursion depth</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Tries</div>
+      <div class="cx-val" id="cxTries" style="color:#7a5a00">—</div>
+      <div class="cx-sub">this puzzle</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Backtracks</div>
+      <div class="cx-val" id="cxBacks" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">this puzzle</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-try" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Sudoku Solver (Backtracking)</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-inc"><span class="ck">#include</span><span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line" id="cl-us"><span class="ck">using namespace</span> std;</span>
+<span class="code-line" id="cl-valid"><span class="ck">bool</span> <span class="cf">isValid</span>(<span class="ck">auto</span>&amp; b,<span class="ck">int</span> r,<span class="ck">int</span> c,<span class="ck">int</span> d){</span>
+<span class="code-line" id="cl-v1">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">0</span>;i&lt;<span class="cn">9</span>;i++){</span>
+<span class="code-line" id="cl-v2">   <span class="ck">if</span>(b[r][i]==d) <span class="ck">return false</span>; <span class="cc">// row</span></span>
+<span class="code-line" id="cl-v3">   <span class="ck">if</span>(b[i][c]==d) <span class="ck">return false</span>; <span class="cc">// col</span></span>
+<span class="code-line" id="cl-v4">   <span class="ck">int</span> br=<span class="cn">3</span>*(r/<span class="cn">3</span>)+i/<span class="cn">3</span>, bc=<span class="cn">3</span>*(c/<span class="cn">3</span>)+i%<span class="cn">3</span>;</span>
+<span class="code-line" id="cl-v5">   <span class="ck">if</span>(b[br][bc]==d) <span class="ck">return false</span>; <span class="cc">// box</span></span>
+<span class="code-line" id="cl-v6">  } <span class="ck">return true</span>; }</span>
+<span class="code-line" id="cl-sig"><span class="ck">bool</span> <span class="cf">solve</span>(vector&lt;vector&lt;<span class="ck">int</span>&gt;&gt;&amp; b){</span>
+<span class="code-line" id="cl-find">  <span class="ck">for</span>(<span class="ck">int</span> r=<span class="cn">0</span>;r&lt;<span class="cn">9</span>;r++)</span>
+<span class="code-line" id="cl-find2">   <span class="ck">for</span>(<span class="ck">int</span> c=<span class="cn">0</span>;c&lt;<span class="cn">9</span>;c++){</span>
+<span class="code-line" id="cl-find3">    <span class="ck">if</span>(b[r][c]!=<span class="cn">0</span>) <span class="ck">continue</span>;</span>
+<span class="code-line" id="cl-try">    <span class="ck">for</span>(<span class="ck">int</span> d=<span class="cn">1</span>;d&lt;=<span class="cn">9</span>;d++){</span>
+<span class="code-line" id="cl-chk">     <span class="ck">if</span>(!isValid(b,r,c,d)) <span class="ck">continue</span>;</span>
+<span class="code-line" id="cl-place">     b[r][c]=d;</span>
+<span class="code-line" id="cl-rec">     <span class="ck">if</span>(solve(b)) <span class="ck">return true</span>;</span>
+<span class="code-line" id="cl-back">     b[r][c]=<span class="cn">0</span>; <span class="cc">// backtrack</span></span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-false">    <span class="ck">return false</span>; <span class="cc">// no digit works</span></span>
+<span class="code-line" id="cl-end2">   }</span>
+<span class="code-line" id="cl-true">  <span class="ck">return true</span>; <span class="cc">// all filled!</span></span>
+<span class="code-line" id="cl-ret">}</span></pre>
+  </div>
+
+  <!-- CP NOTE -->
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ Key Optimisations</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.78;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// O(1) constraint check using bitsets</span>
+bitset&lt;<span style="color:#fda4af">10</span>&gt; rowUsed[<span style="color:#fda4af">9</span>],colUsed[<span style="color:#fda4af">9</span>],boxUsed[<span style="color:#fda4af">9</span>];
+<span style="color:#c084fc">auto</span> box=[&amp;](<span style="color:#c084fc">int</span> r,<span style="color:#c084fc">int</span> c){<span style="color:#c084fc">return</span>(r/<span style="color:#fda4af">3</span>)*<span style="color:#fda4af">3</span>+c/<span style="color:#fda4af">3</span>;};
+
+<span style="color:#c084fc">bool</span> <span style="color:#67e8f9">canPlace</span>(<span style="color:#c084fc">int</span> r,<span style="color:#c084fc">int</span> c,<span style="color:#c084fc">int</span> d){
+  <span style="color:#c084fc">return</span> !rowUsed[r][d]&amp;&amp;!colUsed[c][d]
+        &amp;&amp;!boxUsed[box(r,c)][d];
+}
+<span style="color:#374151;font-style:italic">// MRV: pick cell with fewest valid digits</span>
+<span style="color:#374151;font-style:italic">// → reduces backtracking dramatically</span>
+pair&lt;<span style="color:#c084fc">int</span>,<span style="color:#c084fc">int</span>&gt; <span style="color:#67e8f9">pickMRV</span>(){
+  <span style="color:#c084fc">int</span> best=<span style="color:#fda4af">10</span>,br=-<span style="color:#fda4af">1</span>,bc=-<span style="color:#fda4af">1</span>;
+  <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> r=<span style="color:#fda4af">0</span>;r&lt;<span style="color:#fda4af">9</span>;r++)
+    <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> c=<span style="color:#fda4af">0</span>;c&lt;<span style="color:#fda4af">9</span>;c++)
+      <span style="color:#c084fc">if</span>(b[r][c]==<span style="color:#fda4af">0</span>){
+        <span style="color:#c084fc">int</span> cnt=<span style="color:#fda4af">0</span>;
+        <span style="color:#c084fc">for</span>(<span style="color:#c084fc">int</span> d=<span style="color:#fda4af">1</span>;d&lt;=<span style="color:#fda4af">9</span>;d++)
+          <span style="color:#c084fc">if</span>(canPlace(r,c,d)) cnt++;
+        <span style="color:#c084fc">if</span>(cnt&lt;best){best=cnt;br=r;bc=c;}
+      }
+  <span style="color:#c084fc">return</span>{br,bc};
+}</pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">bitset O(1)</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">MRV heuristic</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">naked singles</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">forward check</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcCell"> <div class="var-name">cell (r,c)</div>    <div class="var-value" id="vCell"  style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcDigit"><div class="var-name">digit trying</div>  <div class="var-value" id="vDigit" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcTries"><div class="var-name">total tries</div>   <div class="var-value" id="vTries" style="color:var(--accent2)">0</div></div>
+      <div class="var-card" id="vcBacks"><div class="var-name">backtracks</div>    <div class="var-value" id="vBacks" style="color:var(--accent)">0</div></div>
+      <div class="var-card" id="vcDepth"><div class="var-name">rec depth</div>     <div class="var-value" id="vDepth" style="color:var(--accent3)">0</div></div>
+      <div class="var-card" id="vcValid"><div class="var-name">valid?</div>        <div class="var-value" id="vValid" style="color:#e2e8f0">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Puzzle Solved!</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ SUDOKU SOLVED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {r,c,d,tries,backs,depth,rowSet,colSet,boxSet} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Backtracking: scan for the first empty cell top-left to bottom-right. Try digits 1–9. For each digit, check three constraints: no same digit in the same row, column, or 3×3 box. If valid → place it and recurse. If recursion fails or no digit works → erase and backtrack.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> at every recursive call, all already-filled cells satisfy the three Sudoku constraints. We never place an invalid digit.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>O(9^m)</strong> worst case where m = number of empty cells. In practice, constraints prune the search tree drastically — typical puzzles solve in milliseconds.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Key trick:</strong> once a cell has no valid digit (empty loop), return false immediately. This triggers backtracking in the caller without testing the remaining cells.`},
+    ]
+  };
+  if(type==='find') return {
+    why:`<div class="ep-why-block why-try">Scanning for the next empty cell. Found (${r},${c}) = 0. Will try digits 1 through 9 and check each against row ${r}, column ${c}, and box (${Math.floor(r/3)},${Math.floor(c/3)}).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Scan order:</strong> row by row, left to right. Always pick the first empty cell. (MRV heuristic picks the most constrained instead — far faster in practice.)`},
+    ]
+  };
+  if(type==='try') return {
+    why:`<div class="ep-why-block why-try">Trying digit <strong>${d}</strong> at (${r},${c}). Checking: row ${r} (${rowSet?.has(d)?`contains ${d} ✗`:`${d} free ✓`}), col ${c} (${colSet?.has(d)?`contains ${d} ✗`:`${d} free ✓`}), box (${boxSet?.has(d)?`contains ${d} ✗`:`${d} free ✓`}).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Three constraint checks in one loop:</strong> row[r][i], col[i][c], and box cell. If any contains d → invalid, skip.`},
+    ]
+  };
+  if(type==='place') return {
+    why:`<div class="ep-why-block why-try">Digit <strong>${d}</strong> is valid at (${r},${c})! Placing it. Now recursing to fill the next empty cell. If recursion returns false, we'll erase this and try ${d+1}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Optimistic placement:</strong> place d and recurse immediately. The constraint check already guaranteed it doesn't conflict with existing cells.`},
+    ]
+  };
+  if(type==='back') return {
+    why:`<div class="ep-why-block why-back">Recursion returned false — no digit completed the puzzle from this state. Erasing <strong>${d}</strong> from (${r},${c}) (reset to 0) and trying ${d<9?d+1:'— no more digits, backtrack further'}.</div>`,
+    inv:[
+      {icon:'🔑',cls:'inv-key',text:`<strong>Backtrack = undo.</strong> Setting board[${r}][${c}] = 0 restores the state exactly as it was before we placed ${d}. Then the loop continues with d+1.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All 81 cells filled with no conflicts! The recursion returns true all the way up the call stack. ${tries} digit placements tried, ${backs} backtracks.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Solved!</strong> ${tries} tries, ${backs} backtracks. Every row, column, and 3×3 box contains 1–9 exactly once.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-find','cl-find2','cl-find3'],cls:'hl-find'},
+  find: {ids:['cl-find','cl-find2','cl-find3'],cls:'hl-find'},
+  try:  {ids:['cl-try','cl-chk','cl-v1','cl-v2','cl-v3','cl-v4','cl-v5','cl-v6'],cls:'hl-try'},
+  place:{ids:['cl-place','cl-rec'],cls:'hl-place'},
+  back: {ids:['cl-back'],cls:'hl-back'},
+  done: {ids:['cl-true'],cls:'hl-done'},
+  nodig:{ids:['cl-false'],cls:'hl-back'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ─────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN to watch the solver think.',color:'var(--accent4)'};
+  const {type,r,c,d,tries,backs,depth} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`Starting Sudoku backtracking solver. Scan for each empty cell. For every empty cell, try digits 1–9 one by one. Check row, column, and 3×3 box constraints. If none work, backtrack.`};
+  if(type==='find') return {color:'var(--accent2)',
+    text:`Found next empty cell at <strong>(${r},${c})</strong>. Will try all valid digits 1–9 here. Depth = ${depth}.`};
+  if(type==='try') return {color:'var(--accent4)',
+    text:`Trying digit <strong>${d}</strong> at (${r},${c}). Checking row ${r}, col ${c}, box. Tries so far: ${tries}.`};
+  if(type==='place') return {color:'var(--accent3)',
+    text:`✓ Digit <strong>${d}</strong> is valid at (${r},${c})! Placing it and recursing deeper to the next empty cell.`};
+  if(type==='back') return {color:'var(--accent)',
+    text:`✗ Backtrack at (${r},${c})! Erasing <strong>${d}</strong> → 0. That path led to a dead end. Backtracks: ${backs}.`};
+  if(type==='nodig') return {color:'var(--accent)',
+    text:`No digit 1–9 works at (${r},${c}). All options exhausted. Returning false → caller will backtrack its last placement.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ <strong>Solved!</strong> All 81 cells filled correctly. ${tries} digits tried, ${backs} backtracks. The constraint-checker eliminated invalid branches early.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps (iterative backtracking with full state snapshots) ───────────
+function computeSteps(initBoard){
+  const board=initBoard.map(r=>[...r]);
+  const steps=[];
+  let tries=0, backs=0;
+
+  const getSet=(board,r,c)=>{
+    const rowS=new Set(), colS=new Set(), boxS=new Set();
+    const br=Math.floor(r/3)*3, bc=Math.floor(c/3)*3;
+    for(let i=0;i<9;i++){
+      if(board[r][i]) rowS.add(board[r][i]);
+      if(board[i][c]) colS.add(board[i][c]);
+      const nr=br+Math.floor(i/3), nc=bc+(i%3);
+      if(board[nr][nc]) boxS.add(board[nr][nc]);
+    }
+    return {rowS,colS,boxS};
+  };
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,tries,backs,
+    board:board.map(r=>[...r]),
+    result:null,...extra,
+    explain:makeExplain(type,{tries,backs,...extra})
+  });
+
+  snap('init','🔢 Starting backtracking solver.',{r:null,c:null,d:null,depth:0});
+
+  // iterative backtracking using explicit stack
+  const empties=[];
+  for(let r=0;r<9;r++)
+    for(let c=0;c<9;c++)
+      if(board[r][c]===0) empties.push([r,c]);
+
+  // DFS with state stack: [emptyCellIdx, digitToTry]
+  // We'll simulate recursion iteratively
+  const stk=[{idx:0,d:1}];
+  const placed=[]; // which cells we placed digits into (in order)
+
+  while(stk.length>0){
+    const top=stk[stk.length-1];
+    if(top.idx>=empties.length){
+      // All cells filled!
+      snap('done','🎉 <strong>Solved!</strong>',{r:null,c:null,d:null,depth:stk.length,result:{solved:true}});
+      steps[steps.length-1].result={solved:true};
+      return steps;
+    }
+    const [r,c]=empties[top.idx];
+    const depth=stk.length;
+
+    if(top.d===1){
+      snap('find',`🔍 Empty cell (${r},${c}). Trying 1–9.`,{r,c,d:null,depth});
+    }
+
+    if(top.d>9){
+      // Backtrack — erase current cell and pop
+      board[r][c]=0; backs++;
+      snap('nodig',`✗ No digit works at (${r},${c}). Backtrack.`,{r,c,d:0,depth});
+      stk.pop();
+      if(stk.length>0){
+        const prev=stk[stk.length-1];
+        const [pr,pc]=empties[prev.idx];
+        const prevD=board[pr][pc];
+        board[pr][pc]=0; backs++;
+        snap('back',`↩ Erase ${prevD} from (${pr},${pc}). Try ${prevD+1}.`,{r:pr,c:pc,d:prevD,depth:stk.length});
+        prev.d=prevD+1;
+      }
+      continue;
+    }
+
+    const d=top.d;
+    const {rowS,colS,boxS}=getSet(board,r,c);
+    tries++;
+    snap('try',`Try ${d} at (${r},${c})`,{r,c,d,depth,rowSet:rowS,colSet:colS,boxSet:boxS});
+
+    if(!rowS.has(d)&&!colS.has(d)&&!boxS.has(d)){
+      board[r][c]=d;
+      snap('place',`✓ Place ${d} at (${r},${c})`,{r,c,d,depth});
+      stk.push({idx:top.idx+1,d:1});
+    } else {
+      top.d++;
+    }
+  }
+  // Unsolvable (shouldn't happen for valid puzzles)
+  snap('done','No solution found.',{r:null,c:null,d:null,depth:0,result:{solved:false}});
+  steps[steps.length-1].result={solved:false};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=180;
+let initBoard=[];
+
+// ─── BUILD GRID ────────────────────────────────────────────────────────────────
+function buildGrid(){
+  const grid=document.getElementById('sudokuGrid');
+  grid.innerHTML='';
+  for(let r=0;r<9;r++)
+    for(let c=0;c<9;c++){
+      const cell=document.createElement('div');
+      cell.className='scell';
+      cell.id=`sc-${r}-${c}`;
+      // thick borders
+      if(c===2||c===5) cell.classList.add('col2');
+      if(c===5) cell.classList.remove('col2'); // only add correct class
+      if(c===2) cell.classList.add('col2');
+      if(c===5) cell.classList.add('col5');
+      if(r===2||r===5) cell.classList.add(r===2?'row2':'row5');
+      grid.appendChild(cell);
+    }
+}
+
+function buildUI(){
+  const raw=document.getElementById('inBoard').value.trim();
+  initBoard=raw.split(';').map(r=>r.split(',').map(Number));
+  if(initBoard.length!==9||initBoard[0].length!==9){alert('Board must be 9×9');return;}
+
+  buildGrid();
+
+  // Mark given cells
+  for(let r=0;r<9;r++)
+    for(let c=0;c<9;c++){
+      const el=document.getElementById(`sc-${r}-${c}`);
+      if(!el)continue;
+      if(initBoard[r][c]!==0){
+        el.textContent=initBoard[r][c];
+        el.classList.add('cs-given');
+      } else {
+        el.textContent='';
+        el.classList.add('cs-empty');
+      }
+    }
+
+  steps=computeSteps(initBoard.map(r=>[...r]));
+  currentStep=0;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxTries').textContent='—';
+  document.getElementById('cxBacks').textContent='—';
+  ['statTries','statBacks','statDepth','statFilled'].forEach(id=>document.getElementById(id).textContent='0');
+  updateConstraintBoxes(null);
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── CONSTRAINT BOXES ────────────────────────────────────────────────────────
+function updateConstraintBoxes(st){
+  ['rowUsed','colUsed','boxUsed'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!st||!st.r){
+      el.innerHTML='<span style="font-size:.6rem;color:var(--muted)">—</span>';
+      return;
+    }
+    const set=id==='rowUsed'?st.rowSet:id==='colUsed'?st.colSet:st.boxSet;
+    el.innerHTML='';
+    for(let i=1;i<=9;i++){
+      const n=document.createElement('div');
+      n.className='cnum';
+      n.textContent=i;
+      if(i===st.d) n.classList.add('cn-try');
+      else if(set&&set.has(i)) n.classList.add('cn-used');
+      else n.classList.add('cn-free');
+      el.appendChild(n);
+    }
+  });
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  // Update grid
+  const board=st.board;
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++){
+      const el=document.getElementById(`sc-${r}-${c}`);
+      if(!el)continue;
+      const isGiven=initBoard[r][c]!==0;
+      const val=board[r][c];
+
+      // reset
+      el.classList.remove('cs-try','cs-place','cs-backtrack','cs-done','cs-conflict','hl-row','hl-box','hl-both');
+
+      if(isGiven){
+        el.classList.add('cs-given');
+        el.textContent=val;
+        continue;
+      }
+
+      // highlight row / box of current cell
+      const cr=st.r, cc=st.c;
+      if(cr!=null&&cc!=null&&!isFinal){
+        const sameRow=r===cr&&c!==cc;
+        const sameBox=Math.floor(r/3)===Math.floor(cr/3)&&Math.floor(c/3)===Math.floor(cc/3)&&!(r===cr&&c===cc);
+        if(sameRow&&sameBox) el.classList.add('hl-both');
+        else if(sameRow)     el.classList.add('hl-row');
+        else if(sameBox)     el.classList.add('hl-box');
+      }
+
+      // state
+      const isCur=r===cr&&c===cc;
+      if(isFinal&&val>0)      {el.classList.add('cs-done');el.textContent=val;}
+      else if(isCur&&st.type==='try')      {el.classList.add('cs-try');el.textContent=st.d||'';}
+      else if(isCur&&st.type==='place')    {el.classList.add('cs-place');el.textContent=val||st.d;}
+      else if(isCur&&(st.type==='back'||st.type==='nodig')) {el.classList.add('cs-backtrack');el.textContent=val||'';}
+      else if(val>0)                       {el.classList.add('cs-place');el.textContent=val;}
+      else                                 {el.classList.add('cs-empty');el.textContent='';}
+    }
+  }
+
+  // Stats
+  const filled=board.flat().filter(Boolean).length - initBoard.flat().filter(Boolean).length;
+  document.getElementById('statTries').textContent=st.tries;
+  document.getElementById('statBacks').textContent=st.backs;
+  document.getElementById('statDepth').textContent=st.depth??0;
+  document.getElementById('statFilled').textContent=Math.max(0,filled);
+
+  // Constraint boxes
+  updateConstraintBoxes(st);
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
+  if(st.type==='try'){
+    sp.className='step-panel sp-try';
+    spt.textContent=`Trying ${st.d} at (${st.r},${st.c})`;
+    const rOk=!st.rowSet?.has(st.d), cOk=!st.colSet?.has(st.d), bOk=!st.boxSet?.has(st.d);
+    spb.innerHTML=mkBox('row',rOk?'✓ free':'✗ clash','',(rOk?'sb-ok':'sb-bad'))+
+      mkBox('col',cOk?'✓ free':'✗ clash','',(cOk?'sb-ok':'sb-bad'))+
+      mkBox('box',bOk?'✓ free':'✗ clash','',(bOk?'sb-ok':'sb-bad'));
+  } else if(st.type==='place'){
+    sp.className='step-panel sp-place';
+    spt.textContent=`Placed ${st.d} at (${st.r},${st.c}) ✓`;
+    spb.innerHTML=mkBox('cell',`(${st.r},${st.c})`,'','spbox sb-ok')+mkBox('digit',st.d,'valid','spbox sb-ok');
+  } else if(st.type==='back'||st.type==='nodig'){
+    sp.className='step-panel sp-back';
+    spt.textContent=st.type==='nodig'?`No digit works at (${st.r},${st.c})`:`Backtrack: erase ${st.d} from (${st.r},${st.c})`;
+    spb.innerHTML=mkBox('backtracks',st.backs,'total','spbox sb-bad');
+  } else if(st.type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=st.result?.solved?'✅ Solved!':'No solution';
+    spb.innerHTML=mkBox('tries',st.tries,'','spbox sb-ok')+mkBox('backs',st.backs,'','spbox sb-bad');
+  } else {
+    sp.className='step-panel';
+    spt.textContent='Backtracking Sudoku solver ready';
+    spb.innerHTML='';
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeBar')?.querySelector('#narrativeText')&&
+    (document.getElementById('narrativeText').innerHTML=narr.text);
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type||'init');
+
+  // Vars
+  setVar('vCell','vcCell',st.r!=null?`(${st.r},${st.c})`:'—');
+  setVar('vDigit','vcDigit',st.d??'—');
+  setVar('vTries','vcTries',st.tries);
+  setVar('vBacks','vcBacks',st.backs);
+  setVar('vDepth','vcDepth',st.depth??0);
+  const valid=st.type==='place'?'✓ YES':st.type==='try'?((!st.rowSet?.has(st.d)&&!st.colSet?.has(st.d)&&!st.boxSet?.has(st.d))?'✓ YES':'✗ NO'):'—';
+  setVar('vValid','vcValid',valid);
+  document.getElementById('vValid').style.color=valid==='✓ YES'?'var(--accent3)':valid==='✗ NO'?'var(--accent)':'#6b7280';
+
+  // Done
+  if(isFinal&&st.result?.solved){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ SOLVED! ${st.tries} TRIES · ${st.backs} BACKTRACKS`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`Solved ✓`;
+    document.getElementById('bestMeta').textContent=`${st.tries} tries · ${st.backs} backtracks · O(9^m)`;
+    document.getElementById('cxTries').textContent=st.tries;
+    document.getElementById('cxBacks').textContent=st.backs;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-try',find:'ep-try',try:'ep-try',place:'ep-try',back:'ep-back',nodig:'ep-back',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-try');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(['INPUT','TEXTAREA'].includes(e.target.tagName))return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

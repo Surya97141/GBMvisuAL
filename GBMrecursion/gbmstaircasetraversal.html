@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staircase Traversal — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input,.field select{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input{width:100px;} .field select{width:160px;}
+.field input:focus,.field select:focus{border-color:var(--accent3);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#028a5b;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: STAIRCASE SVG ══ */
+.stair-section{margin-bottom:14px;}
+.stair-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .3s;}
+.stair-outer.so-active{border-color:var(--accent3);}
+.stair-outer.so-done  {border-color:var(--accent3);}
+#stairSvg{width:100%;display:block;}
+
+/* ══ UNIQUE VISUAL 2: DP ARRAY ══
+   dp[0..height] shown as cells.
+   Current computing cell pulses. Sliding window bracket shown. */
+.dp-section{margin-bottom:14px;}
+.dp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s;overflow-x:auto;}
+.dp-outer.dpo-active{border-color:var(--accent3);}
+.dp-outer.dpo-done  {border-color:var(--accent3);}
+.dp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.dph-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.dph-formula{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent3);}
+/* DP row */
+.dp-row-wrap{position:relative;margin-bottom:10px;}
+.dp-row{display:flex;gap:5px;flex-wrap:nowrap;}
+.dp-cell{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:52px;flex-shrink:0;
+}
+.dp-box{
+  width:52px;height:52px;border-radius:8px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dp-idx{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);}
+.dp-label{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);margin-top:1px;}
+/* dp cell states */
+.db-done  {background:rgba(6,214,160,.12);border-color:#06d6a0;color:#024d37;}
+.db-cur   {background:rgba(255,209,102,.25);border-color:#ffd166;color:#7a4800;transform:scale(1.1) translateY(-4px);box-shadow:0 6px 16px rgba(255,209,102,.35);}
+.db-window{background:rgba(33,150,243,.1); border-color:#2196f3;color:#0d47a1;}
+.db-base  {background:rgba(192,84,252,.1); border-color:#c084fc;color:#5b1a9a;}
+.db-answer{background:rgba(6,214,160,.25); border-color:#06d6a0;color:#024d37;box-shadow:0 0 12px rgba(6,214,160,.3);}
+
+/* Window bracket indicator */
+.window-bracket{
+  display:flex;gap:5px;margin-top:4px;
+}
+.wb-cell{
+  min-width:52px;height:6px;border-radius:3px;flex-shrink:0;
+  background:rgba(33,150,243,.2);border:1px solid rgba(33,150,243,.4);
+  transition:all .3s;
+}
+.wb-cell.wb-active{background:rgba(33,150,243,.5);border-color:#2196f3;}
+.wb-cell.wb-cur   {background:rgba(255,209,102,.6);border-color:#ffd166;}
+
+/* Sliding window sum display */
+.window-info{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;}
+.wi-label{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);}
+.wi-formula{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--ink);}
+.wi-result{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--accent3);}
+
+/* ══ UNIQUE VISUAL 3: WAYS BREAKDOWN PANEL ══
+   Shows for the current dp[i], which prior cells
+   contribute to it and by how much. */
+.breakdown-section{margin-bottom:14px;}
+.breakdown-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.breakdown-outer.bdo-active{border-color:var(--accent4);}
+.breakdown-outer.bdo-done  {border-color:var(--accent3);}
+.bd-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.bd-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.bd-total{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--accent3);}
+.bd-rows{display:flex;flex-direction:column;gap:5px;}
+.bd-row{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;
+  border:1.5px solid var(--border);background:var(--surface);transition:all .3s;
+}
+.bd-row.bdr-active{border-color:var(--accent4);background:rgba(255,209,102,.07);}
+.bd-row.bdr-done  {border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.bd-step{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;min-width:30px;}
+.bd-from{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);flex:1;}
+.bd-val {font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;min-width:28px;text-align:right;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-init{border-color:var(--pur);}
+.step-panel.sp-dp  {border-color:var(--accent4);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* COUNT BADGE */
+.count-badge{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.count-badge.cb-new{animation:cbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes cbnew{from{transform:scale(1.2);background:rgba(6,214,160,.3);}to{transform:none;background:rgba(6,214,160,.12);}}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* CX */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-init{border-color:var(--pur);}
+.explain-panel.ep-dp  {border-color:var(--accent4);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-dp  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-dp  {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-win {background:rgba(33,150,243,.14); border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.dp-right{margin-bottom:12px;overflow-x:auto;}
+.dpr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.dpr-chips{display:flex;gap:3px;flex-wrap:wrap;}
+.dpr-chip{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:3px 7px;border-radius:5px;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all .22s;}
+.dpr-chip.dprc-done{border-color:#06d6a0;background:rgba(6,214,160,.15);color:#06d6a0;}
+.dpr-chip.dprc-cur {border-color:#ffd166;background:rgba(255,209,102,.2);color:#ffd166;}
+.dpr-chip.dprc-win {border-color:#2196f3;background:rgba(33,150,243,.15);color:#4fc3f7;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Staircase Traversal</h1>
+    <div class="sub">DP · Sliding Window Sum · O(n) time O(1) extra</div>
+  </div>
+  <div class="family-badge">DP · Sliding Window</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Height</label>
+      <input type="number" id="inHeight" value="4" min="1" max="12">
+      <div class="hint">staircase steps</div>
+    </div>
+    <div class="field">
+      <label>Max Steps</label>
+      <input type="number" id="inMax" value="2" min="1">
+      <div class="hint">≤ height</div>
+    </div>
+    <div class="field">
+      <label>Approach</label>
+      <select id="inMode">
+        <option value="sliding">Sliding Window — O(n) time</option>
+        <option value="naive">Naive DP — O(n·k) time</option>
+      </select>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.1);border-color:#c084fc;border-radius:3px"></div> base case</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> computing</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.1);border-color:#2196f3;border-radius:3px"></div> sliding window</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.12);border-color:#06d6a0;border-radius:3px"></div> done ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.25);border-color:#06d6a0;border-radius:3px"></div> answer</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: STAIRCASE SVG -->
+  <div class="stair-section">
+    <div class="section-label">Staircase — highlighted step = current dp[i] being computed</div>
+    <div class="stair-outer" id="stairOuter">
+      <svg id="stairSvg" viewBox="0 0 580 200"></svg>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DP ARRAY -->
+  <div class="dp-section">
+    <div class="section-label">dp array — dp[i] = ways to reach step i</div>
+    <div class="dp-outer" id="dpOuter">
+      <div class="dp-header">
+        <div class="dph-title" id="dpFormula">dp[i] = Σ dp[i-j] for j=1..maxSteps</div>
+        <div class="dph-formula" id="dpWindowLabel">window sum</div>
+      </div>
+      <div class="dp-row-wrap">
+        <div class="dp-row" id="dpRow"></div>
+        <div class="window-bracket" id="windowBracket"></div>
+      </div>
+      <div class="window-info" id="windowInfo">
+        <span class="wi-label">window sum:</span>
+        <span class="wi-formula" id="wiFormula">—</span>
+        <span style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted)">=</span>
+        <span class="wi-result" id="wiResult">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: CONTRIBUTION BREAKDOWN -->
+  <div class="breakdown-section">
+    <div class="section-label">Which steps contribute to dp[<span id="curI">?</span>]</div>
+    <div class="breakdown-outer" id="breakdownOuter">
+      <div class="bd-header">
+        <div class="bd-title">step j → contributes dp[i-j] ways</div>
+        <div class="bd-total" id="bdTotal">total = —</div>
+      </div>
+      <div class="bd-rows" id="bdRows">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">contributions appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUNT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="count-badge" id="countBadge">Ways = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-init" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" id="cxTime" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub" id="cxTimeSub">—</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">dp array</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">n</div>
+      <div class="cx-val" id="cxN" style="color:#7a5a00">—</div>
+      <div class="cx-sub">height</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">ways</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title" id="codeTitle">C++ — Sliding Window DP</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">staircaseTraversal</span>(</span>
+<span class="code-line" id="cl-sg2">    <span class="ck">int</span> height, <span class="ck">int</span> maxSteps) {</span>
+<span class="code-line" id="cl-dp">  vector&lt;<span class="ck">int</span>&gt; dp(height+<span class="cn">1</span>, <span class="cn">0</span>);</span>
+<span class="code-line" id="cl-base">  dp[<span class="cn">0</span>] = <span class="cn">1</span>; <span class="cc">// 1 way to stand at base</span></span>
+<span class="code-line" id="cl-win">  <span class="ck">int</span> windowSum = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">1</span>; i&lt;=height; i++) {</span>
+<span class="code-line" id="cl-add">    windowSum += dp[i-<span class="cn">1</span>];   <span class="cc">// add new entry</span></span>
+<span class="code-line" id="cl-rem">    <span class="ck">if</span> (i > maxSteps)         <span class="cc">// remove expired</span></span>
+<span class="code-line" id="cl-rem2">      windowSum -= dp[i-maxSteps-<span class="cn">1</span>];</span>
+<span class="code-line" id="cl-set">    dp[i] = windowSum;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[height];</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">      <div class="var-name">i (step)</div>    <div class="var-value" id="vI"      style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcWin">    <div class="var-name">windowSum</div>   <div class="var-value" id="vWin"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcDpI">    <div class="var-name">dp[i]</div>       <div class="var-value" id="vDpI"    style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcAdded">  <div class="var-name">+dp[i-1]</div>    <div class="var-value" id="vAdded"  style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcRemoved"><div class="var-name">-dp[i-k-1]</div>  <div class="var-value" id="vRemoved" style="color:var(--accent)">—</div></div>
+      <div class="var-card" id="vcAns">    <div class="var-name">dp[height]</div>  <div class="var-value" id="vAns"    style="color:var(--accent3)">—</div></div>
+    </div>
+
+    <div class="dp-right">
+      <div class="dpr-title">dp[0..height]</div>
+      <div class="dpr-chips" id="dprChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Total Ways</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ STAIRCASE TRAVERSAL COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args,mode){
+  const{i,height,maxSteps,dp,windowSum,added,removed}=args||{};
+  const isSliding=mode==='sliding';
+
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">dp[i] = number of ways to reach step i. Base case: dp[0]=1 (one way: don't move). Recurrence: dp[i] = dp[i-1] + dp[i-2] + … + dp[i-maxSteps] — the last step could have been 1, 2, … or maxSteps steps from a lower stair.<br><br>${isSliding?`<strong>Sliding Window optimization:</strong> Instead of summing maxSteps terms each time (O(n·k)), maintain a running window sum. Add dp[i-1] when entering, subtract dp[i-maxSteps-1] when the window slides past. O(n) total!`:`<strong>Naive DP:</strong> For each dp[i], sum dp[i-j] for j=1..min(i,maxSteps). O(n·k) total.`}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Loop invariant:</strong> When computing dp[i], all dp[0..i-1] are correct. dp[i] = sum of the last maxSteps computed dp values.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why dp[0]=1?</strong> The empty path — standing at the bottom already — is exactly 1 way. This seeds the recurrence correctly.`},
+      {icon:'🔑',cls:'inv-pur',text:isSliding?`<strong>Sliding window key:</strong> dp[i] always equals sum of dp[max(0,i-maxSteps)..i-1]. Adding dp[i-1] and removing dp[i-maxSteps-1] maintains this in O(1) per step.`:`<strong>Naive sum:</strong> O(n×maxSteps) — for each of n steps, sum up to maxSteps prior values.`},
+    ]
+  };
+  if(type==='dp') return {
+    why:`<div class="ep-why-block why-dp">Computing dp[${i}]. windowSum (sum of dp[${Math.max(0,i-maxSteps)}..dp[${i-1}]]) = ${windowSum}. So dp[${i}]=${windowSum}. This means there are ${windowSum} ways to reach step ${i} using jumps of 1–${maxSteps}.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>dp[${i}] = ${windowSum}.</strong> Contributed by dp[${Math.max(0,i-maxSteps)}..${i-1}].`},
+      {icon:'💡',cls:'inv-warn',text:isSliding?`<strong>Sliding window update:</strong> added dp[${i-1}]=${added}, ${i>maxSteps?`removed dp[${i-maxSteps-1}]=${removed}`:'no removal (window not full yet)'}. Net windowSum=${windowSum}.`:`<strong>Naive sum:</strong> summed dp[${Math.max(1,i-maxSteps)}..${i}] = ${windowSum}.`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">dp[${height}]=${dp[height]}. This is the number of distinct ways to climb ${height} steps taking at most ${maxSteps} at a time.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${dp[height]} ways.</strong> Every dp[0..${height}] computed once.`},
+      {icon:'📐',cls:'inv-warn',text:`${isSliding?'O(n) time (sliding window), O(n) space.':'O(n×k) time, O(n) space.'}`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES_SLIDING={
+  init:{ids:['cl-dp','cl-base','cl-win'],cls:'hl-init'},
+  dp:  {ids:['cl-add','cl-rem','cl-rem2','cl-set'],cls:'hl-dp'},
+  done:{ids:['cl-ret'],cls:'hl-done'},
+};
+const TYPE_LINES_NAIVE={
+  init:{ids:['cl-dp','cl-base'],cls:'hl-init'},
+  dp:  {ids:['cl-for','cl-set'],cls:'hl-dp'},
+  done:{ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type,mode){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const tl=mode==='sliding'?TYPE_LINES_SLIDING:TYPE_LINES_NAIVE;
+  const e=tl[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── CODE SNIPPETS ─────────────────────────────────────────────────────────
+const CODE_NAIVE=`<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">staircaseTraversal</span>(</span>
+<span class="code-line" id="cl-sg2">    <span class="ck">int</span> height, <span class="ck">int</span> maxSteps) {</span>
+<span class="code-line" id="cl-dp">  vector&lt;<span class="ck">int</span>&gt; dp(height+<span class="cn">1</span>, <span class="cn">0</span>);</span>
+<span class="code-line" id="cl-base">  dp[<span class="cn">0</span>] = <span class="cn">1</span>;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">1</span>; i&lt;=height; i++)</span>
+<span class="code-line" id="cl-inner">    <span class="ck">for</span> (<span class="ck">int</span> j=<span class="cn">1</span>; j&lt;=min(i,maxSteps); j++)</span>
+<span class="code-line" id="cl-set">      dp[i] += dp[i-j];</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[height];</span>
+<span class="code-line" id="cl-close">}</span>`;
+
+const CODE_SLIDING=`<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">staircaseTraversal</span>(</span>
+<span class="code-line" id="cl-sg2">    <span class="ck">int</span> height, <span class="ck">int</span> maxSteps) {</span>
+<span class="code-line" id="cl-dp">  vector&lt;<span class="ck">int</span>&gt; dp(height+<span class="cn">1</span>, <span class="cn">0</span>);</span>
+<span class="code-line" id="cl-base">  dp[<span class="cn">0</span>] = <span class="cn">1</span>; <span class="cc">// 1 way to stand at base</span></span>
+<span class="code-line" id="cl-win">  <span class="ck">int</span> windowSum = <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-for">  <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">1</span>; i&lt;=height; i++) {</span>
+<span class="code-line" id="cl-add">    windowSum += dp[i-<span class="cn">1</span>];   <span class="cc">// add new entry</span></span>
+<span class="code-line" id="cl-rem">    <span class="ck">if</span> (i > maxSteps)         <span class="cc">// remove expired</span></span>
+<span class="code-line" id="cl-rem2">      windowSum -= dp[i-maxSteps-<span class="cn">1</span>];</span>
+<span class="code-line" id="cl-set">    dp[i] = windowSum;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[height];</span>
+<span class="code-line" id="cl-close">}</span>`;
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(height,maxSteps,mode){
+  const steps=[];
+  const dp=new Array(height+1).fill(0);
+  dp[0]=1;
+  let windowSum=0;
+
+  const snap=(type,desc,i,extra={})=>{
+    steps.push({type,desc,i,height,maxSteps,dp:[...dp],windowSum,
+      result:null,mode,...extra,
+      explain:makeExplain(type,{i,height,maxSteps,dp:[...dp],windowSum,...extra},mode)});
+  };
+
+  snap('init',`📐 <strong>Init.</strong> dp[0..${height}]=[0…]. dp[0]=1. ${mode==='sliding'?'windowSum=0.':''}`,0,{added:null,removed:null});
+
+  if(mode==='sliding'){
+    for(let i=1;i<=height;i++){
+      const added=dp[i-1];
+      windowSum+=added;
+      let removed=null;
+      if(i>maxSteps){
+        removed=dp[i-maxSteps-1];
+        windowSum-=removed;
+      }
+      dp[i]=windowSum;
+      // Build contribution list for breakdown
+      const contribs=[];
+      for(let j=1;j<=Math.min(i,maxSteps);j++){
+        contribs.push({step:j,from:i-j,val:dp[i-j]});
+      }
+      snap('dp',`➕ i=${i}: +dp[${i-1}]=${added}${i>maxSteps?` -dp[${i-maxSteps-1}]=${removed}`:''}. windowSum=${windowSum}=dp[${i}].`,
+        i,{added,removed,contribs});
+    }
+  } else {
+    // Naive
+    for(let i=1;i<=height;i++){
+      const contribs=[];
+      let sum=0;
+      for(let j=1;j<=Math.min(i,maxSteps);j++){
+        contribs.push({step:j,from:i-j,val:dp[i-j]});
+        sum+=dp[i-j];
+      }
+      dp[i]=sum;
+      windowSum=sum;
+      snap('dp',`i=${i}: dp[${i}] = ${contribs.map(c=>`dp[${c.from}]`).join('+')} = ${sum}.`,
+        i,{added:null,removed:null,contribs});
+    }
+  }
+
+  snap('done',`🎉 <strong>dp[${height}]=${dp[height]} ways</strong> to climb ${height} steps with max ${maxSteps} at a time.`,
+    height,{added:null,removed:null,result:{answer:dp[height]}});
+  steps[steps.length-1].result={answer:dp[height]};
+  return steps;
+}
+
+// ─── DRAW STAIRCASE ────────────────────────────────────────────────────────
+function drawStaircase(height,curI,dp,isFinal){
+  const svg=document.getElementById('stairSvg');
+  const W=580,H=200;
+  svg.innerHTML='';
+
+  const maxH=height;
+  const stepW=Math.min(Math.floor((W-40)/maxH),48);
+  const stepH=Math.min(Math.floor((H-30)/maxH),24);
+  const baseX=30;
+  const baseY=H-20;
+
+  // Draw steps bottom to top
+  for(let s=0;s<=height;s++){
+    const x=baseX+s*stepW;
+    const y=baseY-s*stepH;
+    const w=stepW;
+    const h2=stepH;
+
+    const isCur=s===curI&&!isFinal;
+    const isDone=dp[s]!==undefined&&(isFinal||(s<curI));
+    const isAnswer=s===height&&isFinal;
+
+    // Step riser
+    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',x);rect.setAttribute('y',y-h2);
+    rect.setAttribute('width',w);rect.setAttribute('height',h2);
+    rect.setAttribute('rx','3');
+    rect.setAttribute('fill',
+      isAnswer?'rgba(6,214,160,.3)':
+      isCur?'rgba(255,209,102,.3)':
+      isDone?'rgba(6,214,160,.12)':
+      'rgba(200,195,185,.2)');
+    rect.setAttribute('stroke',
+      isAnswer?'#06d6a0':
+      isCur?'#ffd166':
+      isDone?'rgba(6,214,160,.5)':
+      '#d4ccb8');
+    rect.setAttribute('stroke-width',isCur||isAnswer?'2':'1');
+    if(isCur)rect.setAttribute('filter','drop-shadow(0 0 6px rgba(255,209,102,.6))');
+    if(isAnswer)rect.setAttribute('filter','drop-shadow(0 0 8px rgba(6,214,160,.5))');
+    svg.appendChild(rect);
+
+    // Step label (dp value)
+    if(s<=curI||isFinal){
+      const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+      t.setAttribute('x',x+w/2);t.setAttribute('y',y-h2/2+1);
+      t.setAttribute('text-anchor','middle');t.setAttribute('dominant-baseline','central');
+      t.setAttribute('font-family','Space Mono,monospace');t.setAttribute('font-size','11');
+      t.setAttribute('font-weight','700');
+      t.setAttribute('fill',isAnswer?'#024d37':isCur?'#7a4800':isDone?'#024d37':'#aaa');
+      t.textContent=dp[s]!=null?dp[s]:'';
+      svg.appendChild(t);
+    }
+
+    // Step number below
+    const tn=document.createElementNS('http://www.w3.org/2000/svg','text');
+    tn.setAttribute('x',x+w/2);tn.setAttribute('y',baseY+10);
+    tn.setAttribute('text-anchor','middle');tn.setAttribute('font-family','Space Mono,monospace');
+    tn.setAttribute('font-size','8');tn.setAttribute('fill','#aaa');
+    tn.textContent=s;
+    svg.appendChild(tn);
+  }
+
+  // Current position indicator
+  if(curI>=0&&!isFinal){
+    const px=baseX+curI*stepW+stepW/2;
+    const py=baseY-curI*stepH-stepH-8;
+    const arrow=document.createElementNS('http://www.w3.org/2000/svg','text');
+    arrow.setAttribute('x',px);arrow.setAttribute('y',py);
+    arrow.setAttribute('text-anchor','middle');arrow.setAttribute('font-size','14');
+    arrow.setAttribute('fill','#ffd166');
+    arrow.textContent='▼';
+    svg.appendChild(arrow);
+  }
+
+  // Labels
+  const lbl=document.createElementNS('http://www.w3.org/2000/svg','text');
+  lbl.setAttribute('x',10);lbl.setAttribute('y',12);
+  lbl.setAttribute('font-family','Space Mono,monospace');lbl.setAttribute('font-size','9');
+  lbl.setAttribute('fill','#aaa');
+  lbl.textContent='ways';
+  svg.appendChild(lbl);
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let heightVal=4, maxStepsVal=2, modeVal='sliding';
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  heightVal=Math.max(1,Math.min(12,parseInt(document.getElementById('inHeight').value)||4));
+  maxStepsVal=Math.max(1,Math.min(heightVal,parseInt(document.getElementById('inMax').value)||2));
+  modeVal=document.getElementById('inMode').value;
+  document.getElementById('inHeight').value=heightVal;
+  document.getElementById('inMax').value=maxStepsVal;
+
+  // Set code
+  document.getElementById('codeBlock').innerHTML=modeVal==='sliding'?CODE_SLIDING:CODE_NAIVE;
+  document.getElementById('codeTitle').textContent=modeVal==='sliding'?'C++ — Sliding Window DP':'C++ — Naive DP';
+
+  steps=computeSteps(heightVal,maxStepsVal,modeVal);
+  currentStep=0;
+
+  // CX
+  document.getElementById('cxN').textContent=heightVal;
+  document.getElementById('cxTime').textContent=modeVal==='sliding'?'O(n)':'O(n·k)';
+  document.getElementById('cxTimeSub').textContent=modeVal==='sliding'?'sliding window':'n=height, k=maxSteps';
+  document.getElementById('dpFormula').textContent=modeVal==='sliding'?
+    'dp[i] = windowSum of dp[i-k..i-1]':
+    'dp[i] = dp[i-1]+…+dp[i-k]';
+  document.getElementById('dpWindowLabel').textContent=modeVal==='sliding'?'sliding window':'naive sum';
+
+  // Build dp row
+  const dr=document.getElementById('dpRow');
+  dr.innerHTML='';
+  const wb=document.getElementById('windowBracket');
+  wb.innerHTML='';
+  for(let i=0;i<=heightVal;i++){
+    const cell=document.createElement('div');cell.className='dp-cell';
+    cell.innerHTML=`<div class="dp-box" id="dpb-${i}">—</div><div class="dp-idx">${i}</div><div class="dp-label" id="dpl-${i}"></div>`;
+    dr.appendChild(cell);
+    const wc=document.createElement('div');wc.className='wb-cell';wc.id=`wb-${i}`;
+    wb.appendChild(wc);
+  }
+  // Build dp right chips
+  const dc=document.getElementById('dprChips');
+  dc.innerHTML='';
+  for(let i=0;i<=heightVal;i++){
+    const chip=document.createElement('div');
+    chip.className='dpr-chip';chip.id=`dpc-${i}`;chip.textContent=`dp[${i}]:?`;
+    dc.appendChild(chip);
+  }
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('countBadge').textContent='Ways = —';
+  document.getElementById('bdRows').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">contributions appear here…</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const height=st.height,maxSteps=st.maxSteps,curI=st.i;
+
+  // ── Staircase ──
+  drawStaircase(height,curI,st.dp,isFinal);
+  document.getElementById('stairOuter').className='stair-outer '+(isFinal?'so-done':'so-active');
+
+  // ── DP row ──
+  const windowStart=Math.max(0,curI-maxSteps);
+  const windowEnd=curI-1;
+  for(let i=0;i<=height;i++){
+    const box=document.getElementById(`dpb-${i}`);
+    const lbl=document.getElementById(`dpl-${i}`);
+    const wc=document.getElementById(`wb-${i}`);
+    const chip=document.getElementById(`dpc-${i}`);
+    if(!box)continue;
+    const v=st.dp[i];
+    const isCur=i===curI&&!isFinal&&st.type==='dp';
+    const inWin=!isFinal&&i>=windowStart&&i<=windowEnd&&st.type==='dp';
+    const isBase=i===0;
+    const isAnswer=i===height&&isFinal;
+    box.textContent=i<=curI||(st.type==='init'&&i===0)?v:'—';
+    box.className=`dp-box ${isAnswer?'db-answer':isCur?'db-cur':inWin?'db-window':isBase&&i<=curI?'db-base':i<curI?'db-done':''}`;
+    if(lbl){lbl.textContent=isBase&&i===0?'base':isAnswer?'ans':'';}
+    if(wc){wc.className=`wb-cell ${isCur?'wb-cur':inWin?'wb-active':''}`;}
+    if(chip){
+      const val=i<=curI?v:'?';
+      chip.textContent=`dp[${i}]:${val}`;
+      chip.className=`dpr-chip ${isAnswer?'dprc-done':isCur?'dprc-cur':inWin?'dprc-win':i<curI?'dprc-done':''}`;
+    }
+  }
+
+  // Window info
+  if(st.type==='dp'&&!isFinal){
+    const parts=[];
+    for(let j=1;j<=Math.min(curI,maxSteps);j++) parts.push(`dp[${curI-j}]`);
+    document.getElementById('wiFormula').textContent=parts.join('+');
+    document.getElementById('wiResult').textContent=st.windowSum;
+    document.getElementById('dpOuter').className='dp-outer dpo-active';
+  } else {
+    document.getElementById('wiFormula').textContent='—';
+    document.getElementById('wiResult').textContent='—';
+    document.getElementById('dpOuter').className=isFinal?'dp-outer dpo-done':'dp-outer';
+  }
+
+  // ── Breakdown ──
+  document.getElementById('curI').textContent=isFinal?height:curI;
+  const bdo=document.getElementById('breakdownOuter');
+  const bdr=document.getElementById('bdRows');
+  bdo.className='breakdown-outer '+(isFinal?'bdo-done':st.type==='dp'?'bdo-active':'');
+  if(st.contribs&&st.contribs.length>0){
+    bdr.innerHTML='';
+    let total=0;
+    st.contribs.forEach(({step,from,val},k)=>{
+      total+=val;
+      const row=document.createElement('div');
+      row.className=`bd-row ${isFinal?'bdr-done':'bdr-active'}`;
+      row.innerHTML=`<div class="bd-step">j=${step}</div>`
+        +`<div class="bd-from">take ${step} step${step>1?'s':''} from stair ${from} → dp[${from}]</div>`
+        +`<div class="bd-val" style="color:var(--accent3)">${val}</div>`;
+      bdr.appendChild(row);
+    });
+    document.getElementById('bdTotal').textContent=`total = ${total}`;
+  } else {
+    bdr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">contributions appear here…</span>';
+    document.getElementById('bdTotal').textContent='total = —';
+  }
+
+  // ── Count badge ──
+  const cb=document.getElementById('countBadge');
+  const prevAns=idx>0?steps[idx-1].dp[height]:undefined;
+  const curAns=st.dp[height];
+  if(curAns!==undefined&&(isFinal||curI===height)){
+    cb.textContent=`Ways = ${curAns}`;
+    if(curAns!==prevAns){cb.classList.remove('cb-new');void cb.offsetWidth;cb.classList.add('cb-new');}
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  sp.className=`step-panel ${isFinal?'sp-done':st.type==='init'?'sp-init':'sp-dp'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(st.type==='dp'){
+    spb.innerHTML=mkBox('i',curI,'step','spbox sb-yel')+
+      mkBox('windowSum',st.windowSum,'sum','spbox sb-blue')+
+      mkBox('dp[i]',st.dp[curI],'= ways','spbox sb-grn')+
+      mkBox('window',`[${Math.max(0,curI-maxSteps)},${curI-1}]`,'range','spbox sb-pur');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('height',height,'n','spbox sb-blue')+mkBox('answer',st.dp[height],'ways','spbox sb-grn');
+  } else {
+    spb.innerHTML=mkBox('dp[0]','1','base','spbox sb-pur')+mkBox('height',height,'goal','spbox sb-blue');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:`dp[0]=1 (base). dp[1..${height}]=0. ${modeVal==='sliding'?'windowSum=0.':'Now fill dp[1..'+height+'] using recurrence.'}`,
+    dp:  `Step ${curI}: ways = dp[${Math.max(0,curI-maxSteps)}]+…+dp[${curI-1}] = <strong>${st.windowSum}</strong>. ${modeVal==='sliding'?`Sliding window: +dp[${curI-1}]=${st.added}${curI>maxSteps?`, -dp[${curI-maxSteps-1}]=${st.removed}`:''}. windowSum→${st.windowSum}.`:`Summed ${Math.min(curI,maxSteps)} terms.`}`,
+    done:`✅ dp[${height}] = <strong>${st.dp[height]} ways</strong> to climb ${height} stairs with max ${maxSteps} steps.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={init:'var(--pur)',dp:'var(--accent4)',done:'var(--accent3)'}[st.type]||'var(--accent3)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type,modeVal);
+
+  // ── Right vars ──
+  setVar('vI',      'vcI',      st.type==='dp'?curI:'—');
+  setVar('vWin',    'vcWin',    st.type==='dp'?st.windowSum:'—');
+  setVar('vDpI',    'vcDpI',    st.type==='dp'?st.dp[curI]:'—');
+  setVar('vAdded',  'vcAdded',  st.added!=null?`+${st.added}`:'—');
+  setVar('vRemoved','vcRemoved',st.removed!=null?`-${st.removed}`:'—');
+  setVar('vAns',    'vcAns',    st.dp[height]!=null&&(isFinal||curI===height)?st.dp[height]:'—');
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ${st.result.answer} WAYS TO CLIMB ${height} STEPS`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`height=${height}, maxSteps=${maxSteps} · ${modeVal==='sliding'?'O(n)':'O(n·k)'}`;
+    document.getElementById('cxAnswer').textContent=st.result.answer;
+    document.getElementById('countBadge').textContent=`Ways = ${st.result.answer}`;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',dp:'ep-dp',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>
