@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Three Largest Numbers — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.fw{width:380px;} .field input:focus{border-color:var(--accent3);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#028a5b;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: ARRAY SCAN STRIP ══ */
+.array-section{margin-bottom:14px;}
+.array-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;overflow-x:auto;}
+.array-outer.ao-scan{border-color:var(--accent3);}
+.array-outer.ao-done{border-color:var(--accent3);}
+.array-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.ah-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ah-idx{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--accent3);}
+.array-row{display:flex;gap:4px;flex-wrap:nowrap;}
+.arr-cell{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;}
+.arr-box{
+  width:46px;height:46px;border-radius:8px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.arr-idx{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+/* box states */
+.ab-cur    {background:rgba(255,209,102,.28);border-color:#ffd166;color:#7a4800;transform:scale(1.1) translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,.35);}
+.ab-done   {background:rgba(6,214,160,.08);  border-color:rgba(6,214,160,.3);color:#028a5b;opacity:.6;}
+.ab-entered{background:rgba(6,214,160,.18);  border-color:#06d6a0;color:#024d37;}
+.ab-top3   {background:rgba(6,214,160,.22);  border-color:#06d6a0;color:#024d37;box-shadow:0 0 8px rgba(6,214,160,.2);}
+
+/* ══ UNIQUE VISUAL 2: THREE-SLOT PODIUM ══ */
+.podium-section{margin-bottom:14px;}
+.podium-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s;}
+.podium-outer.po-update{border-color:var(--accent3);}
+.podium-outer.po-done  {border-color:var(--accent3);}
+.podium-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.ph-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ph-action{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent3);}
+/* Three slot row */
+.podium-row{display:flex;gap:10px;align-items:flex-end;justify-content:center;}
+.podium-slot{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  flex:1;max-width:140px;
+}
+.ps-rank{font-family:'Space Mono',monospace;font-size:.55rem;text-transform:uppercase;color:var(--muted);}
+.ps-box{
+  width:100%;min-height:64px;border-radius:10px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font-family:'Space Mono',monospace;font-weight:700;
+  background:var(--surface);
+  transition:all .35s cubic-bezier(.34,1.56,.64,1);
+  position:relative;
+}
+.ps-val{font-size:1.3rem;}
+.ps-badge{font-size:.52rem;color:var(--muted);}
+/* slot states */
+.ps-empty {border-style:dashed;border-color:#ccc;opacity:.55;}
+.ps-filled{border-color:var(--accent3);background:rgba(6,214,160,.08);color:#024d37;}
+.ps-filled .ps-val{color:#024d37;}
+.ps-new   {border-color:var(--accent3);background:rgba(6,214,160,.2);color:#024d37;
+  transform:scale(1.05) translateY(-6px);box-shadow:0 8px 20px rgba(6,214,160,.25);}
+.ps-new .ps-val{color:#024d37;}
+.ps-shifted{border-color:var(--accent4);background:rgba(255,209,102,.12);animation:slotShift .4s ease;}
+@keyframes slotShift{0%{transform:translateY(-6px);opacity:.5}100%{transform:none;opacity:1}}
+/* height for podium visual */
+.podium-slot:nth-child(2) .ps-box{min-height:80px;}  /* middle = first */
+.podium-slot:nth-child(1) .ps-box{min-height:68px;}  /* second */
+.podium-slot:nth-child(3) .ps-box{min-height:54px;}  /* third */
+
+/* Arrow showing shift direction */
+.shift-arrow{
+  display:flex;align-items:center;gap:3px;
+  font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);
+  padding:3px 8px;border-radius:4px;background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.3);
+}
+
+/* ══ UNIQUE VISUAL 3: COMPARISON & DECISION PANEL ══ */
+.decision-section{margin-bottom:14px;}
+.decision-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.decision-outer.do-active{border-color:var(--accent4);}
+.decision-outer.do-insert{border-color:var(--accent3);}
+.dec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.dec-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.dec-val{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;}
+/* comparison boxes */
+.dec-row{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center;margin-bottom:10px;}
+.dec-box{border:1.5px solid var(--border);border-radius:8px;padding:8px;text-align:center;transition:all .3s;}
+.dec-box.db-cur  {border-color:var(--accent4);background:rgba(255,209,102,.12);}
+.dec-box.db-first{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.dec-box.db-sec  {border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.dec-box.db-third{border-color:var(--pur);    background:rgba(192,84,252,.06);}
+.db-lbl{font-family:'Space Mono',monospace;font-size:.5rem;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.db-v  {font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.dec-op{font-family:'Space Mono',monospace;font-size:.9rem;color:var(--muted);text-align:center;}
+/* Decision result */
+.dec-result{
+  padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;
+  text-align:center;transition:all .3s;
+}
+.dr-insert{background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;}
+.dr-skip  {background:rgba(0,0,0,.04);      border:1.5px solid var(--border);color:var(--muted);}
+.dr-shift {background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a4800;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-scan  {border-color:var(--accent3);}
+.step-panel.sp-insert{border-color:var(--accent3);}
+.step-panel.sp-skip  {border-color:var(--muted);}
+.step-panel.sp-done  {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.result-badge{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-new{animation:rbPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbPop{from{transform:scale(1.15);background:rgba(6,214,160,.3);}to{transform:none;}}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-scan  {border-color:var(--accent3);}
+.explain-panel.ep-insert{border-color:var(--accent3);}
+.explain-panel.ep-done  {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init  {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-scan  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-insert{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-skip  {border-left-color:var(--muted);background:rgba(0,0,0,.03);}
+.ep-why-block.why-done  {border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-scan  {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-insert{background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-shift {background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-done  {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.top3-right{margin-bottom:12px;}
+.t3r-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.t3r-row{display:flex;gap:5px;}
+.t3r-slot{flex:1;border:1px solid #2a2a3e;border-radius:6px;padding:7px;text-align:center;background:#0d0d18;transition:all .25s;}
+.t3r-slot.ts-filled{border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.08);}
+.t3r-slot.ts-new{border-color:var(--accent4);animation:vflash .4s ease;}
+.t3r-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:#6b6b8a;margin-bottom:3px;}
+.t3r-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Find Three Largest Numbers</h1>
+    <div class="sub">Single Pass · O(n) time O(1) space · Shift-Down Update</div>
+  </div>
+  <div class="family-badge">Arrays · Linear Scan</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Array</label>
+      <input type="text" id="inArr" value="141, 1, 17, -7, -17, -27, 18, 541, 8, 7, 7" class="fw">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.28);border-color:#ffd166;border-radius:3px"></div> current element</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.18);border-color:#06d6a0;border-radius:3px"></div> entered top-3</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.08);border-color:rgba(6,214,160,.3);border-radius:3px"></div> scanned (smaller)</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: ARRAY SCAN STRIP -->
+  <div class="array-section">
+    <div class="section-label">Array scan — element by element</div>
+    <div class="array-outer" id="arrayOuter">
+      <div class="array-header">
+        <div class="ah-label">scanning left → right</div>
+        <div class="ah-idx">idx: <span id="curIdx">—</span></div>
+      </div>
+      <div class="array-row" id="arrayRow"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: THREE-SLOT PODIUM -->
+  <div class="podium-section">
+    <div class="section-label">Top-3 podium  [third, second, first] (sorted ascending)</div>
+    <div class="podium-outer" id="podiumOuter">
+      <div class="podium-header">
+        <div class="ph-title">always kept sorted: third ≤ second ≤ first</div>
+        <div class="ph-action" id="phAction">—</div>
+      </div>
+      <div class="podium-row">
+        <div class="podium-slot" id="slot-2">
+          <div class="ps-rank">2nd largest</div>
+          <div class="ps-box ps-empty" id="psbox-1">
+            <div class="ps-val">—</div><div class="ps-badge">index 1</div>
+          </div>
+        </div>
+        <div class="podium-slot" id="slot-1">
+          <div class="ps-rank">★ 1st largest</div>
+          <div class="ps-box ps-empty" id="psbox-2">
+            <div class="ps-val">—</div><div class="ps-badge">index 2</div>
+          </div>
+        </div>
+        <div class="podium-slot" id="slot-0">
+          <div class="ps-rank">3rd largest</div>
+          <div class="ps-box ps-empty" id="psbox-0">
+            <div class="ps-val">—</div><div class="ps-badge">index 0</div>
+          </div>
+        </div>
+      </div>
+      <!-- Shift arrow indicator -->
+      <div style="display:flex;justify-content:center;margin-top:10px;" id="shiftWrap">
+        <div class="shift-arrow" id="shiftArrow" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: COMPARISON & DECISION PANEL -->
+  <div class="decision-section">
+    <div class="section-label">Comparison — where does current value fit?</div>
+    <div class="decision-outer" id="decisionOuter">
+      <div class="dec-header">
+        <div class="dec-title">value vs current top-3</div>
+        <div class="dec-val" id="decVal">—</div>
+      </div>
+      <div class="dec-row">
+        <div class="dec-box db-cur" id="decCur">
+          <div class="db-lbl">current</div>
+          <div class="db-v" id="decCurV">—</div>
+        </div>
+        <div class="dec-op" id="decOp1">?</div>
+        <div class="dec-box db-first" id="decFirst">
+          <div class="db-lbl">first</div>
+          <div class="db-v" id="decFirstV">—</div>
+        </div>
+        <div class="dec-op" id="decOp2">|</div>
+        <div class="dec-box db-sec" id="decSec">
+          <div class="db-lbl">second</div>
+          <div class="db-v" id="decSecV">—</div>
+        </div>
+      </div>
+      <div class="dec-result dr-skip" id="decResult">—</div>
+    </div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">result = [—, —, —]</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-scan" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n)</div>
+      <div class="cx-sub">single pass</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">3 slots fixed</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Updates</div>
+      <div class="cx-val" id="cxUpdates" style="color:#7a5a00">—</div>
+      <div class="cx-sub">top-3 changes</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">n</div>
+      <div class="cx-val" id="cxN" style="color:#028a5b">—</div>
+      <div class="cx-sub">elements</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-scan" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Find Three Largest Numbers</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Optimized</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-sig">vector&lt;<span class="ck">int</span>&gt; <span class="cf">findThreeLargest</span>(</span>
+<span class="code-line" id="cl-sg2">    vector&lt;<span class="ck">int</span>&gt;&amp; arr) {</span>
+<span class="code-line" id="cl-init">  vector&lt;<span class="ck">int</span>&gt; top(<span class="cn">3</span>, INT_MIN);</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">int</span> n : arr) {</span>
+<span class="code-line" id="cl-chk1">    <span class="ck">if</span> (n &gt; top[<span class="cn">2</span>]) {</span>
+<span class="code-line" id="cl-sh1">      top[<span class="cn">0</span>]=top[<span class="cn">1</span>]; top[<span class="cn">1</span>]=top[<span class="cn">2</span>];</span>
+<span class="code-line" id="cl-st1">      top[<span class="cn">2</span>] = n; <span class="cc">// new first</span></span>
+<span class="code-line" id="cl-chk2">    } <span class="ck">else if</span> (n &gt; top[<span class="cn">1</span>]) {</span>
+<span class="code-line" id="cl-sh2">      top[<span class="cn">0</span>] = top[<span class="cn">1</span>];</span>
+<span class="code-line" id="cl-st2">      top[<span class="cn">1</span>] = n; <span class="cc">// new second</span></span>
+<span class="code-line" id="cl-chk3">    } <span class="ck">else if</span> (n &gt; top[<span class="cn">0</span>]) {</span>
+<span class="code-line" id="cl-st3">      top[<span class="cn">0</span>] = n; <span class="cc">// new third</span></span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-lend">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> top;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CODEFORCES OPTIMIZED</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3,unroll-loops"</span>)</span>
+<span class="code-line"><span class="ck">#pragma GCC target</span>(<span class="cn">"avx2,bmi,bmi2"</span>)</span>
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">solve</span>() {</span>
+<span class="code-line">  <span class="ck">int</span> n; cin &gt;&gt; n;</span>
+<span class="code-line">  <span class="cc">// 3 vars — no array overhead</span></span>
+<span class="code-line">  <span class="ck">int</span> a=INT_MIN,b=INT_MIN,c=INT_MIN;</span>
+<span class="code-line">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">0</span>;i&lt;n;i++){</span>
+<span class="code-line">    <span class="ck">int</span> x; cin &gt;&gt; x;</span>
+<span class="code-line">    <span class="ck">if</span>(x&gt;c){a=b;b=c;c=x;}</span>
+<span class="code-line">    <span class="ck">else if</span>(x&gt;b){a=b;b=x;}</span>
+<span class="code-line">    <span class="ck">else if</span>(x&gt;a){a=x;}</span>
+<span class="code-line">  }</span>
+<span class="code-line">  cout&lt;&lt;a&lt;&lt;<span class="cn">' '</span>&lt;&lt;b&lt;&lt;<span class="cn">' '</span>&lt;&lt;c&lt;&lt;<span class="cn">'\n'</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">main</span>(){</span>
+<span class="code-line">  ios::sync_with_stdio(<span class="cn">0</span>);</span>
+<span class="code-line">  cin.tie(<span class="cn">0</span>); solve();</span>
+<span class="code-line">}</span>
+</pre>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcN">   <div class="var-name">n (current)</div> <div class="var-value" id="vN"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcIdx"> <div class="var-name">index</div>       <div class="var-value" id="vIdx"  style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcAct"> <div class="var-name">action</div>      <div class="var-value" id="vAct"  style="color:var(--accent3);font-size:.72rem">—</div></div>
+      <div class="var-card" id="vcUpd"> <div class="var-name">updates</div>     <div class="var-value" id="vUpd"  style="color:var(--accent3)">0</div></div>
+    </div>
+    <div class="top3-right">
+      <div class="t3r-title">top[0..2]  (ascending)</div>
+      <div class="t3r-row" id="t3rRow">
+        <div class="t3r-slot" id="ts0"><div class="t3r-lbl">top[0] 3rd</div><div class="t3r-val" id="tv0">—</div></div>
+        <div class="t3r-slot" id="ts1"><div class="t3r-lbl">top[1] 2nd</div><div class="t3r-val" id="tv1">—</div></div>
+        <div class="t3r-slot" id="ts2"><div class="t3r-lbl">top[2] 1st</div><div class="t3r-val" id="tv2">—</div></div>
+      </div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Final Answer</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ THREE LARGEST FOUND</div>
+</div>
+</div>
+
+<script>
+const NEG_INF = -Infinity;
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const{val, idx, top, action}=args||{};
+  const topStr=`[${top.map(v=>v===NEG_INF?'—':v).join(', ')}]`;
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">Maintain 3 slots: <strong>top[0]≤top[1]≤top[2]</strong> (third≤second≤first). For each element, cascade it into the right position in O(1) using 3 comparisons and at most 2 shifts. No sorting needed — single pass O(n).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> At all times top[0]≤top[1]≤top[2]. After scanning i elements, these are the 3 largest seen so far.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why shift down?</strong> When a new value beats top[2], the old top[2] becomes top[1], old top[1] becomes top[0]. The smallest is evicted.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(n) time, O(1) space:</strong> exactly 3 comparison checks per element, no extra memory needed regardless of array size.`},
+    ]
+  };
+  if(type==='scan') return {
+    why:`<div class="ep-why-block why-scan">Visiting arr[${idx}]=${val}. Check: is ${val} > top[2]=${top[2]===NEG_INF?'—':top[2]}? Is ${val} > top[1]=${top[1]===NEG_INF?'—':top[1]}? Is ${val} > top[0]=${top[0]===NEG_INF?'—':top[0]}? Otherwise skip.</div>`,
+    inv:[{icon:'🔍',cls:'',text:`<strong>Checking ${val}.</strong> Current top: ${topStr}.`}]
+  };
+  if(type==='insert-first') return {
+    why:`<div class="ep-why-block why-insert">${val} > top[2]=${top[2]===NEG_INF?'—':top[2]} → New 1st largest! Shift: top[0]←top[1], top[1]←top[2], top[2]←${val}. Two elements shift down.</div>`,
+    inv:[{icon:'🥇',cls:'',text:`<strong>${val} becomes 1st.</strong> Cascade: old 1st→2nd, old 2nd→3rd, old 3rd evicted.`}]
+  };
+  if(type==='insert-second') return {
+    why:`<div class="ep-why-block why-insert">${val} ≤ top[2] but ${val} > top[1]=${top[1]===NEG_INF?'—':top[1]} → New 2nd largest. Shift: top[0]←top[1], top[1]←${val}. One element shifts down.</div>`,
+    inv:[{icon:'🥈',cls:'',text:`<strong>${val} becomes 2nd.</strong> Old 2nd→3rd, old 3rd evicted.`}]
+  };
+  if(type==='insert-third') return {
+    why:`<div class="ep-why-block why-insert">${val} ≤ top[1] but ${val} > top[0]=${top[0]===NEG_INF?'—':top[0]} → New 3rd largest. top[0]←${val}. No shifts needed.</div>`,
+    inv:[{icon:'🥉',cls:'',text:`<strong>${val} becomes 3rd.</strong> Old 3rd evicted.`}]
+  };
+  if(type==='skip') return {
+    why:`<div class="ep-why-block why-skip">${val} ≤ top[0]=${top[0]===NEG_INF?'—':top[0]} (smallest of top-3). Not among top 3. Skip.</div>`,
+    inv:[{icon:'⏭',cls:'inv-warn',text:`<strong>Skip ${val}.</strong> Already smaller than all 3 current bests.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">All elements scanned. top = ${topStr}. These are the three largest in ascending order.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${topStr}.</strong> Single pass, O(n) time, O(1) extra space.`},
+      {icon:'📐',cls:'inv-warn',text:`Exactly 3 comparisons per element. Total comparisons: 3×n = 3×${args?.n||'n'}.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:         {ids:['cl-init','cl-loop'],cls:'hl-scan'},
+  scan:         {ids:['cl-chk1','cl-chk2','cl-chk3'],cls:'hl-scan'},
+  'insert-first': {ids:['cl-sh1','cl-st1'],cls:'hl-insert'},
+  'insert-second':{ids:['cl-sh2','cl-st2'],cls:'hl-insert'},
+  'insert-third': {ids:['cl-st3'],cls:'hl-insert'},
+  skip:         {ids:['cl-chk3','cl-end'],cls:'hl-scan'},
+  done:         {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('#code-clean .code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+let activeCodeTab='clean';
+function switchCodeTab(tab){
+  activeCodeTab=tab;
+  document.getElementById('code-clean').style.display=tab==='clean'?'block':'none';
+  document.getElementById('code-cf').style.display=tab==='cf'?'block':'none';
+  document.getElementById('ctab-clean').classList.toggle('active',tab==='clean');
+  document.getElementById('ctab-cf').classList.toggle('active',tab==='cf');
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const steps=[];
+  const n=arr.length;
+  const top=[NEG_INF,NEG_INF,NEG_INF];
+  let updates=0;
+
+  const snap=(type,desc,idx,val,action,extra={})=>{
+    steps.push({type,desc,idx,val,n,arr,top:[...top],action,updates,
+      result:null,...extra,
+      explain:makeExplain(type,{val,idx,top:[...top],action,n})});
+  };
+
+  snap('init',`📐 <strong>Init.</strong> top=[—,—,—]. Scan ${n} elements, maintain 3 largest.`,null,null,'init');
+
+  for(let i=0;i<n;i++){
+    const val=arr[i];
+    snap('scan',`🔍 Check arr[${i}]=${val} against top=[${top.map(v=>v===NEG_INF?'—':v).join(',')}].`,i,val,'scan');
+
+    if(val>top[2]){
+      top[0]=top[1]; top[1]=top[2]; top[2]=val;
+      updates++;
+      snap('insert-first',`🥇 ${val} > top[2]. New 1st! Shift down × 2.`,i,val,'new 1st');
+    } else if(val>top[1]){
+      top[0]=top[1]; top[1]=val;
+      updates++;
+      snap('insert-second',`🥈 ${val} > top[1]. New 2nd! Shift down × 1.`,i,val,'new 2nd');
+    } else if(val>top[0]){
+      top[0]=val;
+      updates++;
+      snap('insert-third',`🥉 ${val} > top[0]. New 3rd! No shift.`,i,val,'new 3rd');
+    } else {
+      snap('skip',`⏭ ${val} ≤ top[0]=${top[0]===NEG_INF?'—':top[0]}. Skip.`,i,val,'skip');
+    }
+  }
+
+  snap('done',`🎉 <strong>Done!</strong> Three largest = [${top.map(v=>v===NEG_INF?'—':v).join(', ')}].`,null,null,'done',
+    {result:{answer:[...top]},updates});
+  steps[steps.length-1].result={answer:[...top]};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let arrVal=[];
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  arrVal=document.getElementById('inArr').value.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x));
+  steps=computeSteps(arrVal);
+  currentStep=0;
+
+  document.getElementById('cxN').textContent=arrVal.length;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxUpdates').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('resultBadge').textContent='result = [—, —, —]';
+  document.getElementById('resultBadge').className='result-badge';
+
+  // Build array row
+  const ar=document.getElementById('arrayRow');
+  ar.innerHTML='';
+  arrVal.forEach((v,i)=>{
+    const cell=document.createElement('div');cell.className='arr-cell';
+    cell.innerHTML=`<div class="arr-box" id="ab-${i}">${v}</div><div class="arr-idx">${i}</div>`;
+    ar.appendChild(cell);
+  });
+
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function fmt(v){return v===NEG_INF?'—':String(v);}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const top=st.top;
+  const isInsert=st.type.startsWith('insert');
+
+  // ── Array cells ──
+  const ao=document.getElementById('arrayOuter');
+  ao.className='array-outer '+(isFinal?'ao-done':'ao-scan');
+  document.getElementById('curIdx').textContent=st.idx!=null?st.idx:'—';
+  // Determine which indices entered top-3 up to this point
+  const topSet=new Set(top.filter(v=>v!==NEG_INF));
+  for(let i=0;i<arrVal.length;i++){
+    const box=document.getElementById(`ab-${i}`);if(!box)continue;
+    const isCur=i===st.idx&&!isFinal;
+    const isDone=st.idx!=null?i<st.idx:(isFinal);
+    // Check if this value is in final top3
+    const inTop3=isFinal&&top.includes(arrVal[i]);
+    box.className='arr-box '+(
+      isCur?'ab-cur':
+      inTop3?'ab-top3':
+      isDone?'ab-done':'');
+    // Mark cells that contributed to current top (entered)
+    if(!isFinal&&!isCur&&isDone&&top.includes(arrVal[i])) box.className='arr-box ab-entered';
+  }
+
+  // ── Podium ──
+  const po=document.getElementById('podiumOuter');
+  po.className='podium-outer '+(isInsert?'po-update':isFinal?'po-done':'');
+  const slotOrder=[1,2,0]; // display: 2nd, 1st, 3rd
+  const slotLabels=['3rd largest','★ 1st largest','2nd largest'];
+  const prevTop=idx>0?steps[idx-1].top:[NEG_INF,NEG_INF,NEG_INF];
+  for(let k=0;k<3;k++){
+    const box=document.getElementById(`psbox-${k}`);if(!box)continue;
+    const val=top[k];
+    const prevVal=prevTop[k];
+    const isNew=val!==prevVal&&isInsert;
+    const isShifted=isInsert&&k<2&&prevTop[k+1]!==NEG_INF&&val===prevTop[k+1]&&val!==prevVal;
+    box.innerHTML=`<div class="ps-val">${fmt(val)}</div><div class="ps-badge">top[${k}]</div>`;
+    box.className=`ps-box ${val===NEG_INF?'ps-empty':isNew?'ps-new':isShifted?'ps-shifted':'ps-filled'}`;
+  }
+  document.getElementById('phAction').textContent=
+    st.type==='insert-first'?'🥇 New 1st — shift ×2':
+    st.type==='insert-second'?'🥈 New 2nd — shift ×1':
+    st.type==='insert-third'?'🥉 New 3rd':
+    st.type==='skip'?'⏭ Skip':
+    isFinal?`✅ [${top.map(fmt).join(', ')}]`:'scanning…';
+
+  // Shift arrow
+  const sa=document.getElementById('shiftArrow');
+  if(st.type==='insert-first'){sa.style.display='flex';sa.textContent='top[0]←top[1]←top[2]←new';}
+  else if(st.type==='insert-second'){sa.style.display='flex';sa.textContent='top[0]←top[1]←new';}
+  else{sa.style.display='none';}
+
+  // ── Comparison panel ──
+  const co=document.getElementById('decisionOuter');
+  co.className='decision-outer '+(isInsert?'do-insert':st.type==='scan'?'do-active':'');
+  document.getElementById('decVal').textContent=st.val!=null?`val = ${st.val}`:'—';
+  document.getElementById('decCurV').textContent=fmt(st.val);
+  document.getElementById('decFirstV').textContent=fmt(top[2]);
+  document.getElementById('decSecV').textContent=fmt(top[1]);
+
+  const op1=st.val!=null&&top[2]!==NEG_INF?(st.val>top[2]?'>':st.val===top[2]?'=':'<'):'?';
+  const op2='|';
+  document.getElementById('decOp1').textContent=op1;
+  document.getElementById('decOp2').textContent=op2;
+
+  const dr=document.getElementById('decResult');
+  if(st.type==='insert-first'){dr.className='dec-result dr-insert';dr.textContent='🥇 Insert as 1st — cascade shift ×2';}
+  else if(st.type==='insert-second'){dr.className='dec-result dr-insert';dr.textContent='🥈 Insert as 2nd — cascade shift ×1';}
+  else if(st.type==='insert-third'){dr.className='dec-result dr-insert';dr.textContent='🥉 Insert as 3rd';}
+  else if(st.type==='skip'){dr.className='dec-result dr-skip';dr.textContent='⏭ Skip — not in top 3';}
+  else if(isFinal){dr.className='dec-result dr-insert';dr.textContent=`✅ Result: [${top.map(fmt).join(', ')}]`;}
+  else{dr.className='dec-result dr-skip';dr.textContent='—';}
+
+  // ── Result badge ──
+  const rb=document.getElementById('resultBadge');
+  const prevTop2=idx>0?steps[idx-1].top:[NEG_INF,NEG_INF,NEG_INF];
+  if(isFinal||top.some(v=>v!==NEG_INF)){
+    const prev=rb.textContent;
+    rb.textContent=`result = [${top.map(fmt).join(', ')}]`;
+    if(isInsert&&rb.textContent!==prev){rb.classList.remove('rb-new');void rb.offsetWidth;rb.classList.add('rb-new');}
+    if(isFinal)rb.className='result-badge rb-new';
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const typeClass={init:'sp-scan',scan:'sp-scan','insert-first':'sp-insert','insert-second':'sp-insert','insert-third':'sp-insert',skip:'sp-skip',done:'sp-done'};
+  sp.className=`step-panel ${typeClass[st.type]||'sp-scan'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(isInsert){
+    spb.innerHTML=mkBox('val',fmt(st.val),'new entry','spbox sb-grn')+
+      mkBox('1st',fmt(top[2]),'top[2]','spbox sb-grn')+
+      mkBox('2nd',fmt(top[1]),'top[1]','spbox sb-blue')+
+      mkBox('3rd',fmt(top[0]),'top[0]','spbox sb-pur');
+  } else if(st.type==='scan'){
+    spb.innerHTML=mkBox('val',fmt(st.val),'checking','spbox sb-yel')+
+      mkBox('idx',st.idx,'index','spbox sb-blue')+
+      mkBox('top[2]',fmt(top[2]),'1st so far','spbox sb-grn');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('3rd',fmt(top[0]),'','spbox sb-pur')+
+      mkBox('2nd',fmt(top[1]),'','spbox sb-blue')+
+      mkBox('1st',fmt(top[2]),'','spbox sb-grn')+
+      mkBox('updates',st.updates,'changes','spbox sb-yel');
+  } else {
+    spb.innerHTML=mkBox('n',arrVal.length,'elements','spbox sb-blue')+mkBox('top','[—,—,—]','init','spbox sb-grn');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:    `Initialise top=[—,—,—]. Scan all ${arrVal.length} elements. For each, check if it belongs in the top 3.`,
+    scan:    `arr[${st.idx}]=${st.val}. Compare with top[2]=${fmt(top[2])}, top[1]=${fmt(top[1])}, top[0]=${fmt(top[0])}.`,
+    'insert-first':`🥇 ${st.val} > ${fmt(prevTop[2])} (old 1st). <strong>New 1st!</strong> Cascade: old 1st→2nd, old 2nd→3rd. Old 3rd evicted.`,
+    'insert-second':`🥈 ${st.val} > ${fmt(prevTop[1])} (old 2nd). <strong>New 2nd!</strong> Old 2nd→3rd. Old 3rd evicted.`,
+    'insert-third':`🥉 ${st.val} > ${fmt(prevTop[0])} (old 3rd). <strong>New 3rd!</strong> Old 3rd evicted.`,
+    skip:    `${st.val} ≤ top[0]=${fmt(top[0])}. Not in top 3. Skip — no update.`,
+    done:    `✅ Three largest: <strong>[${top.map(fmt).join(', ')}]</strong>. ${st.updates} update${st.updates!==1?'s':''} in ${arrVal.length} elements.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={
+    'insert-first':'var(--accent3)','insert-second':'var(--accent3)','insert-third':'var(--accent3)',
+    scan:'var(--accent4)',skip:'var(--muted)',done:'var(--accent3)',init:'var(--accent2)'
+  }[st.type]||'var(--accent3)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vN',  'vcN',   fmt(st.val));
+  setVar('vIdx','vcIdx', st.idx!=null?st.idx:'—');
+  setVar('vAct','vcAct', st.action||'—');
+  setVar('vUpd','vcUpd', st.updates);
+
+  // top3 right panel
+  [0,1,2].forEach(k=>{
+    const ts=document.getElementById(`ts${k}`);
+    const tv=document.getElementById(`tv${k}`);
+    if(!ts||!tv)return;
+    const v=top[k];
+    const prevV=prevTop[k];
+    const isNew=v!==prevV&&isInsert;
+    ts.className=`t3r-slot ${v!==NEG_INF?'ts-filled':''} ${isNew?'ts-new':''}`;
+    tv.textContent=fmt(v);
+  });
+
+  // ── Done ──
+  if(isFinal&&st.result){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ [${st.result.answer.map(fmt).join(', ')}]`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`[${st.result.answer.map(fmt).join(', ')}]`;
+    document.getElementById('bestMeta').textContent=`n=${arrVal.length} · ${st.updates} update${st.updates!==1?'s':''}`;
+    document.getElementById('cxUpdates').textContent=st.updates;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-scan',scan:'ep-scan','insert-first':'ep-insert','insert-second':'ep-insert','insert-third':'ep-insert',skip:'ep-scan',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-scan');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

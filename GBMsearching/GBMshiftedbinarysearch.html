@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shifted Binary Search — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a4800;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.fw{width:380px;} .field input.sm{width:100px;}
+.field input:focus{border-color:var(--accent4);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#7a4800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: ARRAY + ROTATION DISPLAY ══ */
+.array-section{margin-bottom:14px;}
+.array-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;transition:border-color .3s;}
+.array-outer.ao-search{border-color:var(--accent4);}
+.array-outer.ao-found {border-color:var(--accent3);}
+.array-outer.ao-miss  {border-color:var(--accent);}
+.array-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.ah-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ah-status{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;}
+
+/* pointer labels row */
+.ptr-row{display:flex;gap:4px;margin-bottom:4px;}
+.pl{width:50px;height:18px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.5rem;font-weight:700;flex-shrink:0;border-radius:3px;transition:all .2s;}
+.pl-lo {background:rgba(33,150,243,.15);color:#0d47a1;}
+.pl-hi {background:rgba(192,84,252,.15);color:#5b1a9a;}
+.pl-mid{background:rgba(255,209,102,.25);color:#7a4800;}
+.pl-lh {background:rgba(6,214,160,.15);color:#024d37;}
+
+/* Array cells */
+.array-row{display:flex;gap:4px;flex-wrap:nowrap;}
+.arr-cell{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;}
+.arr-box{
+  width:50px;height:50px;border-radius:8px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.arr-idx{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+/* box states */
+.ab-lo     {background:rgba(33,150,243,.12);border-color:#2196f3;color:#0d47a1;}
+.ab-hi     {background:rgba(192,84,252,.12);border-color:#c084fc;color:#5b1a9a;}
+.ab-mid    {background:rgba(255,209,102,.28);border-color:#ffd166;color:#7a4800;transform:scale(1.12) translateY(-4px);box-shadow:0 6px 16px rgba(255,209,102,.35);}
+.ab-in-left {background:rgba(33,150,243,.06);border-color:rgba(33,150,243,.3);color:#1565c0;}
+.ab-in-right{background:rgba(192,84,252,.06);border-color:rgba(192,84,252,.2);color:#5b1a9a;}
+.ab-out    {background:rgba(0,0,0,.03);border-color:var(--border);color:#ccc;opacity:.45;}
+.ab-found  {background:rgba(6,214,160,.28);border-color:#06d6a0;color:#024d37;box-shadow:0 0 12px rgba(6,214,160,.3);transform:scale(1.08);}
+.ab-miss   {background:rgba(230,57,70,.1);border-color:#e63946;color:#b71c1c;}
+/* rotation break marker */
+.ab-pivot  {border-top:3px solid var(--accent) !important;position:relative;}
+.ab-pivot::before{content:'↑';position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:.6rem;color:var(--accent);font-family:'Space Mono',monospace;}
+
+/* ══ UNIQUE VISUAL 2: SORTED-HALF IDENTIFICATION PANEL ══ */
+.half-section{margin-bottom:14px;}
+.half-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.half-outer.ho-left {border-color:var(--accent2);}
+.half-outer.ho-right{border-color:var(--pur);}
+.half-outer.ho-none {border-color:var(--border);}
+.half-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.hh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.half-row{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;}
+.half-box{border:1.5px solid var(--border);border-radius:8px;padding:10px;transition:all .3s;}
+.hb-left {border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.hb-right{border-color:var(--pur);background:rgba(192,84,252,.06);}
+.hb-sorted{border-width:2px;}
+.hb-sorted.hb-left {border-color:var(--accent2);background:rgba(33,150,243,.15);}
+.hb-sorted.hb-right{border-color:var(--pur);background:rgba(192,84,252,.15);}
+.hb-label{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.hb-range{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.hb-badge{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
+.hb-sorted-badge{background:rgba(6,214,160,.15);color:#024d37;border:1px solid var(--accent3);}
+.hb-mixed-badge {background:rgba(230,57,70,.08);color:#b71c1c;border:1px solid var(--accent);}
+.half-mid-badge{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px;
+  border-radius:8px;background:rgba(255,209,102,.12);border:1.5px solid var(--accent4);}
+.hmb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);}
+.hmb-val{font-family:'Space Mono',monospace;font-size:.95rem;font-weight:700;color:#7a4800;}
+/* Direction banner */
+.dir-result{margin-top:10px;padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;text-align:center;transition:all .3s;}
+.dr-left   {background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
+.dr-right  {background:rgba(192,84,252,.12);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.dr-found  {background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;}
+.dr-miss   {background:rgba(230,57,70,.08);border:1.5px solid var(--accent);color:#b71c1c;}
+.dr-init   {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+
+/* ══ UNIQUE VISUAL 3: SHRINK BAR ══ */
+.shrink-section{margin-bottom:14px;}
+.shrink-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.shrink-outer.sho-active{border-color:var(--accent4);}
+.shrink-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.shh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.shh-iter{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--accent4);}
+.shrink-history{display:flex;flex-direction:column;gap:5px;}
+.shrink-row{display:flex;gap:8px;align-items:center;}
+.sr-iter{font-family:'Space Mono',monospace;font-size:.55rem;color:var(--muted);min-width:30px;}
+.sr-bar-wrap{flex:1;height:18px;background:#e8e2d4;border-radius:4px;overflow:hidden;position:relative;}
+.sr-bar{height:100%;border-radius:4px;position:absolute;display:flex;align-items:center;justify-content:center;transition:width .4s,left .4s;}
+.srb-active{background:rgba(255,209,102,.5);}
+.srb-found {background:rgba(6,214,160,.5);}
+.srb-miss  {background:rgba(230,57,70,.4);}
+.sr-mid-tick{position:absolute;top:0;width:2px;height:100%;background:#ffd166;border-radius:1px;}
+.sr-bar-lbl{font-family:'Space Mono',monospace;font-size:.5rem;font-weight:700;color:#7a4800;z-index:1;white-space:nowrap;}
+.sr-info{font-family:'Space Mono',monospace;font-size:.53rem;color:var(--muted);min-width:70px;text-align:right;}
+
+/* STEP / RESULT */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-search{border-color:var(--accent4);}
+.step-panel.sp-found {border-color:var(--accent3);}
+.step-panel.sp-miss  {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.result-badge{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(255,209,102,.12);border:2px solid var(--accent4);color:#7a4800;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-found{background:rgba(6,214,160,.15);border-color:var(--accent3);color:#024d37;}
+.result-badge.rb-miss {background:rgba(230,57,70,.08);border-color:var(--accent);color:#b71c1c;}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;}
+.ep-why-block.why-init {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-mid  {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-found{border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-left {border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-right{border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-miss {border-left-color:var(--accent);background:rgba(230,57,70,.04);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+.done-banner.db-found{background:var(--accent3);color:#012a1e;}
+.done-banner.db-miss {background:var(--accent);color:white;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-mid  {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(6,214,160,.18); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-left {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-right{background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-miss {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.iter-log{margin-bottom:12px;}
+.il-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.il-rows{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.il-rows::-webkit-scrollbar{width:3px;}.il-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.il-row{display:flex;justify-content:space-between;padding:3px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:.58rem;color:#9ca3af;transition:all .22s;}
+.il-row.ilr-found{border-color:rgba(6,214,160,.5);background:rgba(6,214,160,.07);}
+.il-row.ilr-new  {animation:fadeUp .3s ease;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;}
+.best-box.show{opacity:1;}
+.best-box.bb-found{background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.bb-miss {background:rgba(230,57,70,.06); border:1px solid rgba(230,57,70,.2);}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bb-found .best-label{color:var(--accent3);}
+.bb-miss  .best-label{color:var(--accent);}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show.dbt{display:block;background:var(--accent3);color:#012a1e;animation:fadeUp .4s ease;}
+.done-bar.show.dbf{display:block;background:var(--accent);color:white;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Shifted Binary Search</h1>
+    <div class="sub">Rotated Sorted Array · Sorted-Half Detection · O(log n)</div>
+  </div>
+  <div class="family-badge">Binary Search · Rotation</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Shifted Array</label>
+      <input type="text" id="inArr" value="45, 61, 71, 72, 73, 0, 1, 21, 33, 37" class="fw">
+    </div>
+    <div class="field">
+      <label>Target</label>
+      <input type="number" id="inTarget" value="33" class="sm">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="360">2×</button>
+        <button class="speed-btn" data-ms="140">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.12);border-color:#2196f3;border-radius:3px"></div> lo (left half active)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.12);border-color:#c084fc;border-radius:3px"></div> hi (right half active)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#ffd166;border-radius:3px"></div> mid (checking)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.25);border-color:#06d6a0;border-radius:3px"></div> found ✓</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: ARRAY + ROTATION PIVOT -->
+  <div class="array-section">
+    <div class="section-label">Shifted array — rotation pivot marked with ↑</div>
+    <div class="array-outer" id="arrayOuter">
+      <div class="array-header">
+        <div class="ah-label">sorted but rotated — two sorted halves</div>
+        <div class="ah-status" id="ahStatus">—</div>
+      </div>
+      <div class="ptr-row" id="ptrRow"></div>
+      <div class="array-row" id="arrayRow"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: SORTED-HALF IDENTIFICATION -->
+  <div class="half-section">
+    <div class="section-label">Which half is sorted? — determines where target must be</div>
+    <div class="half-outer" id="halfOuter">
+      <div class="half-header">
+        <div class="hh-title">sorted half → check if target in range → narrow search</div>
+        <div style="font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent4);" id="halfIter">iter 0</div>
+      </div>
+      <div class="half-row">
+        <div class="half-box hb-left" id="hbLeft">
+          <div class="hb-label">Left half [lo..mid]</div>
+          <div class="hb-range" id="hbLeftRange">—</div>
+          <span class="hb-badge" id="hbLeftBadge">—</span>
+        </div>
+        <div class="half-mid-badge">
+          <div class="hmb-lbl">mid</div>
+          <div class="hmb-val" id="hmMid">—</div>
+          <div class="hmb-lbl" id="hmIdx">idx —</div>
+        </div>
+        <div class="half-box hb-right" id="hbRight">
+          <div class="hb-label">Right half [mid..hi]</div>
+          <div class="hb-range" id="hbRightRange">—</div>
+          <span class="hb-badge" id="hbRightBadge">—</span>
+        </div>
+      </div>
+      <div class="dir-result dr-init" id="dirResult">press RUN to begin…</div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: SEARCH SPACE SHRINK BAR -->
+  <div class="shrink-section">
+    <div class="section-label">Search space halving per iteration</div>
+    <div class="shrink-outer" id="shrinkOuter">
+      <div class="shrink-header">
+        <div class="shh-title">each row = one binary search step</div>
+        <div class="shh-iter">iter: <span id="iterNum">0</span></div>
+      </div>
+      <div class="shrink-history" id="shrinkHistory">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">iterations appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">index = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-search" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(log n)</div>
+      <div class="cx-sub">halve each step</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">3 pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Iterations</div>
+      <div class="cx-val" id="cxIter" style="color:#7a5a00">—</div>
+      <div class="cx-sub">actual steps</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Result</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">index found</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Shifted Binary Search</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Optimized</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">shiftedBS</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a, <span class="ck">int</span> t) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> lo=<span class="cn">0</span>, hi=a.size()-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(lo &lt;= hi) {</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid=lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-found">    <span class="ck">if</span>(a[mid]==t) <span class="ck">return</span> mid;</span>
+<span class="code-line" id="cl-lsort">    <span class="ck">if</span>(a[lo] &lt;= a[mid]) { <span class="cc">// left sorted</span></span>
+<span class="code-line" id="cl-lin">      <span class="ck">if</span>(a[lo]&lt;=t &amp;&amp; t&lt;a[mid]) hi=mid-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-lout">      <span class="ck">else</span>                     lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-rsort">    } <span class="ck">else</span> {                   <span class="cc">// right sorted</span></span>
+<span class="code-line" id="cl-rin">      <span class="ck">if</span>(a[mid]&lt;t &amp;&amp; t&lt;=a[hi]) lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-rout">      <span class="ck">else</span>                      hi=mid-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-end">    }</span>
+<span class="code-line" id="cl-wend">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CODEFORCES OPTIMIZED</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3,unroll-loops"</span>)</span>
+<span class="code-line"><span class="ck">#pragma GCC target</span>(<span class="cn">"avx2,bmi,bmi2"</span>)</span>
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">shiftedBS</span>(<span class="ck">int</span>* a,<span class="ck">int</span> n,<span class="ck">int</span> t){</span>
+<span class="code-line">  <span class="ck">int</span> lo=<span class="cn">0</span>,hi=n-<span class="cn">1</span>;</span>
+<span class="code-line">  <span class="ck">while</span>(lo&lt;=hi){</span>
+<span class="code-line">    <span class="ck">int</span> mid=(lo+hi)&gt;&gt;<span class="cn">1</span>; <span class="cc">// bitshift /2</span></span>
+<span class="code-line">    <span class="ck">if</span>(a[mid]==t)<span class="ck">return</span> mid;</span>
+<span class="code-line">    <span class="cc">// left half sorted?</span></span>
+<span class="code-line">    <span class="ck">bool</span> ls=a[lo]&lt;=a[mid];</span>
+<span class="code-line">    <span class="ck">bool</span> inL=ls&amp;&amp;a[lo]&lt;=t&amp;&amp;t&lt;a[mid];</span>
+<span class="code-line">    <span class="ck">bool</span> inR=!ls&amp;&amp;a[mid]&lt;t&amp;&amp;t&lt;=a[hi];</span>
+<span class="code-line">    <span class="ck">if</span>(inL) hi=mid-<span class="cn">1</span>;</span>
+<span class="code-line">    <span class="ck">else if</span>(inR) lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line">    <span class="ck">else if</span>(ls) lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line">    <span class="ck">else</span> hi=mid-<span class="cn">1</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">main</span>(){</span>
+<span class="code-line">  ios::sync_with_stdio(<span class="cn">0</span>);cin.tie(<span class="cn">0</span>);</span>
+<span class="code-line">}</span>
+</pre>
+    </div>
+  </div>
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo"><div class="var-name">lo</div><div class="var-value" id="vLo" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcHi"><div class="var-name">hi</div><div class="var-value" id="vHi" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcMid"><div class="var-name">mid</div><div class="var-value" id="vMid" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcAMid"><div class="var-name">arr[mid]</div><div class="var-value" id="vAMid" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcSorted" style="grid-column:1/3"><div class="var-name">sorted half</div><div class="var-value" id="vSorted" style="color:var(--accent4);font-size:.75rem">—</div></div>
+    </div>
+    <div class="iter-log">
+      <div class="il-title">Iteration log</div>
+      <div class="il-rows" id="ilRows"></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar"></div>
+</div>
+</div>
+
+<script>
+// ─── FIND PIVOT ─────────────────────────────────────────────────────────────
+function findPivot(arr){
+  for(let i=1;i<arr.length;i++) if(arr[i]<arr[i-1]) return i;
+  return -1; // not rotated
+}
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{lo,hi,mid,arrLo,arrMid,arrHi,target,leftSorted,n}=args||{};
+  if(type==='init') return{
+    why:`<div class="ep-why-block why-init">The array is sorted but rotated. Standard binary search fails because we can't tell direction from a single comparison.<br><br><strong>Key insight:</strong> In any rotation, one half [lo..mid] or [mid..hi] is <em>always</em> sorted. Determine which half is sorted using arr[lo] vs arr[mid], then check if target lies in that sorted half. If yes, search there. If no, search the other half.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> target, if present, always lies within arr[lo..hi]. We never eliminate the half that could contain it.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why arr[lo] ≤ arr[mid] means left is sorted:</strong> In a rotation, if the left boundary value ≤ mid value, no rotation point falls between lo and mid, so that half is monotone.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(log n) time:</strong> each iteration halves the window, exactly like standard binary search. The extra 2 comparisons don't change the asymptotic complexity.`},
+    ]
+  };
+  if(type==='mid') return{
+    why:`<div class="ep-why-block why-mid">lo=${lo}, hi=${hi}. mid=${mid}, arr[mid]=${arrMid}.<br><br>Check: arr[lo]=${arrLo} ≤ arr[mid]=${arrMid}? ${arrLo<=arrMid?'Yes → <strong>left half [lo..mid] is sorted.</strong>':'No → <strong>right half [mid..hi] is sorted.</strong>'}<br>Then: is target=${target} in that sorted half?</div>`,
+    inv:[{icon:'🎯',cls:'',text:`<strong>Window [${lo},${hi}].</strong> mid=${mid}. ${leftSorted?'Left':'Right'} half is sorted.`}]
+  };
+  if(type==='found') return{
+    why:`<div class="ep-why-block why-found">arr[${mid}]=${arrMid}==target=${target}. <strong>Found!</strong> Return index ${mid}.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Found at index ${mid}.</strong> arr[${mid}]=${arrMid}=target.`}]
+  };
+  if(type==='go-left-in') return{
+    why:`<div class="ep-why-block why-left">Left half [${lo}..${mid}] is sorted. arr[${lo}]=${arrLo} ≤ target=${target} < arr[${mid}]=${arrMid}? Yes → target is in the left sorted half. Set hi=${mid-1}.</div>`,
+    inv:[{icon:'←',cls:'',text:`<strong>Target in sorted left half.</strong> hi=${mid-1}.`}]
+  };
+  if(type==='go-right-out') return{
+    why:`<div class="ep-why-block why-right">Left half sorted but target=${target} not in [${arrLo},${arrMid}). Target must be in the right half. Set lo=${mid+1}.</div>`,
+    inv:[{icon:'→',cls:'inv-pur',text:`<strong>Target not in left half.</strong> lo=${mid+1}.`}]
+  };
+  if(type==='go-right-in') return{
+    why:`<div class="ep-why-block why-right">Right half [${mid}..${hi}] is sorted. arr[${mid}]=${arrMid} < target=${target} ≤ arr[${hi}]=${arrHi}? Yes → target is in the right sorted half. Set lo=${mid+1}.</div>`,
+    inv:[{icon:'→',cls:'inv-pur',text:`<strong>Target in sorted right half.</strong> lo=${mid+1}.`}]
+  };
+  if(type==='go-left-out') return{
+    why:`<div class="ep-why-block why-left">Right half sorted but target=${target} not in (${arrMid},${arrHi}]. Target must be in the left half. Set hi=${mid-1}.</div>`,
+    inv:[{icon:'←',cls:'',text:`<strong>Target not in right half.</strong> hi=${mid-1}.`}]
+  };
+  if(type==='miss') return{
+    why:`<div class="ep-why-block why-miss">lo=${lo} > hi=${hi}. Search space exhausted. target=${target} not in array. Return -1.</div>`,
+    inv:[{icon:'✗',cls:'inv-warn',text:`<strong>Not found.</strong> lo > hi. Return -1.`}]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:        {ids:['cl-init','cl-while'],cls:'hl-init'},
+  mid:         {ids:['cl-mid','cl-found','cl-lsort'],cls:'hl-mid'},
+  found:       {ids:['cl-found'],cls:'hl-found'},
+  'go-left-in':{ids:['cl-lsort','cl-lin'],cls:'hl-left'},
+  'go-right-out':{ids:['cl-lsort','cl-lout'],cls:'hl-right'},
+  'go-right-in':{ids:['cl-rsort','cl-rin'],cls:'hl-right'},
+  'go-left-out':{ids:['cl-rsort','cl-rout'],cls:'hl-left'},
+  miss:        {ids:['cl-ret'],cls:'hl-miss'},
+};
+function highlightCode(type){
+  document.querySelectorAll('#code-clean .code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+let activeCodeTab='clean';
+function switchCodeTab(tab){
+  activeCodeTab=tab;
+  document.getElementById('code-clean').style.display=tab==='clean'?'block':'none';
+  document.getElementById('code-cf').style.display=tab==='cf'?'block':'none';
+  document.getElementById('ctab-clean').classList.toggle('active',tab==='clean');
+  document.getElementById('ctab-cf').classList.toggle('active',tab==='cf');
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(arr,target){
+  const steps=[];
+  const n=arr.length;
+  const iterLog=[];
+  let iter=0;
+  const pivot=findPivot(arr);
+
+  const snap=(type,desc,lo,hi,mid,extra={})=>{
+    const arrLo=arr[lo], arrHi=arr[hi];
+    const arrMid=mid!=null?arr[mid]:null;
+    const leftSorted=mid!=null&&arrLo<=arrMid;
+    steps.push({type,desc,lo,hi,mid,n,arr,target,iter,pivot,
+      iterLog:[...iterLog],result:null,leftSorted,arrLo,arrHi,arrMid,...extra,
+      explain:makeExplain(type,{lo,hi,mid,arrLo,arrMid,arrHi,target,leftSorted,n})});
+  };
+
+  snap('init',`📐 <strong>Init.</strong> n=${n}, target=${target}. Pivot at index ${pivot>=0?pivot:'none'}. lo=0, hi=${n-1}.`,0,n-1,null);
+
+  let lo=0,hi=n-1;
+  while(lo<=hi){
+    iter++;
+    const mid=lo+Math.floor((hi-lo)/2);
+    const arrMid=arr[mid], arrLo=arr[lo], arrHi=arr[hi];
+    const leftSorted=arrLo<=arrMid;
+
+    snap('mid',`🔍 Iter ${iter}: lo=${lo},hi=${hi},mid=${mid},arr[mid]=${arrMid}. ${leftSorted?'Left sorted.':'Right sorted.'}`,lo,hi,mid,{leftSorted});
+
+    if(arrMid===target){
+      iterLog.push({iter,lo,hi,mid,arrMid,move:'FOUND'});
+      snap('found',`✅ arr[${mid}]=${arrMid}=target. Return ${mid}.`,lo,hi,mid,{result:{answer:mid}});
+      steps[steps.length-1].result={answer:mid};
+      return steps;
+    }
+
+    if(leftSorted){
+      if(arrLo<=target&&target<arrMid){
+        iterLog.push({iter,lo,hi,mid,arrMid,move:'← left (in left)'});
+        snap('go-left-in',`← Left sorted, target in [${arrLo},${arrMid}). hi=${mid-1}.`,lo,hi,mid,{leftSorted});
+        hi=mid-1;
+      } else {
+        iterLog.push({iter,lo,hi,mid,arrMid,move:'→ right (out left)'});
+        snap('go-right-out',`→ Left sorted, target not in left. lo=${mid+1}.`,lo,hi,mid,{leftSorted});
+        lo=mid+1;
+      }
+    } else {
+      if(arrMid<target&&target<=arrHi){
+        iterLog.push({iter,lo,hi,mid,arrMid,move:'→ right (in right)'});
+        snap('go-right-in',`→ Right sorted, target in (${arrMid},${arrHi}]. lo=${mid+1}.`,lo,hi,mid,{leftSorted});
+        lo=mid+1;
+      } else {
+        iterLog.push({iter,lo,hi,mid,arrMid,move:'← left (out right)'});
+        snap('go-left-out',`← Right sorted, target not in right. hi=${mid-1}.`,lo,hi,mid,{leftSorted});
+        hi=mid-1;
+      }
+    }
+  }
+
+  snap('miss',`✗ Not found. Return -1.`,lo,hi,null,{result:{answer:-1}});
+  steps[steps.length-1].result={answer:-1};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let arrVal=[], targetVal=0;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  arrVal=document.getElementById('inArr').value.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x));
+  targetVal=parseInt(document.getElementById('inTarget').value)||0;
+  const n=arrVal.length;
+  if(!n)return;
+
+  steps=computeSteps(arrVal,targetVal);
+  currentStep=0;
+  const pivot=findPivot(arrVal);
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('cxIter').textContent='—';
+  document.getElementById('ilRows').innerHTML='';
+  document.getElementById('shrinkHistory').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">iterations appear here…</span>';
+  document.getElementById('resultBadge').textContent='index = —';
+  document.getElementById('resultBadge').className='result-badge';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build array row
+  const ar=document.getElementById('arrayRow');
+  const pr=document.getElementById('ptrRow');
+  ar.innerHTML=''; pr.innerHTML='';
+  arrVal.forEach((v,i)=>{
+    const cell=document.createElement('div');cell.className='arr-cell';
+    const box=document.createElement('div');
+    box.className=`arr-box${pivot===i?' ab-pivot':''}`;
+    box.id=`ab-${i}`;box.textContent=v;
+    const idx=document.createElement('div');idx.className='arr-idx';idx.textContent=i;
+    cell.appendChild(box);cell.appendChild(idx);
+    ar.appendChild(cell);
+    const pl=document.createElement('div');pl.className='pl';pl.id=`pl-${i}`;
+    pr.appendChild(pl);
+  });
+
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n;
+  const pivot=st.pivot;
+
+  // ── Array cells ──
+  const ao=document.getElementById('arrayOuter');
+  ao.className='array-outer '+(isFinal?(st.result.answer>=0?'ao-found':'ao-miss'):'ao-search');
+
+  for(let i=0;i<n;i++){
+    const box=document.getElementById(`ab-${i}`);
+    const pl=document.getElementById(`pl-${i}`);
+    if(!box||!pl)continue;
+
+    const inWindow=i>=st.lo&&i<=st.hi;
+    const isMid=i===st.mid;
+    const isLo=i===st.lo;
+    const isHi=i===st.hi;
+    const isFound=isFinal&&st.result.answer===i;
+    const inLeft=st.mid!=null&&i>=st.lo&&i<=st.mid;
+    const inRight=st.mid!=null&&i>=st.mid&&i<=st.hi;
+
+    box.className=`arr-box${pivot===i?' ab-pivot':''} `+(
+      isFound?'ab-found':
+      isMid?'ab-mid':
+      !isFinal&&inWindow&&st.leftSorted&&inLeft?'ab-in-left':
+      !isFinal&&inWindow&&!st.leftSorted&&inRight?'ab-in-right':
+      inWindow?'ab-in-left':
+      isFinal&&st.result.answer===-1?'ab-miss':'ab-out');
+
+    const labels=[];
+    if(isMid) labels.push('mid');
+    if(isLo&&isHi) pl.className='pl pl-lh';
+    else if(isLo) pl.className='pl pl-lo';
+    else if(isHi) pl.className='pl pl-hi';
+    else pl.className='pl';
+    if(isMid&&isLo) labels.push('lo');
+    else if(isMid&&isHi) labels.push('hi');
+    else if(isLo) labels.push('lo');
+    else if(isHi) labels.push('hi');
+    pl.textContent=labels.join('/');
+  }
+
+  const ahSt=document.getElementById('ahStatus');
+  if(isFinal){
+    ahSt.textContent=st.result.answer>=0?`✓ idx ${st.result.answer}`:'✗ -1';
+    ahSt.style.color=st.result.answer>=0?'var(--accent3)':'var(--accent)';
+  } else {
+    ahSt.textContent=st.mid!=null?`mid=${st.mid}, val=${st.arrMid}`:
+      `lo=${st.lo}, hi=${st.hi}`;
+    ahSt.style.color='var(--muted)';
+  }
+
+  // ── Half identification panel ──
+  const ho=document.getElementById('halfOuter');
+  if(st.mid!=null&&!isFinal){
+    ho.className='half-outer '+(st.leftSorted?'ho-left':'ho-right');
+    document.getElementById('halfIter').textContent=`iter ${st.iter}`;
+    document.getElementById('hbLeftRange').textContent=`[${st.arrLo} … ${st.arrMid}]`;
+    document.getElementById('hbRightRange').textContent=`[${st.arrMid} … ${st.arrHi}]`;
+    const leftSorted=st.leftSorted;
+    document.getElementById('hbLeft').className=`half-box hb-left${leftSorted?' hb-sorted':''}`;
+    document.getElementById('hbRight').className=`half-box hb-right${!leftSorted?' hb-sorted':''}`;
+    document.getElementById('hbLeftBadge').textContent=leftSorted?'SORTED ✓':'rotated';
+    document.getElementById('hbLeftBadge').className='hb-badge '+(leftSorted?'hb-sorted-badge':'hb-mixed-badge');
+    document.getElementById('hbRightBadge').textContent=!leftSorted?'SORTED ✓':'rotated';
+    document.getElementById('hbRightBadge').className='hb-badge '+(!leftSorted?'hb-sorted-badge':'hb-mixed-badge');
+    document.getElementById('hmMid').textContent=st.arrMid;
+    document.getElementById('hmIdx').textContent=`idx ${st.mid}`;
+
+    const dr=document.getElementById('dirResult');
+    if(st.type==='go-left-in'){dr.className='dir-result dr-left';dr.textContent=`← Target in sorted left half → search left (hi=${st.mid-1})`;}
+    else if(st.type==='go-right-out'){dr.className='dir-result dr-right';dr.textContent=`→ Target not in left → search right (lo=${st.mid+1})`;}
+    else if(st.type==='go-right-in'){dr.className='dir-result dr-right';dr.textContent=`→ Target in sorted right half → search right (lo=${st.mid+1})`;}
+    else if(st.type==='go-left-out'){dr.className='dir-result dr-left';dr.textContent=`← Target not in right → search left (hi=${st.mid-1})`;}
+    else if(st.type==='found'){dr.className='dir-result dr-found';dr.textContent=`✓ arr[mid]=target. Found at index ${st.mid}!`;}
+    else{dr.className='dir-result dr-init';dr.textContent=`arr[lo]=${st.arrLo}≤arr[mid]=${st.arrMid}? ${leftSorted?'Yes→left sorted':'No→right sorted'}`;}
+  } else if(isFinal){
+    ho.className='half-outer '+(st.result.answer>=0?'ho-left':'ho-none');
+    document.getElementById('dirResult').className=`dir-result ${st.result.answer>=0?'dr-found':'dr-miss'}`;
+    document.getElementById('dirResult').textContent=st.result.answer>=0?`✓ Found at index ${st.result.answer}`:'✗ Not in array — return -1';
+  } else {
+    ho.className='half-outer ho-none';
+    document.getElementById('dirResult').className='dir-result dr-init';
+    document.getElementById('dirResult').textContent='press RUN to begin…';
+  }
+
+  // ── Shrink bars ──
+  document.getElementById('iterNum').textContent=st.iter;
+  document.getElementById('shrinkOuter').className='shrink-outer sho-active';
+  const sh=document.getElementById('shrinkHistory');
+  if(st.iterLog&&st.iterLog.length>0){
+    sh.innerHTML='';
+    st.iterLog.forEach(log=>{
+      const total=n-1;
+      const leftPct=Math.round(log.lo/total*100);
+      const widthPct=Math.round((log.hi-log.lo+1)/n*100);
+      const midPct=Math.round(log.mid/total*100);
+      const isDone=log.move==='FOUND';
+      const row=document.createElement('div');row.className='shrink-row';
+      row.innerHTML=`<div class="sr-iter">i${log.iter}</div>
+        <div class="sr-bar-wrap">
+          <div class="sr-bar ${isDone?'srb-found':'srb-active'}" style="left:${leftPct}%;width:${Math.max(widthPct,2)}%">
+            <span class="sr-bar-lbl">[${log.lo},${log.hi}]</span>
+          </div>
+          <div class="sr-mid-tick" style="left:${midPct}%"></div>
+        </div>
+        <div class="sr-info">${log.move}</div>`;
+      sh.appendChild(row);
+    });
+    // Show current mid step if not yet logged
+    if(!isFinal&&st.mid!=null&&st.type==='mid'){
+      const total=n-1;
+      const lp=Math.round(st.lo/total*100);
+      const wp=Math.round((st.hi-st.lo+1)/n*100);
+      const mp=Math.round(st.mid/total*100);
+      const row=document.createElement('div');row.className='shrink-row';
+      row.innerHTML=`<div class="sr-iter" style="color:var(--accent4)">i${st.iter}→</div>
+        <div class="sr-bar-wrap">
+          <div class="sr-bar srb-active" style="left:${lp}%;width:${Math.max(wp,2)}%;opacity:.6">
+            <span class="sr-bar-lbl">[${st.lo},${st.hi}]</span>
+          </div>
+          <div class="sr-mid-tick" style="left:${mp}%"></div>
+        </div>
+        <div class="sr-info" style="color:var(--accent4)">checking</div>`;
+      sh.appendChild(row);
+    }
+  } else {
+    sh.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">iterations appear here…</span>';
+  }
+
+  // ── Result badge ──
+  const rb=document.getElementById('resultBadge');
+  if(isFinal){
+    rb.textContent=st.result.answer>=0?`index = ${st.result.answer}`:`index = -1 (not found)`;
+    rb.className=`result-badge ${st.result.answer>=0?'rb-found':'rb-miss'}`;
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const typeClass={init:'sp-search',mid:'sp-search',found:'sp-found','go-left-in':'sp-search','go-right-out':'sp-search','go-right-in':'sp-search','go-left-out':'sp-search',miss:'sp-miss'};
+  sp.className=`step-panel ${typeClass[st.type]||'sp-search'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+
+  if(st.type==='mid'||st.type.startsWith('go-')){
+    spb.innerHTML=mkBox('lo',st.lo,'','spbox sb-blue')+
+      mkBox('mid',st.mid,'','spbox sb-yel')+
+      mkBox('hi',st.hi,'','spbox sb-pur')+
+      mkBox(st.leftSorted?'left ✓':'right ✓',st.leftSorted?'left':'right','sorted','spbox sb-grn');
+  } else if(st.type==='found'){
+    spb.innerHTML=mkBox('found!',`idx=${st.mid}`,'answer','spbox sb-grn')+
+      mkBox('value',st.arrMid,'=target','spbox sb-grn')+mkBox('iters',st.iter,'steps','spbox sb-yel');
+  } else if(st.type==='miss'){
+    spb.innerHTML=mkBox('lo',st.lo,`>hi=${st.hi}`,'spbox sb-red')+mkBox('result','-1','not found','spbox sb-red');
+  } else {
+    spb.innerHTML=mkBox('lo',0,'start','spbox sb-blue')+mkBox('hi',n-1,'start','spbox sb-pur');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:    `Array rotated at index ${pivot>=0?pivot:'(none)'}. lo=0, hi=${n-1}. Each step determines the sorted half and narrows to the correct half.`,
+    mid:     `Iter ${st.iter}: [${st.lo},${st.hi}]. mid=${st.mid}, arr[mid]=${st.arrMid}. arr[lo]=${st.arrLo}≤arr[mid]? → ${st.leftSorted?'Left half sorted.':'Right half sorted.'}`,
+    found:   `✅ arr[${st.mid}]=${st.arrMid}=target. <strong>Found at index ${st.mid}</strong> in ${st.iter} iter${st.iter!==1?'s':''}!`,
+    'go-left-in': `Left half [${st.arrLo}..${st.arrMid}] sorted. target=${targetVal} in this range. Search left: hi=${st.mid-1}.`,
+    'go-right-out':`Left half sorted. target=${targetVal} NOT in [${st.arrLo},${st.arrMid}). Must be in right. lo=${st.mid+1}.`,
+    'go-right-in':`Right half [${st.arrMid}..${st.arrHi}] sorted. target=${targetVal} in this range. Search right: lo=${st.mid+1}.`,
+    'go-left-out': `Right half sorted. target=${targetVal} NOT in (${st.arrMid},${st.arrHi}]. Must be in left. hi=${st.mid-1}.`,
+    miss:    `✗ lo=${st.lo} > hi=${st.hi}. Search space empty. <strong>target not in array.</strong> Return -1.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={found:'var(--accent3)',miss:'var(--accent)','go-left-in':'var(--accent2)','go-right-out':'var(--pur)','go-right-in':'var(--pur)','go-left-out':'var(--accent2)',mid:'var(--accent4)',init:'var(--accent2)'}[st.type]||'var(--accent4)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vLo',    'vcLo',    st.lo);
+  setVar('vHi',    'vcHi',    st.hi);
+  setVar('vMid',   'vcMid',   st.mid!=null?st.mid:'—');
+  setVar('vAMid',  'vcAMid',  st.arrMid!=null?st.arrMid:'—');
+  setVar('vSorted','vcSorted',st.mid!=null?(st.leftSorted?'LEFT [lo..mid] is sorted':'RIGHT [mid..hi] is sorted'):'—');
+
+  // Iter log
+  const il=document.getElementById('ilRows');
+  il.innerHTML='';
+  const prevLogLen=idx>0?steps[idx-1].iterLog.length:0;
+  [...st.iterLog].reverse().slice(0,8).forEach((log,k)=>{
+    const isNew=k===0&&st.iterLog.length>prevLogLen;
+    il.innerHTML+=`<div class="il-row ${log.move==='FOUND'?'ilr-found':''} ${isNew?'ilr-new':''}">
+      <span>i${log.iter}:[${log.lo},${log.hi}] mid=${log.mid}=${log.arrMid}</span>
+      <span style="font-weight:700;color:${log.move==='FOUND'?'#06d6a0':'#9ca3af'}">${log.move}</span>
+    </div>`;
+  });
+
+  // Done
+  if(isFinal&&st.result){
+    const found=st.result.answer>=0;
+    document.getElementById('doneBanner').className=`done-banner show ${found?'db-found':'db-miss'}`;
+    document.getElementById('doneBanner').textContent=found?`✓ FOUND AT INDEX ${st.result.answer}`:'✗ NOT FOUND — RETURN -1';
+    document.getElementById('doneBar').className=`done-bar show ${found?'dbt':'dbf'}`;
+    document.getElementById('doneBar').textContent=found?`★ INDEX = ${st.result.answer}`:'★ INDEX = -1';
+    document.getElementById('bestBox').className=`best-box show ${found?'bb-found':'bb-miss'}`;
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`target=${targetVal} · ${st.iter} iter${st.iter!==1?'s':''}`;
+    document.getElementById('cxAnswer').textContent=String(st.result.answer);
+    document.getElementById('cxAnswer').style.color=found?'var(--accent3)':'var(--accent)';
+    document.getElementById('cxIter').textContent=st.iter;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

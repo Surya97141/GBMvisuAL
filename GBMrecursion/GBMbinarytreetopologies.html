@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Tree Topologies — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(192,84,252,.2);border:1px solid var(--pur);color:#5b1a9a;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.82rem;color:var(--ink);outline:none;width:120px;transition:border-color .2s;}
+.field input:focus{border-color:var(--pur);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ══ UNIQUE VISUAL 1: TOPOLOGY GALLERY ══
+   Small SVG sketches of all tree shapes for n nodes.
+   Appear as they get counted. */
+.gallery-section{margin-bottom:14px;}
+.gallery-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;overflow:hidden;}
+.gallery-outer.go-active{border-color:var(--pur);}
+.gallery-outer.go-done  {border-color:var(--accent3);}
+.gallery-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.gh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.gh-count{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--pur-dark);}
+.gallery-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+.tree-mini{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 8px;border-radius:7px;border:1.5px solid var(--border);
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.tree-mini.tm-new{animation:tmPop .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes tmPop{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+.tree-mini.tm-active{border-color:var(--pur);background:rgba(192,84,252,.07);transform:scale(1.05);}
+.tree-mini.tm-done  {border-color:var(--accent3);background:rgba(6,214,160,.07);}
+.tm-label{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);margin-top:2px;}
+
+/* ══ UNIQUE VISUAL 2: DP TABLE WITH FORMULA ══
+   Shows T(0)..T(n) cells.
+   Currently computing cell pulses.
+   Formula row shows the product pairs being summed. */
+.dp-section{margin-bottom:14px;}
+.dp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;overflow-x:auto;}
+.dp-outer.dpo-active{border-color:var(--pur);}
+.dp-outer.dpo-done  {border-color:var(--accent3);}
+.dp-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.dph-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.dph-formula{font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;color:var(--pur-dark);}
+/* DP cells row */
+.dp-cells{display:flex;gap:5px;flex-wrap:nowrap;margin-bottom:10px;}
+.dp-cell{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:48px;flex-shrink:0;}
+.dp-box{
+  width:48px;height:48px;border-radius:8px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.dp-idx{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);}
+/* states */
+.db-done   {background:rgba(6,214,160,.12);border-color:#06d6a0;color:#024d37;}
+.db-cur    {background:rgba(192,84,252,.2); border-color:#c084fc;color:#5b1a9a;transform:scale(1.12) translateY(-4px);box-shadow:0 6px 16px rgba(192,84,252,.3);}
+.db-left   {background:rgba(33,150,243,.1); border-color:#2196f3;color:#0d47a1;}
+.db-right  {background:rgba(255,209,102,.2);border-color:#ffd166;color:#7a4800;}
+.db-product{background:rgba(6,214,160,.08); border-color:#06d6a0;color:#024d37;border-style:dashed;}
+.db-answer {background:rgba(6,214,160,.25); border-color:#06d6a0;color:#024d37;box-shadow:0 0 12px rgba(6,214,160,.25);}
+
+/* Formula decomposition */
+.formula-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:8px 10px;
+  background:rgba(192,84,252,.04);border:1px solid rgba(192,84,252,.15);border-radius:8px;}
+.formula-pair{display:flex;gap:3px;align-items:center;}
+.fp-left {font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--accent2);padding:2px 5px;border-radius:4px;background:rgba(33,150,243,.1);}
+.fp-times{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);}
+.fp-right{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:#7a4800;padding:2px 5px;border-radius:4px;background:rgba(255,209,102,.15);}
+.fp-eq   {font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);}
+.fp-prod {font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--accent3);}
+.fp-plus {font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);}
+.fp-pair-active{background:rgba(192,84,252,.08);border-radius:6px;padding:2px 5px;border:1px solid rgba(192,84,252,.2);}
+
+/* ══ UNIQUE VISUAL 3: LEFT/RIGHT SPLIT PANEL ══
+   For computing T(k), shows visually:
+   left subtree gets i nodes, right gets k-1-i.
+   Two mini trees or counts side by side. */
+.split-section{margin-bottom:14px;}
+.split-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.split-outer.spo-active{border-color:var(--accent4);}
+.split-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.split-row{display:flex;gap:8px;align-items:center;}
+.split-side{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px;text-align:center;transition:all .3s;}
+.split-side.ss-left {border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.split-side.ss-right{border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.ss-label{font-family:'Space Mono',monospace;font-size:.55rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.ss-nodes{font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.ss-count{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;}
+.ss-left  .ss-count{color:var(--accent2);}
+.ss-right .ss-count{color:#7a4800;}
+.split-root{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 12px;border:2px solid var(--pur);border-radius:8px;background:rgba(192,84,252,.1);}
+.sr-label{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;}
+.sr-val  {font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--pur-dark);}
+.product-display{display:flex;gap:6px;align-items:center;margin-top:10px;padding:7px 10px;border-radius:7px;border:1.5px solid rgba(192,84,252,.2);background:rgba(192,84,252,.04);}
+.pd-eq{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--ink);}
+.pd-result{font-family:'Space Mono',monospace;font-size:.95rem;font-weight:700;color:var(--accent3);}
+
+/* COUNT BADGE */
+.count-badge{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(192,84,252,.12);border:2px solid var(--pur);color:var(--pur-dark);
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.count-badge.cb-new{animation:cbnew .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes cbnew{from{transform:scale(1.2);background:rgba(192,84,252,.3);}to{transform:none;background:rgba(192,84,252,.12);}}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-init{border-color:var(--pur);}
+.step-panel.sp-pair{border-color:var(--accent4);}
+.step-panel.sp-dp  {border-color:var(--pur);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--pur);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-init{border-color:var(--pur);}
+.explain-panel.ep-pair{border-color:var(--accent4);}
+.explain-panel.ep-dp  {border-color:var(--pur);}
+.explain-panel.ep-done{border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--pur);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-init{border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-pair{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-dp  {border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--pur);color:white;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-pair{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-dp  {background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18); border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.dp-right{margin-bottom:12px;overflow-x:auto;}
+.dpr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.dpr-chips{display:flex;gap:3px;flex-wrap:wrap;}
+.dpr-chip{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:3px 7px;border-radius:5px;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all .22s;}
+.dpr-chip.dprc-done{border-color:#06d6a0;background:rgba(6,214,160,.15);color:#06d6a0;}
+.dpr-chip.dprc-cur {border-color:#c084fc;background:rgba(192,84,252,.2);color:#c084fc;}
+.dpr-chip.dprc-ans {border-color:#06d6a0;background:rgba(6,214,160,.28);color:#06d6a0;box-shadow:0 0 6px rgba(6,214,160,.3);}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(192,84,252,.06);border:1px solid rgba(192,84,252,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--pur);color:white;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Binary Tree Topologies</h1>
+    <div class="sub">Catalan Numbers · Bottom-up DP · O(n²)</div>
+  </div>
+  <div class="family-badge">DP · Trees · Catalan</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>n (nodes)</label>
+      <input type="number" id="inN" value="3" min="0" max="8">
+      <div class="hint">T(n) = Catalan(n)</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: TOPOLOGY GALLERY -->
+  <div class="gallery-section">
+    <div class="section-label">All distinct binary tree topologies for n nodes</div>
+    <div class="gallery-outer" id="galleryOuter">
+      <div class="gallery-header">
+        <div class="gh-title">shapes (not values) — structural uniqueness only</div>
+        <div class="gh-count"><span id="galleryCount">0</span> / <span id="galleryTotal">?</span></div>
+      </div>
+      <div class="gallery-row" id="galleryRow">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">topologies appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: DP TABLE + FORMULA -->
+  <div class="dp-section">
+    <div class="section-label">DP table  T(k) = Σ T(i)×T(k−1−i) for i=0..k−1</div>
+    <div class="dp-outer" id="dpOuter">
+      <div class="dp-header">
+        <div class="dph-title">T(k) = number of topologies with k nodes</div>
+        <div class="dph-formula" id="dpCurrentFormula">computing…</div>
+      </div>
+      <div class="dp-cells" id="dpCells"></div>
+      <div class="formula-row" id="formulaRow">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">product pairs appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: LEFT/RIGHT SPLIT -->
+  <div class="split-section">
+    <div class="section-label">Current split — root + left(i nodes) + right(k−1−i nodes)</div>
+    <div class="split-outer" id="splitOuter">
+      <div class="split-header">
+        <div class="sh-title">for each pair (i, k−1−i): T(i) × T(k−1−i) ways</div>
+        <div style="font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent4)" id="splitLabel">i=? of k=?</div>
+      </div>
+      <div class="split-row">
+        <div class="split-side ss-left" id="splitLeft">
+          <div class="ss-label">Left subtree</div>
+          <div class="ss-nodes" id="slNodes">i = ?</div>
+          <div class="ss-count" id="slCount">T(?) = ?</div>
+        </div>
+        <div class="split-root">
+          <div class="sr-label">ROOT</div>
+          <div class="sr-val">●</div>
+        </div>
+        <div class="split-side ss-right" id="splitRight">
+          <div class="ss-label">Right subtree</div>
+          <div class="ss-nodes" id="srNodes">k−1−i = ?</div>
+          <div class="ss-count" id="srCount">T(?) = ?</div>
+        </div>
+      </div>
+      <div class="product-display" id="productDisplay">
+        <span class="pd-eq" id="pdEq">T(?)×T(?) = ?×?</span>
+        <span style="font-family:'Space Mono',monospace;font-size:.75rem;color:var(--muted)">=</span>
+        <span class="pd-result" id="pdResult">?</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COUNT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="count-badge" id="countBadge">T(n) = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-init" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n²)</div>
+      <div class="cx-sub">n values × n pairs</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">dp array</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Catalan(n)</div>
+      <div class="cx-val" id="cxCatalan" style="color:#7a5a00">—</div>
+      <div class="cx-sub">topologies</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">n</div>
+      <div class="cx-val" id="cxN" style="color:#028a5b">—</div>
+      <div class="cx-sub">nodes</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-init" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Binary Tree Topologies</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">numTopologies</span>(<span class="ck">int</span> n) {</span>
+<span class="code-line" id="cl-dp">  vector&lt;<span class="ck">int</span>&gt; dp(n+<span class="cn">1</span>, <span class="cn">0</span>);</span>
+<span class="code-line" id="cl-base">  dp[<span class="cn">0</span>] = <span class="cn">1</span>; <span class="cc">// null tree = 1 topology</span></span>
+<span class="code-line" id="cl-outer">  <span class="ck">for</span> (<span class="ck">int</span> k=<span class="cn">1</span>; k&lt;=n; k++) {</span>
+<span class="code-line" id="cl-inner">    <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">0</span>; i&lt;k; i++) {</span>
+<span class="code-line" id="cl-prod">      <span class="cc">// left=i nodes, right=k-1-i nodes</span></span>
+<span class="code-line" id="cl-acc">      dp[k] += dp[i] * dp[k-<span class="cn">1</span>-i];</span>
+<span class="code-line" id="cl-iend">    }</span>
+<span class="code-line" id="cl-kend">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dp[n];</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcK">    <div class="var-name">k (outer)</div>   <div class="var-value" id="vK"    style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcI">    <div class="var-name">i (inner)</div>   <div class="var-value" id="vI"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcLeft"> <div class="var-name">dp[i]</div>       <div class="var-value" id="vLeft" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcRight"><div class="var-name">dp[k-1-i]</div>   <div class="var-value" id="vRight" style="color:#ffd166">—</div></div>
+      <div class="var-card" id="vcDpK"  style="grid-column:1/3">
+        <div class="var-name">dp[k] (running)</div>
+        <div class="var-value" id="vDpK" style="color:var(--accent3)">—</div>
+      </div>
+    </div>
+
+    <div class="dp-right">
+      <div class="dpr-title">dp[0..n]</div>
+      <div class="dpr-chips" id="dprChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">T(n) Topologies</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ TOPOLOGIES COUNTED</div>
+</div>
+</div>
+
+<script>
+// ─── CATALAN / DP ──────────────────────────────────────────────────────────
+function catalanDP(n){
+  const dp=new Array(n+1).fill(0); dp[0]=1;
+  for(let k=1;k<=n;k++) for(let i=0;i<k;i++) dp[k]+=dp[i]*dp[k-1-i];
+  return dp;
+}
+
+// ─── TREE TOPOLOGY STRUCTURES ──────────────────────────────────────────────
+// Generate all structural binary trees with n nodes
+// Returns array of {left, right} objects (null = empty)
+function genTrees(n){
+  if(n===0)return[null];
+  if(n===1)return[{left:null,right:null}];
+  const res=[];
+  for(let i=0;i<n;i++){
+    const lefts=genTrees(i);
+    const rights=genTrees(n-1-i);
+    for(const l of lefts) for(const r of rights) res.push({left:l,right:r});
+  }
+  return res;
+}
+
+// Draw a tree into an SVG element
+function drawTreeSVG(tree, W, H){
+  // Assign positions recursively
+  let nodeIdx=0;
+  const nodes=[], edges=[];
+  function layout(node,depth,minX,maxX){
+    if(!node)return null;
+    const x=(minX+maxX)/2, y=12+depth*18;
+    const id=nodeIdx++;
+    nodes.push({id,x,y});
+    const L=layout(node.left,depth+1,minX,(minX+maxX)/2);
+    const R=layout(node.right,depth+1,(minX+maxX)/2,maxX);
+    if(L!=null)edges.push({x1:x,y1:y,x2:nodes[L].x,y2:nodes[L].y});
+    if(R!=null)edges.push({x1:x,y1:y,x2:nodes[R].x,y2:nodes[R].y});
+    return id;
+  }
+  layout(tree,0,0,W);
+  // Build SVG string
+  let svg=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  edges.forEach(e=>{svg+=`<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="#d4ccb8" stroke-width="1.2"/>`; });
+  nodes.forEach(nd=>{svg+=`<circle cx="${nd.x}" cy="${nd.y}" r="5" fill="rgba(192,84,252,.25)" stroke="#c084fc" stroke-width="1.5"/>`; });
+  svg+='</svg>';
+  return svg;
+}
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{n,k,i,dpK,dpI,dpR,product,dp}=args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-init">T(k) = number of distinct binary tree shapes with exactly k nodes. Fix the root (1 node), then split the remaining k−1 nodes between left and right subtrees. For each split i=0..k−1: left gets i nodes, right gets k−1−i. T(i)×T(k−1−i) ways for this split. Sum all splits: T(k) = Σ T(i)×T(k−1−i).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Base case:</strong> T(0)=1 (the null/empty tree is exactly one topology). T(1)=1 (only one shape: a single root).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why multiply?</strong> Left and right subtree shapes are independent. If there are T(i) left shapes and T(k−1−i) right shapes, there are T(i)×T(k−1−i) combined shapes.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Catalan numbers:</strong> T(n) = C(2n,n)/(n+1). O(n²) DP computes all T(0)..T(n) bottom-up with no redundant work.`},
+    ]
+  };
+  if(type==='pair') return {
+    why:`<div class="ep-why-block why-pair">For T(${k}): trying split i=${i}. Left subtree has ${i} nodes → T(${i})=${dpI} ways. Right subtree has ${k-1-i} nodes → T(${k-1-i})=${dpR} ways. Contribution: ${dpI}×${dpR}=${product}. Running dp[${k}]+=${product}=${dpK}.</div>`,
+    inv:[{icon:'✖️',cls:'',text:`<strong>T(${i}) × T(${k-1-i}) = ${dpI} × ${dpR} = ${product}.</strong> dp[${k}] now = ${dpK}.`}]
+  };
+  if(type==='dp') return {
+    why:`<div class="ep-why-block why-dp">T(${k}) complete: all ${k} splits summed. T(${k}) = ${dpK}. This value is now available for use in computing T(${k+1})..T(${n}).</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>dp[${k}] = ${dpK}.</strong> Memoized for future outer-loop iterations.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">T(${n}) = ${dp?.[n]} — the ${n}th Catalan number. There are exactly ${dp?.[n]} distinct binary tree shapes with ${n} nodes.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>T(${n}) = ${dp?.[n]}.</strong> All dp[0..${n}] computed bottom-up.`},
+      {icon:'📐',cls:'inv-warn',text:`O(n²) time: outer loop n×inner loop n. O(n) space for dp array.`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:{ids:['cl-dp','cl-base','cl-outer'],cls:'hl-init'},
+  pair:{ids:['cl-inner','cl-prod','cl-acc'],cls:'hl-pair'},
+  dp:  {ids:['cl-outer','cl-kend'],cls:'hl-dp'},
+  done:{ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(n){
+  const steps=[];
+  const dp=new Array(n+1).fill(0); dp[0]=1;
+  const treesPerK={}; // will gen lazily
+  // Pre-gen all trees up to n (small n only)
+  for(let k=0;k<=Math.min(n,6);k++) treesPerK[k]=genTrees(k);
+
+  const snap=(type,desc,k,i,extra={})=>{
+    steps.push({type,desc,n,k,i,dp:[...dp],treesPerK,
+      result:null,...extra,
+      explain:makeExplain(type,{n,k,i,dp:[...dp],...extra})});
+  };
+
+  snap('init',`📐 <strong>Start.</strong> n=${n}. dp[0..${n}]=0. dp[0]=1 (empty tree). Compute T(1)..T(${n}) bottom-up.`,0,null,{dpK:1});
+
+  for(let k=1;k<=n;k++){
+    for(let i=0;i<k;i++){
+      const dpI=dp[i], dpR=dp[k-1-i];
+      const product=dpI*dpR;
+      dp[k]+=product;
+      snap('pair',`T(${k}): i=${i}. Left=${i}→T(${i})=${dpI}. Right=${k-1-i}→T(${k-1-i})=${dpR}. dp[${k}]+=${product}=${dp[k]}.`,
+        k,i,{dpI,dpR,product,dpK:dp[k]});
+    }
+    snap('dp',`✅ T(${k}) = ${dp[k]}. dp[${k}] locked in.`,k,null,{dpK:dp[k]});
+  }
+
+  snap('done',`🎉 <strong>T(${n}) = ${dp[n]}</strong> binary tree topologies with ${n} nodes.`,n,null,
+    {dpK:dp[n],result:{answer:dp[n]},dp:[...dp]});
+  steps[steps.length-1].result={answer:dp[n],dp:[...dp]};
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let nVal=3;
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  nVal=Math.max(0,Math.min(8,parseInt(document.getElementById('inN').value)||3));
+  document.getElementById('inN').value=nVal;
+
+  const dpFull=catalanDP(nVal);
+  const cat=dpFull[nVal];
+  steps=computeSteps(nVal);
+  currentStep=0;
+
+  document.getElementById('cxN').textContent=nVal;
+  document.getElementById('cxCatalan').textContent=cat;
+  document.getElementById('galleryTotal').textContent=cat;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('galleryCount').textContent='0';
+  document.getElementById('galleryRow').innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">topologies appear here…</span>';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build dp cells
+  const dc=document.getElementById('dpCells');
+  dc.innerHTML='';
+  for(let k=0;k<=nVal;k++){
+    const cell=document.createElement('div');cell.className='dp-cell';
+    cell.innerHTML=`<div class="dp-box" id="dpb-${k}">?</div><div class="dp-idx">T(${k})</div>`;
+    dc.appendChild(cell);
+  }
+  // Build dp right chips
+  const dr=document.getElementById('dprChips');
+  dr.innerHTML='';
+  for(let k=0;k<=nVal;k++){
+    const chip=document.createElement('div');chip.className='dpr-chip';chip.id=`dpc-${k}`;
+    chip.textContent=`T(${k}):?`;dr.appendChild(chip);
+  }
+
+  // Pre-render gallery for n (all topologies shown at end)
+  // We'll reveal them step by step
+  renderStep(0);
+}
+
+// ─── DRAW GALLERY ──────────────────────────────────────────────────────────
+function buildGallery(n, highlightK, treesPerK){
+  const gr=document.getElementById('galleryRow');
+  gr.innerHTML='';
+  if(n===0){
+    const tm=document.createElement('div');tm.className='tree-mini tm-done';
+    tm.innerHTML=`<svg width="24" height="18" viewBox="0 0 24 18"><text x="12" y="14" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#028a5b">∅</text></svg><div class="tm-label">null</div>`;
+    gr.appendChild(tm);
+    return;
+  }
+  const trees=treesPerK[Math.min(n,6)];
+  if(!trees||trees.length===0){
+    gr.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">T(${n})=${catalanDP(n)[n]} topologies (too many to display)</span>`;
+    return;
+  }
+  const depth=n; // rough height estimate
+  const H=Math.min(14+depth*18,80);
+  const W=Math.max(40,8*Math.pow(2,Math.ceil(n/2)));
+  trees.forEach((tree,idx)=>{
+    const tm=document.createElement('div');
+    tm.className=`tree-mini ${highlightK===n?'tm-active':'tm-done'}`;
+    tm.innerHTML=`${tree?drawTreeSVG(tree,W,H):`<svg width="${W}" height="18" viewBox="0 0 ${W} 18"><text x="${W/2}" y="14" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#5b1a9a">∅</text></svg>`}<div class="tm-label">#${idx+1}</div>`;
+    gr.appendChild(tm);
+  });
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n;
+
+  // ── Gallery: show trees for current k being computed ──
+  const showK=isFinal?n:(st.type==='dp'?st.k:st.k>0?st.k:0);
+  const treesPerK=st.treesPerK||{};
+  if(showK<=6){
+    buildGallery(showK,st.type==='dp'?null:showK,treesPerK);
+  }
+  document.getElementById('galleryCount').textContent=st.dp[showK]||'?';
+  document.getElementById('galleryOuter').className='gallery-outer '+(isFinal?'go-done':'go-active');
+
+  // ── DP cells ──
+  const prevDp=idx>0?steps[idx-1].dp:new Array(n+1).fill(0);
+  for(let k=0;k<=n;k++){
+    const box=document.getElementById(`dpb-${k}`);
+    const chip=document.getElementById(`dpc-${k}`);
+    if(!box)continue;
+    const v=st.dp[k];
+    const isCur=k===st.k&&!isFinal&&(st.type==='pair');
+    const isLeft=k===st.i&&st.type==='pair';
+    const isRight=k===(st.k-1-st.i)&&st.type==='pair'&&st.i!=null;
+    const isDone=(v>0&&k<st.k)||(isFinal);
+    const isAnswer=k===n&&isFinal;
+    box.textContent=v>0?v:'?';
+    box.className=`dp-box ${isAnswer?'db-answer':isCur?'db-cur':isLeft?'db-left':isRight?'db-right':isDone?'db-done':''}`;
+    if(chip){
+      chip.textContent=`T(${k}):${v>0?v:'?'}`;
+      chip.className=`dpr-chip ${isAnswer?'dprc-ans':isCur?'dprc-cur':isDone?'dprc-done':''}`;
+    }
+  }
+  document.getElementById('dpCurrentFormula').textContent=
+    st.type==='pair'?`T(${st.k}) += T(${st.i})×T(${st.k-1-st.i})`:
+    st.type==='dp'?`T(${st.k}) = ${st.dpK} ✓`:
+    isFinal?`T(${n}) = ${st.dp[n]}`:'computing…';
+  document.getElementById('dpOuter').className='dp-outer '+(isFinal?'dpo-done':'dpo-active');
+
+  // Formula row: show all pairs for current k
+  const fr=document.getElementById('formulaRow');
+  if(st.type==='pair'&&st.k!=null){
+    fr.innerHTML='';
+    for(let i=0;i<st.k;i++){
+      const dI=st.dp[i], dR=st.dp[st.k-1-i], prod=dI*dR;
+      const isActive=i===st.i;
+      const pair=document.createElement('div');
+      pair.className=`formula-pair ${isActive?'fp-pair-active':''}`;
+      pair.innerHTML=`<span class="fp-left">T(${i})=${dI}</span><span class="fp-times">×</span><span class="fp-right">T(${st.k-1-i})=${dR}</span><span class="fp-eq">=${prod}</span>${i<st.k-1?'<span class="fp-plus">+</span>':''}`;
+      fr.appendChild(pair);
+    }
+  } else if(st.type==='dp'&&st.k!=null){
+    fr.innerHTML=`<span style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--accent3);font-weight:700">T(${st.k}) = ${st.dpK} ✓</span>`;
+  } else {
+    fr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">product pairs appear here…</span>';
+  }
+
+  // ── Split panel ──
+  const splitLbl=document.getElementById('splitLabel');
+  if(st.type==='pair'&&st.i!=null&&st.k!=null){
+    document.getElementById('splitOuter').className='split-outer spo-active';
+    splitLbl.textContent=`i=${st.i} of k=${st.k}`;
+    document.getElementById('slNodes').textContent=`i = ${st.i} nodes`;
+    document.getElementById('slCount').textContent=`T(${st.i}) = ${st.dpI}`;
+    const right=st.k-1-st.i;
+    document.getElementById('srNodes').textContent=`k−1−i = ${right} nodes`;
+    document.getElementById('srCount').textContent=`T(${right}) = ${st.dpR}`;
+    document.getElementById('pdEq').textContent=`T(${st.i})×T(${right}) = ${st.dpI}×${st.dpR}`;
+    document.getElementById('pdResult').textContent=st.product;
+  } else {
+    document.getElementById('splitOuter').className='split-outer';
+    splitLbl.textContent=isFinal?`done!`:'—';
+  }
+
+  // ── Count badge ──
+  const cb=document.getElementById('countBadge');
+  const prevCb=idx>0?steps[idx-1].dp[n]:0;
+  cb.textContent=`T(${n}) = ${st.dp[n]>0?st.dp[n]:'—'}`;
+  if(st.dp[n]>prevCb){cb.classList.remove('cb-new');void cb.offsetWidth;cb.classList.add('cb-new');}
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const typeClass={init:'sp-init',pair:'sp-pair',dp:'sp-dp',done:'sp-done'};
+  sp.className=`step-panel ${typeClass[st.type]||'sp-init'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(st.type==='pair'){
+    spb.innerHTML=mkBox('k',st.k,'outer','spbox sb-pur')+
+      mkBox('i',st.i,'inner','spbox sb-blue')+
+      mkBox(`T(${st.i})×T(${st.k-1-st.i})`,`${st.dpI}×${st.dpR}`,'product','spbox sb-yel')+
+      mkBox('dp[k]',st.dpK,'so far','spbox sb-grn');
+  } else if(st.type==='dp'){
+    spb.innerHTML=mkBox('k',st.k,'completed','spbox sb-pur')+mkBox('T(k)',st.dpK,'topologies','spbox sb-grn');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('n',n,'nodes','spbox sb-blue')+mkBox('T(n)',st.dp[n],'topologies','spbox sb-grn');
+  } else {
+    spb.innerHTML=mkBox('n',n,'nodes','spbox sb-blue')+mkBox('T(0)','1','base','spbox sb-pur');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:  `dp[0]=1 (null tree). Computing T(1)..T(${n}) bottom-up. For each k, sum T(i)×T(k−1−i) over all splits.`,
+    pair:  `T(${st.k}): split i=${st.i}. Left=${st.i} nodes → T(${st.i})=${st.dpI}. Right=${st.k-1-st.i} nodes → T(${st.k-1-st.i})=${st.dpR}. Product=${st.product}. dp[${st.k}]=${st.dpK}.`,
+    dp:    `T(${st.k}) = <strong>${st.dpK}</strong>. All ${st.k} splits summed. This value is now fixed and available for future computations.`,
+    done:  `✅ T(${n}) = <strong>${st.dp[n]}</strong>. There are exactly ${st.dp[n]} distinct binary tree topologies with ${n} nodes.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={pair:'var(--accent4)',dp:'var(--pur)',done:'var(--accent3)',init:'var(--pur)'}[st.type]||'var(--pur)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vK',    'vcK',    st.k!=null?st.k:'—');
+  setVar('vI',    'vcI',    st.i!=null?st.i:'—');
+  setVar('vLeft', 'vcLeft', st.dpI!=null?st.dpI:'—');
+  setVar('vRight','vcRight',st.dpR!=null?st.dpR:'—');
+  setVar('vDpK',  'vcDpK',  st.dpK!=null?st.dpK:'—');
+
+  // ── Done ──
+  if(isFinal&&st.result){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ T(${n}) = ${st.result.answer} TOPOLOGIES`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('doneBar').textContent=`★ CATALAN(${n}) = ${st.result.answer}`;
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`n=${n} nodes · O(n²) DP`;
+    document.getElementById('cxCatalan').textContent=st.result.answer;
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={init:'ep-init',pair:'ep-pair',dp:'ep-dp',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-init');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>
