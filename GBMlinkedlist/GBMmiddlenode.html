@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Middle Node — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--pur);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(192,84,252,.2);border:1px solid var(--pur);color:#5b1a9a;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;width:360px;}
+.field input:focus{border-color:var(--pur);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--pur-dark);}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: DUAL-SPEED POINTER STRIP ══ */
+.list-section{margin-bottom:14px;}
+.list-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto;transition:border-color .3s;}
+.list-outer.lo-running{border-color:var(--pur);}
+.list-outer.lo-found  {border-color:var(--accent3);}
+.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.lh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.lh-status{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;}
+
+/* Pointer label row above nodes */
+.ptr-labels-row{display:flex;gap:0;margin-bottom:4px;}
+.ptr-label-cell{display:flex;align-items:flex-end;justify-content:center;flex-shrink:0;height:28px;}
+.ptr-badge{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;padding:2px 6px;border-radius:4px;transition:all .25s;}
+.pb-slow{background:rgba(33,150,243,.2);border:1.5px solid var(--accent2);color:#0d47a1;}
+.pb-fast{background:rgba(192,84,252,.2);border:1.5px solid var(--pur);color:#5b1a9a;}
+.pb-both{background:rgba(6,214,160,.2);border:1.5px solid var(--accent3);color:#024d37;}
+
+/* Node row */
+.nodes-row{display:flex;gap:0;align-items:center;flex-wrap:nowrap;}
+.node-wrap{display:flex;align-items:center;flex-shrink:0;}
+.node-box{
+  width:54px;height:54px;border-radius:10px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-family:'Space Mono',monospace;font-weight:700;
+  background:var(--surface);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+  position:relative;flex-shrink:0;
+}
+.nb-val{font-size:.9rem;}
+.nb-idx{font-size:.44rem;color:var(--muted);}
+.arrow-wrap{display:flex;align-items:center;width:24px;flex-shrink:0;}
+.arrow-line{height:2px;width:100%;border-radius:1px;background:var(--border);position:relative;}
+.arrow-line::after{content:'►';position:absolute;right:-4px;top:50%;transform:translateY(-50%);font-size:.55rem;color:var(--border);}
+.null-end{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);padding:4px 7px;border:1.5px dashed var(--border);border-radius:5px;flex-shrink:0;}
+
+/* Node states */
+.ns-slow  {background:rgba(33,150,243,.18);border-color:var(--accent2);color:#0d47a1;transform:scale(1.08) translateY(-4px);box-shadow:0 6px 14px rgba(33,150,243,.25);}
+.ns-fast  {background:rgba(192,84,252,.18);border-color:var(--pur);color:#5b1a9a;transform:scale(1.08) translateY(-4px);box-shadow:0 6px 14px rgba(192,84,252,.2);}
+.ns-both  {background:rgba(6,214,160,.22);border-color:var(--accent3);color:#024d37;transform:scale(1.1) translateY(-5px);box-shadow:0 8px 18px rgba(6,214,160,.3);}
+.ns-behind{background:rgba(33,150,243,.06);border-color:rgba(33,150,243,.2);color:var(--muted);opacity:.75;}
+.ns-ahead {background:rgba(192,84,252,.04);border-color:rgba(192,84,252,.15);color:var(--muted);}
+.ns-result{background:rgba(6,214,160,.25);border-color:var(--accent3);color:#024d37;box-shadow:0 0 14px rgba(6,214,160,.35);}
+.ns-normal{background:var(--surface);border-color:var(--border);color:var(--muted);}
+
+/* Colored arrows based on slow/fast coverage */
+.arrow-slow .arrow-line{background:rgba(33,150,243,.4);}
+.arrow-slow .arrow-line::after{color:rgba(33,150,243,.5);}
+.arrow-fast .arrow-line{background:rgba(192,84,252,.4);}
+.arrow-fast .arrow-line::after{color:rgba(192,84,252,.5);}
+.arrow-done .arrow-line{background:rgba(6,214,160,.4);}
+.arrow-done .arrow-line::after{color:rgba(6,214,160,.5);}
+
+/* ══ UNIQUE VISUAL 2: SPEED METER ══ */
+.speed-section{margin-bottom:14px;}
+.speed-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.speed-outer.so-running{border-color:var(--pur);}
+.speed-outer.so-done   {border-color:var(--accent3);}
+.speed-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.sh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ptr-cards{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;}
+.ptr-card{border:1.5px solid var(--border);border-radius:9px;padding:10px 12px;transition:all .3s;}
+.pc-slow{border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.pc-fast{border-color:var(--pur);background:rgba(192,84,252,.05);}
+.pc-active.pc-slow{background:rgba(33,150,243,.14);box-shadow:0 2px 10px rgba(33,150,243,.15);}
+.pc-active.pc-fast{background:rgba(192,84,252,.12);box-shadow:0 2px 10px rgba(192,84,252,.15);}
+.pc-label{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.pc-val  {font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;margin-bottom:3px;}
+.pc-slow .pc-val{color:#0d47a1;}
+.pc-fast .pc-val{color:#5b1a9a;}
+.pc-steps{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+/* Speed ratio indicator */
+.speed-ratio{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.sr-box{background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);border-radius:7px;padding:5px 10px;text-align:center;}
+.sr-lbl{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);}
+.sr-val{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:#7a4800;}
+/* Track bars */
+.track-section{margin-top:10px;}
+.track-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+.tr-label{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;min-width:42px;}
+.tr-label.slow{color:var(--accent2);}
+.tr-label.fast{color:var(--pur-dark);}
+.tr-bar-wrap{flex:1;height:16px;background:#e8e2d4;border-radius:4px;overflow:hidden;position:relative;}
+.tr-bar{height:100%;border-radius:4px;transition:width .4s;display:flex;align-items:center;padding-left:6px;}
+.tr-bar-lbl{font-family:'Space Mono',monospace;font-size:.5rem;font-weight:700;color:white;white-space:nowrap;}
+.tr-count{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);min-width:24px;text-align:right;}
+
+/* ══ UNIQUE VISUAL 3: ODD/EVEN DECISION PANEL ══ */
+.decision-section{margin-bottom:14px;}
+.decision-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.decision-outer.do-active{border-color:var(--accent4);}
+.decision-outer.do-done  {border-color:var(--accent3);}
+.dh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;}
+.decision-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.dg-box{border:1.5px solid var(--border);border-radius:8px;padding:9px;text-align:center;transition:all .3s;}
+.dg-box.db-odd {border-color:var(--accent4);background:rgba(255,209,102,.08);}
+.dg-box.db-even{border-color:var(--pur);background:rgba(192,84,252,.05);}
+.dg-box.db-active.db-odd {background:rgba(255,209,102,.18);box-shadow:0 2px 10px rgba(255,209,102,.2);}
+.dg-box.db-active.db-even{background:rgba(192,84,252,.12);box-shadow:0 2px 10px rgba(192,84,252,.15);}
+.dg-lbl{font-family:'Space Mono',monospace;font-size:.5rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.dg-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--ink);margin-bottom:3px;}
+.dg-sub{font-family:'Space Mono',monospace;font-size:.55rem;color:var(--muted);}
+.stop-condition{padding:9px 14px;border-radius:8px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;text-align:center;transition:all .3s;}
+.sc-running{background:rgba(192,84,252,.1);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.sc-done   {background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;}
+.sc-init   {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+
+/* STEP / RESULT */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-run {border-color:var(--pur);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.result-badge{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-new{animation:rbPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbPop{from{transform:scale(1.15);}to{transform:none;}}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--pur);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--pur);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--pur);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;}
+.ep-why-block.why-init{border-left-color:var(--pur);background:rgba(192,84,252,.06);}
+.ep-why-block.why-step{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--pur);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-step{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.2);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Middle Node</h1>
+    <div class="sub">Fast &amp; Slow Pointer · O(n) · O(1) Space</div>
+  </div>
+  <div class="family-badge">Linked List · Two-Pointer</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Linked List (comma separated)</label>
+      <input type="text" id="inList" value="2, 7, 3, 5">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="350">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.18);border-color:#2196f3;border-radius:3px"></div> slow (1×)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.18);border-color:#c084fc;border-radius:3px"></div> fast (2×)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.22);border-color:#06d6a0;border-radius:3px"></div> slow=fast (same node)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;border-radius:3px"></div> middle (answer)</div>
+  </div>
+
+  <!-- VISUAL 1: DUAL-POINTER STRIP -->
+  <div class="list-section">
+    <div class="section-label">Slow moves 1 node per step · Fast moves 2 nodes per step</div>
+    <div class="list-outer" id="listOuter">
+      <div class="list-header">
+        <div class="lh-title">when fast reaches null, slow = middle</div>
+        <div class="lh-status" id="lhStatus">—</div>
+      </div>
+      <div class="ptr-labels-row" id="ptrLabelsRow"></div>
+      <div class="nodes-row" id="nodesRow"></div>
+    </div>
+  </div>
+
+  <!-- VISUAL 2: SPEED METER WITH TRACKS -->
+  <div class="speed-section">
+    <div class="section-label">Pointer progress — fast covers 2× more distance</div>
+    <div class="speed-outer" id="speedOuter">
+      <div class="speed-header">
+        <div class="sh-title">fast stops when fast==null or fast.next==null</div>
+        <div style="font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--pur);" id="shStep">step 0</div>
+      </div>
+      <div class="ptr-cards">
+        <div class="ptr-card pc-slow" id="pcSlow">
+          <div class="pc-label">slow (1× speed)</div>
+          <div class="pc-val" id="pcSlowVal">—</div>
+          <div class="pc-steps" id="pcSlowSteps">0 steps</div>
+        </div>
+        <div class="speed-ratio">
+          <div class="sr-box">
+            <div class="sr-lbl">ratio</div>
+            <div class="sr-val">fast / slow = 2×</div>
+          </div>
+        </div>
+        <div class="ptr-card pc-fast" id="pcFast">
+          <div class="pc-label">fast (2× speed)</div>
+          <div class="pc-val" id="pcFastVal">—</div>
+          <div class="pc-steps" id="pcFastSteps">0 steps</div>
+        </div>
+      </div>
+      <div class="track-section">
+        <div class="track-row">
+          <div class="tr-label slow">slow</div>
+          <div class="tr-bar-wrap">
+            <div class="tr-bar" id="trBarSlow" style="width:0%;background:var(--accent2)">
+              <span class="tr-bar-lbl" id="trSlowLbl"></span>
+            </div>
+          </div>
+          <div class="tr-count" id="trSlowCount">0</div>
+        </div>
+        <div class="track-row">
+          <div class="tr-label fast">fast</div>
+          <div class="tr-bar-wrap">
+            <div class="tr-bar" id="trBarFast" style="width:0%;background:var(--pur)">
+              <span class="tr-bar-lbl" id="trFastLbl"></span>
+            </div>
+          </div>
+          <div class="tr-count" id="trFastCount">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISUAL 3: ODD/EVEN + STOP CONDITION -->
+  <div class="decision-section">
+    <div class="section-label">Stop condition — odd vs even length changes where slow lands</div>
+    <div class="decision-outer" id="decisionOuter">
+      <div class="dh-title">fast stops at null (even n) or fast.next=null (odd n)</div>
+      <div class="decision-grid">
+        <div class="dg-box db-odd" id="dgOdd">
+          <div class="dg-lbl">Odd length</div>
+          <div class="dg-val">fast.next = null</div>
+          <div class="dg-sub">slow = exact middle</div>
+        </div>
+        <div class="dg-box db-even" id="dgEven">
+          <div class="dg-lbl">Even length</div>
+          <div class="dg-val">fast = null</div>
+          <div class="dg-sub">slow = 2nd middle</div>
+        </div>
+      </div>
+      <div class="stop-condition sc-init" id="stopCondition">press RUN to begin…</div>
+    </div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">middle = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <div class="step-panel sp-run" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n)</div>
+      <div class="cx-sub">single pass</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">2 pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Length</div>
+      <div class="cx-val" id="cxLen" style="color:#7a5a00">—</div>
+      <div class="cx-sub">nodes</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Middle</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">node value</div>
+    </div>
+  </div>
+
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Middle Node</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Optimized</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-sig">Node* <span class="cf">middleNode</span>(Node* head) {</span>
+<span class="code-line" id="cl-init">  Node *slow=head, *fast=head;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span> (fast != <span class="cn">nullptr</span> &&</span>
+<span class="code-line" id="cl-wh2">         fast->next != <span class="cn">nullptr</span>) {</span>
+<span class="code-line" id="cl-slow">    slow = slow->next;       <span class="cc">// +1</span></span>
+<span class="code-line" id="cl-fast">    fast = fast->next->next; <span class="cc">// +2</span></span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> slow; <span class="cc">// middle!</span></span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CODEFORCES OPTIMIZED</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3"</span>)</span>
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">struct</span> Node{<span class="ck">int</span> v;Node*n;};</span>
+<span class="code-line">Node* <span class="cf">mid</span>(Node* h){</span>
+<span class="code-line">  Node *s=h,*f=h;</span>
+<span class="code-line">  <span class="ck">while</span>(f&&f->n)</span>
+<span class="code-line">    s=s->n, f=f->n->n;</span>
+<span class="code-line">  <span class="ck">return</span> s;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="cc">// array-based approach (CF arrays):</span></span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">midVal</span>(<span class="ck">int</span>* a, <span class="ck">int</span> n){</span>
+<span class="code-line">  <span class="ck">return</span> a[(n)/<span class="cn">2</span>]; <span class="cc">// O(1) with arrays!</span></span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">main</span>(){</span>
+<span class="code-line">  ios::sync_with_stdio(<span class="cn">0</span>);cin.tie(<span class="cn">0</span>);</span>
+<span class="code-line">}</span>
+</pre>
+    </div>
+  </div>
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcSlow"><div class="var-name">slow.val</div><div class="var-value" id="vSlow" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcFast"><div class="var-name">fast.val</div><div class="var-value" id="vFast" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcSIdx"><div class="var-name">slow idx</div><div class="var-value" id="vSIdx" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcFIdx"><div class="var-name">fast idx</div><div class="var-value" id="vFIdx" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcSteps" style="grid-column:1/3">
+        <div class="var-name">steps taken</div>
+        <div class="var-value" id="vSteps" style="color:var(--accent4)">0</div>
+      </div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Middle Node</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MIDDLE NODE FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ─────────────────────────────────────────────────────────
+function makeExplain(type, args) {
+  const { slow, fast, slowIdx, fastIdx, n, steps } = args || {};
+  if (type === 'init') return {
+    why: `<div class="ep-why-block why-init">Start both slow and fast at head.<br><br>Each iteration: slow moves 1 step, fast moves 2 steps. When fast reaches null (or fast.next reaches null), slow is at the middle.<br><br>Invariant: fast is always at position 2×slow. So when fast = end, slow = half = middle.</div>`,
+    inv: [
+      { icon: '🔒', cls: '', text: `<strong>Invariant:</strong> At all times, fastIdx = 2 × slowIdx. This ratio is maintained every iteration.` },
+      { icon: '🗺️', cls: 'inv-warn', text: `<strong>Even vs odd:</strong> For odd n, fast.next hits null → slow lands on exact middle. For even n, fast hits null → slow lands on 2nd of two middles.` },
+      { icon: '🔑', cls: 'inv-pur', text: `<strong>Why not count + divide?</strong> You'd need two passes. Fast/slow does it in one pass without knowing n upfront.` },
+    ]
+  };
+  if (type === 'step') return {
+    why: `<div class="ep-why-block why-step">Step ${steps}: slow.val=${slow}, fast=${fast !== null ? `val=${fast}` : 'null'}.<br>slow moves: idx ${slowIdx - 1} → ${slowIdx}. fast moves: idx ${(fastIdx || 0) - 2} → ${fastIdx !== null ? fastIdx : 'null'}.<br>Invariant maintained: fast pos = 2 × slow pos.</div>`,
+    inv: [{ icon: '↔️', cls: '', text: `<strong>Step ${steps}:</strong> slow at index ${slowIdx}, fast at index ${fastIdx !== null ? fastIdx : 'null/end'}.` }]
+  };
+  if (type === 'done') return {
+    why: `<div class="ep-why-block why-done">fast=${fast !== null ? `val=${fast}` : 'null'}, fast.next=${fast !== null ? 'null' : 'N/A'}. Stop condition reached!<br>slow.val=${slow} at index ${slowIdx} = the middle node.<br>n=${n}, middle index = ${Math.floor(n / 2)} (0-based).</div>`,
+    inv: [
+      { icon: '✅', cls: '', text: `<strong>Middle = ${slow}</strong> at index ${slowIdx}. n=${n}, ${n % 2 === 0 ? 'even → 2nd of two middles' : 'odd → exact center'}.` },
+      { icon: '📐', cls: 'inv-warn', text: `O(n/2) iterations. Fast travels n nodes, slow travels n/2 nodes.` },
+    ]
+  };
+  return { why: '', inv: [] };
+}
+
+// ─── CODE HIGHLIGHT ────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init: { ids: ['cl-init', 'cl-while', 'cl-wh2'], cls: 'hl-init' },
+  step: { ids: ['cl-slow', 'cl-fast'], cls: 'hl-step' },
+  done: { ids: ['cl-ret'], cls: 'hl-done' },
+};
+function highlightCode(type) {
+  document.querySelectorAll('#code-clean .code-line').forEach(e => e.className = 'code-line');
+  const e = TYPE_LINES[type]; if (!e) return;
+  e.ids.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add(e.cls); });
+  const first = document.getElementById(e.ids[0]);
+  if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+let activeCodeTab = 'clean';
+function switchCodeTab(tab) {
+  activeCodeTab = tab;
+  document.getElementById('code-clean').style.display = tab === 'clean' ? 'block' : 'none';
+  document.getElementById('code-cf').style.display = tab === 'cf' ? 'block' : 'none';
+  document.getElementById('ctab-clean').classList.toggle('active', tab === 'clean');
+  document.getElementById('ctab-cf').classList.toggle('active', tab === 'cf');
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────
+function computeSteps(vals) {
+  const steps = [];
+  const n = vals.length;
+
+  const snap = (type, desc, slowIdx, fastIdx, stepCount, extra = {}) => {
+    steps.push({
+      type, desc, vals, n, slowIdx, fastIdx, stepCount,
+      slowVal: slowIdx < n ? vals[slowIdx] : null,
+      fastVal: fastIdx !== null && fastIdx < n ? vals[fastIdx] : null,
+      result: null, ...extra,
+      explain: makeExplain(type, {
+        slow: slowIdx < n ? vals[slowIdx] : null,
+        fast: fastIdx !== null && fastIdx < n ? vals[fastIdx] : null,
+        slowIdx, fastIdx, n, steps: stepCount
+      })
+    });
+  };
+
+  snap('init', `📐 <strong>Init.</strong> slow=head(${vals[0]}), fast=head(${vals[0]}). n=${n}.`, 0, 0, 0);
+
+  let slow = 0, fast = 0, stepCount = 0;
+  while (fast < n && fast + 1 < n) {
+    slow = slow + 1;
+    fast = fast + 2;
+    stepCount++;
+    const fastIdx = fast < n ? fast : null;
+    snap('step', `Step ${stepCount}: slow→${vals[slow]}(idx ${slow}), fast→${fastIdx !== null ? vals[fastIdx] : 'null'}(idx ${fastIdx ?? 'end'}).`,
+      slow, fastIdx, stepCount);
+  }
+
+  const answer = vals[slow];
+  snap('done', `✅ <strong>fast at end. slow.val=${answer}</strong> is the middle node. Return slow.`,
+    slow, fast < n ? fast : null, stepCount,
+    { result: { answer, idx: slow } });
+  steps[steps.length - 1].result = { answer, idx: slow };
+  return steps;
+}
+
+// ─── GLOBALS ────────────────────────────────────────────────────────
+let steps = [], currentStep = 0, playing = false, timer = null, speed = 750;
+let valsOrig = [];
+
+// ─── BUILD UI ────────────────────────────────────────────────────────
+function buildUI() {
+  valsOrig = document.getElementById('inList').value.split(',').map(s => parseInt(s.trim())).filter(x => !isNaN(x));
+  if (!valsOrig.length) return;
+  const n = valsOrig.length;
+
+  steps = computeSteps(valsOrig);
+  currentStep = 0;
+
+  document.getElementById('stepTotal').textContent = `/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent = steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className = 'done-bar';
+  document.getElementById('bestBox').className = 'best-box';
+  document.getElementById('cxAnswer').textContent = '—';
+  document.getElementById('cxLen').textContent = n;
+  document.getElementById('resultBadge').textContent = 'middle = —';
+  document.getElementById('resultBadge').className = 'result-badge';
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+
+  // Build node row
+  buildNodeRow();
+  renderStep(0);
+}
+
+function buildNodeRow() {
+  const nr = document.getElementById('nodesRow');
+  const pr = document.getElementById('ptrLabelsRow');
+  nr.innerHTML = ''; pr.innerHTML = '';
+  const n = valsOrig.length;
+  const NODE_W = 54, ARROW_W = 24;
+  const cellW = NODE_W + ARROW_W;
+
+  valsOrig.forEach((v, i) => {
+    // Ptr label cell
+    const plc = document.createElement('div');
+    plc.className = 'ptr-label-cell';
+    plc.style.width = cellW + 'px';
+    plc.id = `plc-${i}`;
+    pr.appendChild(plc);
+
+    const nw = document.createElement('div');
+    nw.className = 'node-wrap';
+    const box = document.createElement('div');
+    box.className = 'node-box ns-normal';
+    box.id = `nb-${i}`;
+    box.innerHTML = `<div class="nb-val">${v}</div><div class="nb-idx">[${i}]</div>`;
+    nw.appendChild(box);
+    if (i < n - 1) {
+      const aw = document.createElement('div');
+      aw.className = 'arrow-wrap';
+      aw.id = `aw-${i}`;
+      const al = document.createElement('div');
+      al.className = 'arrow-line';
+      aw.appendChild(al);
+      nw.appendChild(aw);
+    }
+    nr.appendChild(nw);
+  });
+  // null end
+  const nullEl = document.createElement('div');
+  nullEl.className = 'null-end';
+  nullEl.innerHTML = '→ <strong>null</strong>';
+  nr.appendChild(nullEl);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────
+let prevVars = {};
+function setVar(elId, cardId, val) {
+  const el = document.getElementById(elId), card = document.getElementById(cardId);
+  if (!el || !card) return;
+  const s = String(val); el.textContent = s;
+  if (prevVars[elId] !== undefined && prevVars[elId] !== s) {
+    card.classList.remove('changed'); void card.offsetWidth; card.classList.add('changed');
+    setTimeout(() => card.classList.remove('changed'), 500);
+  }
+  prevVars[elId] = s;
+}
+
+function renderStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
+  const st = steps[idx]; currentStep = idx;
+  const isFinal = !!st.result;
+  const { vals, n, slowIdx, fastIdx, stepCount } = st;
+  const NODE_W = 54, ARROW_W = 24;
+  const cellW = NODE_W + ARROW_W;
+
+  // ── Node states ──
+  for (let i = 0; i < n; i++) {
+    const box = document.getElementById(`nb-${i}`);
+    const aw = document.getElementById(`aw-${i}`);
+    const plc = document.getElementById(`plc-${i}`);
+    if (!box) continue;
+
+    const isSlow = i === slowIdx;
+    const isFast = fastIdx !== null && i === fastIdx;
+    const isBehindSlow = i < slowIdx;
+    const isResult = isFinal && i === slowIdx;
+
+    box.className = `node-box ${isResult ? 'ns-result' : isSlow && isFast ? 'ns-both' : isSlow ? 'ns-slow' : isFast ? 'ns-fast' : isBehindSlow ? 'ns-behind' : 'ns-ahead'}`;
+
+    // Arrow coloring
+    if (aw) {
+      aw.className = `arrow-wrap ${isBehindSlow ? 'arrow-slow' : ''}`;
+    }
+
+    // Pointer labels
+    if (plc) {
+      plc.innerHTML = '';
+      const labels = [];
+      if (isSlow && isFast) {
+        const b = document.createElement('div');
+        b.className = 'ptr-badge pb-both';
+        b.textContent = 'slow/fast';
+        plc.appendChild(b);
+      } else {
+        if (isSlow) {
+          const b = document.createElement('div');
+          b.className = 'ptr-badge pb-slow';
+          b.textContent = isFinal ? '← middle' : 'slow';
+          plc.appendChild(b);
+        }
+        if (isFast) {
+          const b = document.createElement('div');
+          b.className = 'ptr-badge pb-fast';
+          b.textContent = 'fast';
+          plc.appendChild(b);
+        }
+      }
+    }
+  }
+
+  document.getElementById('listOuter').className = `list-outer ${isFinal ? 'lo-found' : 'lo-running'}`;
+  document.getElementById('lhStatus').textContent = isFinal ?
+    `✓ middle = ${st.result.answer}` :
+    `slow[${slowIdx}]=${vals[slowIdx]}, fast[${fastIdx ?? 'end'}]=${fastIdx !== null ? vals[fastIdx] : 'null'}`;
+  document.getElementById('lhStatus').style.color = isFinal ? 'var(--accent3)' : 'var(--muted)';
+
+  // ── Speed meter ──
+  document.getElementById('speedOuter').className = `speed-outer ${isFinal ? 'so-done' : 'so-running'}`;
+  document.getElementById('shStep').textContent = `step ${stepCount}`;
+  document.getElementById('pcSlowVal').textContent = vals[slowIdx];
+  document.getElementById('pcSlowSteps').textContent = `${slowIdx} steps`;
+  document.getElementById('pcFastVal').textContent = fastIdx !== null ? vals[fastIdx] : 'null';
+  document.getElementById('pcFastSteps').textContent = `${fastIdx !== null ? fastIdx : n} steps`;
+  document.getElementById('pcSlow').className = `ptr-card pc-slow ${!isFinal ? 'pc-active' : ''}`;
+  document.getElementById('pcFast').className = `ptr-card pc-fast ${!isFinal ? 'pc-active' : ''}`;
+
+  // Track bars
+  const slowPct = (slowIdx / (n - 1)) * 100;
+  const fastPct = Math.min(((fastIdx !== null ? fastIdx : n) / (n - 1)) * 100, 100);
+  document.getElementById('trBarSlow').style.width = Math.max(slowPct, 4) + '%';
+  document.getElementById('trSlowLbl').textContent = `idx ${slowIdx}`;
+  document.getElementById('trSlowCount').textContent = slowIdx;
+  document.getElementById('trBarFast').style.width = Math.max(fastPct, 4) + '%';
+  document.getElementById('trFastLbl').textContent = fastIdx !== null ? `idx ${fastIdx}` : 'end';
+  document.getElementById('trFastCount').textContent = fastIdx !== null ? fastIdx : n;
+
+  // ── Decision panel ──
+  document.getElementById('decisionOuter').className = `decision-outer ${isFinal ? 'do-done' : 'do-active'}`;
+  const isOdd = n % 2 === 1;
+  document.getElementById('dgOdd').className = `dg-box db-odd ${isFinal && isOdd ? 'db-active' : ''}`;
+  document.getElementById('dgEven').className = `dg-box db-even ${isFinal && !isOdd ? 'db-active' : ''}`;
+  const sc = document.getElementById('stopCondition');
+  if (isFinal) {
+    sc.className = 'stop-condition sc-done';
+    sc.textContent = isOdd ?
+      `✓ Odd n=${n}: fast.next=null → slow at exact middle [${slowIdx}]` :
+      `✓ Even n=${n}: fast=null → slow at 2nd middle [${slowIdx}]`;
+  } else if (fastIdx !== null) {
+    sc.className = 'stop-condition sc-running';
+    sc.textContent = `fast[${fastIdx}]=${vals[fastIdx]} (not null), fast.next${fastIdx + 1 < n ? `=[${fastIdx + 1}]` : '=null (stopping next)'} → continue`;
+  } else {
+    sc.className = 'stop-condition sc-init';
+    sc.textContent = 'press RUN to begin…';
+  }
+
+  // ── Step panel ──
+  const sp = document.getElementById('stepPanel');
+  sp.className = `step-panel ${isFinal ? 'sp-done' : 'sp-run'}`;
+  document.getElementById('spTitle').textContent = st.desc?.replace(/<[^>]+>/g, '') || '';
+  const mkBox = (lbl, val, sub, cls) =>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const spb = document.getElementById('spBody');
+  if (isFinal) {
+    spb.innerHTML = mkBox('middle', st.result.answer, `idx ${st.result.idx}`, 'spbox sb-grn') +
+      mkBox('steps', stepCount, `iterations`, 'spbox sb-yel') +
+      mkBox('n', n, `${isOdd ? 'odd' : 'even'}`, 'spbox sb-pur');
+  } else {
+    spb.innerHTML = mkBox('slow', vals[slowIdx], `idx ${slowIdx}`, 'spbox sb-blue') +
+      mkBox('fast', fastIdx !== null ? vals[fastIdx] : 'null', `idx ${fastIdx ?? 'end'}`, 'spbox sb-pur') +
+      mkBox('step', stepCount, '', 'spbox sb-yel');
+  }
+
+  // ── Narrative ──
+  const narrs = {
+    init: `Both slow and fast start at head (${vals[0]}). Each iteration: slow moves 1, fast moves 2. Fast outruns slow 2×.`,
+    step: `Step ${stepCount}: slow → ${vals[slowIdx]} (idx ${slowIdx}). fast → ${fastIdx !== null ? vals[fastIdx] : 'null'} (idx ${fastIdx ?? 'end'}). Fast is always 2× ahead.`,
+    done: `✅ fast at end. When fast can't move 2 more, slow is at the middle. <strong>Middle = ${st.result?.answer}</strong> (idx ${st.result?.idx}).`,
+  };
+  const nb = document.getElementById('narrativeBar');
+  if (nb) nb.style.borderLeftColor = { done: 'var(--accent3)', step: 'var(--accent4)', init: 'var(--pur)' }[st.type] || 'var(--pur)';
+  document.getElementById('narrativeText').innerHTML = narrs[st.type] || '';
+
+  // ── Result badge ──
+  const rb = document.getElementById('resultBadge');
+  if (isFinal) {
+    rb.textContent = `middle = ${st.result.answer}`;
+    rb.className = 'result-badge rb-new';
+  }
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vSlow', 'vcSlow', vals[slowIdx]);
+  setVar('vFast', 'vcFast', fastIdx !== null ? vals[fastIdx] : 'null');
+  setVar('vSIdx', 'vcSIdx', slowIdx);
+  setVar('vFIdx', 'vcFIdx', fastIdx !== null ? fastIdx : 'null');
+  setVar('vSteps', 'vcSteps', stepCount);
+
+  // Done
+  if (isFinal && st.result) {
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent = `★ MIDDLE NODE = ${st.result.answer}`;
+    document.getElementById('doneBar').className = 'done-bar show';
+    document.getElementById('bestBox').className = 'best-box show';
+    document.getElementById('bestVal').textContent = String(st.result.answer);
+    document.getElementById('bestMeta').textContent = `idx ${st.result.idx} · n=${n} · ${stepCount} step${stepCount !== 1 ? 's' : ''}`;
+    document.getElementById('cxAnswer').textContent = String(st.result.answer);
+  }
+
+  document.getElementById('stepIdx').textContent = idx + 1;
+  document.getElementById('stepCounter').textContent = `Step ${idx + 1}`;
+  document.getElementById('progressFill').style.width = ((idx + 1) / steps.length * 100) + '%';
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────
+let activeTab = 'what';
+function switchTab(tab) {
+  activeTab = tab;
+  ['what', 'why', 'inv'].forEach(t => {
+    const c = t[0].toUpperCase() + t.slice(1);
+    document.getElementById('tab' + c).classList.toggle('active', t === tab);
+    document.getElementById('pane' + c).classList.toggle('active', t === tab);
+  });
+  if (steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st) {
+  if (!st || !st.explain) return;
+  document.getElementById('paneWhat').innerHTML = st.desc || '';
+  document.getElementById('paneWhy').innerHTML = st.explain.why || '';
+  document.getElementById('invBlock').innerHTML = (st.explain.inv || []).map(r =>
+    `<div class="inv-row ${r.cls || ''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────
+function play() {
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  playing = true;
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnPause').textContent = '⏸ Pause';
+  document.getElementById('btnRun').disabled = true;
+  tick();
+}
+function tick() { if (!playing) return; if (currentStep >= steps.length - 1) { stopPlay(); return; } renderStep(currentStep + 1); timer = setTimeout(tick, speed); }
+function stopPlay() { playing = false; clearTimeout(timer); document.getElementById('btnPause').textContent = '▶ Resume'; document.getElementById('btnRun').disabled = false; }
+
+document.getElementById('btnRun').addEventListener('click', () => { buildUI(); setTimeout(play, 200); });
+document.getElementById('btnReset').addEventListener('click', () => { stopPlay(); buildUI(); });
+document.getElementById('btnPrev').addEventListener('click', () => { stopPlay(); renderStep(currentStep - 1); });
+document.getElementById('btnNext').addEventListener('click', () => { stopPlay(); renderStep(currentStep + 1); });
+document.getElementById('btnPause').addEventListener('click', () => playing ? stopPlay() : play());
+document.querySelectorAll('.speed-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.speed-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); speed = parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') { stopPlay(); renderStep(currentStep + 1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stopPlay(); renderStep(currentStep - 1); e.preventDefault(); }
+  else if (e.key === ' ') { e.preventDefault(); playing ? stopPlay() : play(); }
+  else if (e.key === 'r' || e.key === 'R') { stopPlay(); buildUI(); }
+});
+buildUI();
+</script>
+</body>
+</html>

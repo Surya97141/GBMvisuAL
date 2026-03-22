@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Median Of Two Sorted Arrays — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.mw{width:220px;} .field input:focus{border-color:var(--accent3);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#028a5b;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: DUAL PARTITION STRIPS ══ */
+.partition-section{margin-bottom:14px;}
+.partition-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;transition:border-color .3s;}
+.partition-outer.po-search{border-color:var(--accent4);}
+.partition-outer.po-found {border-color:var(--accent3);}
+.partition-outer.po-adj   {border-color:var(--accent);}
+.partition-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.ph-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ph-iter{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;}
+
+/* Single array row */
+.arr-strip{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:nowrap;}
+.as-label{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;min-width:36px;color:var(--muted);}
+.as-cells{display:flex;gap:3px;flex-wrap:nowrap;position:relative;}
+.ac{
+  width:42px;height:42px;border-radius:7px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+}
+.ac-left   {background:rgba(33,150,243,.12);border-color:#2196f3;color:#0d47a1;}
+.ac-right  {background:rgba(192,84,252,.1); border-color:#c084fc;color:#5b1a9a;}
+.ac-ml     {background:rgba(33,150,243,.22);border-color:#2196f3;color:#0d47a1;box-shadow:0 0 8px rgba(33,150,243,.2);}  /* maxLeft */
+.ac-mr     {background:rgba(33,150,243,.15);border-color:#2196f3;color:#0d47a1;}
+.ac-mright {background:rgba(192,84,252,.18);border-color:#c084fc;color:#5b1a9a;box-shadow:0 0 8px rgba(192,84,252,.2);} /* minRight */
+.ac-found  {background:rgba(6,214,160,.22); border-color:#06d6a0;color:#024d37;box-shadow:0 0 10px rgba(6,214,160,.3);}
+.ac-out    {background:rgba(0,0,0,.02);      border-color:var(--border);color:#ccc;opacity:.35;}
+/* Partition cut marker */
+.cut-marker{
+  display:flex;align-items:center;justify-content:center;
+  width:18px;height:42px;flex-shrink:0;
+  font-family:'Space Mono',monospace;font-size:1rem;color:var(--accent4);font-weight:700;
+  position:relative;
+}
+.cut-marker::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--accent4);border-radius:1px;}
+/* Pointer labels */
+.ptr-row{display:flex;gap:3px;margin-bottom:2px;margin-left:42px;}
+.ptl{width:42px;height:14px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.44rem;font-weight:700;flex-shrink:0;border-radius:2px;transition:all .2s;}
+.ptl-lo {background:rgba(33,150,243,.18);color:#0d47a1;}
+.ptl-hi {background:rgba(192,84,252,.18);color:#5b1a9a;}
+.ptl-mid{background:rgba(255,209,102,.28);color:#7a4800;}
+
+/* ══ UNIQUE VISUAL 2: FOUR-BOUNDARY PANEL ══ */
+.boundary-section{margin-bottom:14px;}
+.boundary-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.boundary-outer.bo-valid  {border-color:var(--accent3);}
+.boundary-outer.bo-adj-l  {border-color:var(--accent);}
+.boundary-outer.bo-adj-r  {border-color:var(--pur);}
+.boundary-outer.bo-checking{border-color:var(--accent4);}
+.bh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;}
+/* Four boxes: maxL1 | minR1 | maxL2 | minR2 */
+.four-row{display:grid;grid-template-columns:1fr auto 1fr 16px 1fr auto 1fr;gap:5px;align-items:center;margin-bottom:10px;}
+.fb{border:1.5px solid var(--border);border-radius:8px;padding:8px;text-align:center;transition:all .3s;min-width:60px;}
+.fb-ml1{border-color:var(--accent2);background:rgba(33,150,243,.07);}
+.fb-mr1{border-color:var(--accent2);background:rgba(33,150,243,.04);}
+.fb-ml2{border-color:var(--pur);    background:rgba(192,84,252,.06);}
+.fb-mr2{border-color:var(--pur);    background:rgba(192,84,252,.04);}
+.fb-valid {border-width:2px;box-shadow:0 0 8px rgba(6,214,160,.2);border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.fb-bad   {border-color:var(--accent);background:rgba(230,57,70,.06);}
+.fb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.fb-v  {font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.fb-sub{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:2px;}
+.fb-op{font-family:'Space Mono',monospace;font-size:.85rem;color:var(--muted);text-align:center;align-self:center;}
+.four-sep{display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);font-weight:700;}
+/* Cross-check results */
+.cross-checks{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.cc-chip{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:3px 9px;border-radius:5px;border:1.5px solid var(--border);transition:all .25s;}
+.cc-pass{border-color:var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+.cc-fail{border-color:var(--accent);background:rgba(230,57,70,.08);color:#b71c1c;}
+.cc-wait{border-color:var(--border);background:var(--surface);color:var(--muted);}
+/* Adjustment banner */
+.adj-banner{padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;text-align:center;transition:all .3s;margin-top:8px;}
+.ab-valid{background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;}
+.ab-right{background:rgba(230,57,70,.08);border:1.5px solid var(--accent);color:#b71c1c;}
+.ab-left {background:rgba(192,84,252,.1); border:1.5px solid var(--pur);color:var(--pur-dark);}
+.ab-init {background:rgba(0,0,0,.04);     border:1.5px solid var(--border);color:var(--muted);}
+
+/* ══ UNIQUE VISUAL 3: MERGED MEDIAN BAR ══ */
+.median-section{margin-bottom:14px;}
+.median-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.median-outer.mo-active{border-color:var(--accent3);}
+.median-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.mh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.mh-result{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--accent3);}
+/* Merged bar */
+.merged-bar{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:8px;padding-bottom:2px;}
+.mb-cell{
+  min-width:36px;height:36px;border-radius:6px;border:1.5px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  background:var(--surface);color:var(--muted);flex-shrink:0;transition:all .3s;
+}
+.mbc-left  {background:rgba(33,150,243,.1);border-color:#2196f3;color:#0d47a1;}
+.mbc-right {background:rgba(192,84,252,.08);border-color:#c084fc;color:#5b1a9a;}
+.mbc-median{background:rgba(6,214,160,.25);border-color:#06d6a0;color:#024d37;transform:scale(1.08);box-shadow:0 0 10px rgba(6,214,160,.3);}
+/* Median formula */
+.median-formula{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--ink);padding:7px 12px;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);border-radius:6px;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-search{border-color:var(--accent4);}
+.step-panel.sp-found {border-color:var(--accent3);}
+.step-panel.sp-adj   {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.result-badge{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-new{animation:rbPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbPop{from{transform:scale(1.15);}to{transform:none;}}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;}
+.ep-why-block.why-init  {border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-check {border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-adj   {border-left-color:var(--accent); background:rgba(230,57,70,.05);}
+.ep-why-block.why-found {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(6,214,160,.12); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-check{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-adj  {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-found{background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Median Of Two Sorted Arrays</h1>
+    <div class="sub">Binary Search on Partition · O(log min(m,n))</div>
+  </div>
+  <div class="family-badge">Binary Search · Partition</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Array One</label>
+      <input type="text" id="inA" value="1, 3, 4, 5" class="mw">
+    </div>
+    <div class="field">
+      <label>Array Two</label>
+      <input type="text" id="inB" value="2, 3, 6, 7" class="mw">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="800">1×</button>
+        <button class="speed-btn" data-ms="360">2×</button>
+        <button class="speed-btn" data-ms="140">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.12);border-color:#2196f3;border-radius:3px"></div> left half (≤ median)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.1);border-color:#c084fc;border-radius:3px"></div> right half (≥ median)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.22);border-color:#06d6a0;border-radius:3px"></div> boundary values / median</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.1);border-color:#e63946;border-radius:3px"></div> invalid partition</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: DUAL PARTITION STRIPS -->
+  <div class="partition-section">
+    <div class="section-label">Partitioning both arrays — cut so combined left = combined right</div>
+    <div class="partition-outer" id="partitionOuter">
+      <div class="partition-header">
+        <div class="ph-label" id="phLabel">binary search on partition point of shorter array</div>
+        <div class="ph-iter" id="phIter">—</div>
+      </div>
+      <!-- ptr row A -->
+      <div class="ptr-row" id="ptrRowA"></div>
+      <!-- Array A -->
+      <div class="arr-strip">
+        <div class="as-label">A:</div>
+        <div class="as-cells" id="cellsA"></div>
+      </div>
+      <!-- Array B -->
+      <div class="arr-strip">
+        <div class="as-label">B:</div>
+        <div class="as-cells" id="cellsB"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: FOUR-BOUNDARY PANEL -->
+  <div class="boundary-section">
+    <div class="section-label">Four boundary values — need maxLeft ≤ minRight across arrays</div>
+    <div class="boundary-outer" id="boundaryOuter">
+      <div class="bh-title">valid partition: maxLeft1 ≤ minRight2 AND maxLeft2 ≤ minRight1</div>
+      <div class="four-row">
+        <div class="fb fb-ml1" id="fbML1"><div class="fb-lbl">maxLeft₁</div><div class="fb-v" id="fbML1V">—</div><div class="fb-sub">A[i-1]</div></div>
+        <div class="fb-op" id="fbOp1">≤?</div>
+        <div class="fb fb-mr2" id="fbMR2"><div class="fb-lbl">minRight₂</div><div class="fb-v" id="fbMR2V">—</div><div class="fb-sub">B[j]</div></div>
+        <div class="four-sep">│</div>
+        <div class="fb fb-ml2" id="fbML2"><div class="fb-lbl">maxLeft₂</div><div class="fb-v" id="fbML2V">—</div><div class="fb-sub">B[j-1]</div></div>
+        <div class="fb-op" id="fbOp2">≤?</div>
+        <div class="fb fb-mr1" id="fbMR1"><div class="fb-lbl">minRight₁</div><div class="fb-v" id="fbMR1V">—</div><div class="fb-sub">A[i]</div></div>
+      </div>
+      <div class="cross-checks" id="crossChecks"></div>
+      <div class="adj-banner ab-init" id="adjBanner">press RUN…</div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: MERGED MEDIAN BAR -->
+  <div class="median-section">
+    <div class="section-label">Merged conceptual array — median position highlighted</div>
+    <div class="median-outer" id="medianOuter">
+      <div class="median-header">
+        <div class="mh-title">sorted merge of both arrays</div>
+        <div class="mh-result" id="mhResult">—</div>
+      </div>
+      <div class="merged-bar" id="mergedBar"></div>
+      <div class="median-formula" id="medianFormula">median = ?</div>
+    </div>
+  </div>
+
+  <!-- RESULT BADGE -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">median = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-search" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- CX -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(log min)</div>
+      <div class="cx-sub">binary search shorter</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">no merge needed</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Iters</div>
+      <div class="cx-val" id="cxIter" style="color:#7a5a00">—</div>
+      <div class="cx-sub">partitions tried</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Median</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">answer</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Median of Two Sorted Arrays</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Optimized</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">double</span> <span class="cf">median</span>(vector&lt;<span class="ck">int</span>&gt;&amp; A,</span>
+<span class="code-line" id="cl-sg2">           vector&lt;<span class="ck">int</span>&gt;&amp; B) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">if</span>(A.size()>B.size()) <span class="ck">return</span> <span class="cf">median</span>(B,A);</span>
+<span class="code-line" id="cl-init2">  <span class="ck">int</span> m=A.size(),n=B.size();</span>
+<span class="code-line" id="cl-init3">  <span class="ck">int</span> lo=<span class="cn">0</span>,hi=m,half=(m+n+<span class="cn">1</span>)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(lo&lt;=hi){</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> i=lo+(hi-lo)/<span class="cn">2</span>, j=half-i;</span>
+<span class="code-line" id="cl-ml1">    <span class="ck">int</span> ml1=i?A[i-<span class="cn">1</span>]:INT_MIN;</span>
+<span class="code-line" id="cl-mr1">    <span class="ck">int</span> mr1=i&lt;m?A[i]:INT_MAX;</span>
+<span class="code-line" id="cl-ml2">    <span class="ck">int</span> ml2=j?B[j-<span class="cn">1</span>]:INT_MIN;</span>
+<span class="code-line" id="cl-mr2">    <span class="ck">int</span> mr2=j&lt;n?B[j]:INT_MAX;</span>
+<span class="code-line" id="cl-check">    <span class="ck">if</span>(ml1&lt;=mr2 &amp;&amp; ml2&lt;=mr1){</span>
+<span class="code-line" id="cl-odd">      <span class="ck">if</span>((m+n)%<span class="cn">2</span>) <span class="ck">return</span> max(ml1,ml2);</span>
+<span class="code-line" id="cl-even">      <span class="ck">return</span>(max(ml1,ml2)+min(mr1,mr2))/<span class="cn">2.0</span>;</span>
+<span class="code-line" id="cl-adjr">    } <span class="ck">else if</span>(ml1>mr2) hi=i-<span class="cn">1</span>; <span class="cc">// i too big</span></span>
+<span class="code-line" id="cl-adjl">    <span class="ck">else</span>             lo=i+<span class="cn">1</span>; <span class="cc">// i too small</span></span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CODEFORCES OPTIMIZED</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3,unroll-loops"</span>)</span>
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">double</span> <span class="cf">med</span>(<span class="ck">int</span>* A,<span class="ck">int</span> m,<span class="ck">int</span>* B,<span class="ck">int</span> n){</span>
+<span class="code-line">  <span class="ck">if</span>(m>n)<span class="ck">return</span> <span class="cf">med</span>(B,n,A,m);</span>
+<span class="code-line">  <span class="ck">int</span> lo=<span class="cn">0</span>,hi=m,h=(m+n+<span class="cn">1</span>)/2;</span>
+<span class="code-line">  <span class="ck">while</span>(lo&lt;=hi){</span>
+<span class="code-line">    <span class="ck">int</span> i=(lo+hi)&gt;&gt;<span class="cn">1</span>,j=h-i;</span>
+<span class="code-line">    <span class="ck">int</span> l1=i?A[i-<span class="cn">1</span>]:INT_MIN;</span>
+<span class="code-line">    <span class="ck">int</span> r1=i&lt;m?A[i]:INT_MAX;</span>
+<span class="code-line">    <span class="ck">int</span> l2=j?B[j-<span class="cn">1</span>]:INT_MIN;</span>
+<span class="code-line">    <span class="ck">int</span> r2=j&lt;n?B[j]:INT_MAX;</span>
+<span class="code-line">    <span class="ck">if</span>(l1&lt;=r2&amp;&amp;l2&lt;=r1){</span>
+<span class="code-line">      <span class="ck">if</span>((m+n)&amp;<span class="cn">1</span>)<span class="ck">return</span> max(l1,l2); <span class="cc">// &1 = odd</span></span>
+<span class="code-line">      <span class="ck">return</span>(max(l1,l2)+min(r1,r2))*0.5;</span>
+<span class="code-line">    }</span>
+<span class="code-line">    l1>r2?hi=i-<span class="cn">1</span>:lo=i+<span class="cn">1</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">main</span>(){ios::sync_with_stdio(<span class="cn">0</span>);cin.tie(<span class="cn">0</span>);}</span>
+</pre>
+    </div>
+  </div>
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI"><div class="var-name">i (A cut)</div><div class="var-value" id="vI" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcJ"><div class="var-name">j (B cut)</div><div class="var-value" id="vJ" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcLo"><div class="var-name">lo</div><div class="var-value" id="vLo" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcHi"><div class="var-name">hi</div><div class="var-value" id="vHi" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcML1"><div class="var-name">maxLeft1</div><div class="var-value" id="vML1" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcMR1"><div class="var-name">minRight1</div><div class="var-value" id="vMR1" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcML2"><div class="var-name">maxLeft2</div><div class="var-value" id="vML2" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcMR2"><div class="var-name">minRight2</div><div class="var-value" id="vMR2" style="color:var(--pur)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Median</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ MEDIAN FOUND</div>
+</div>
+</div>
+
+<script>
+const INF=1e9;
+
+// ─── EXPLAIN ─────────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{i,j,ml1,mr1,ml2,mr2,m,n,iters}=args||{};
+  if(type==='init') return{
+    why:`<div class="ep-why-block why-init">Binary search the <strong>partition point i</strong> in the shorter array A (length m). The partition in B is automatically j = half − i, where half = (m+n+1)/2.<br><br>A valid partition satisfies: <strong>maxLeft1 ≤ minRight2</strong> AND <strong>maxLeft2 ≤ minRight1</strong>. This means everything in the combined left halves is ≤ everything in the combined right halves.<br><br>Use −∞/+∞ for boundary elements outside the array.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Key invariant:</strong> i + j = half = (m+n+1)/2. We always have exactly half elements in the combined left side.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why always search shorter array?</strong> Ensures j stays valid (0 ≤ j ≤ n). Swapping arrays if needed costs O(1).`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>O(log min(m,n)):</strong> Binary search on the shorter array only. Each step halves the search space on the shorter side.`},
+    ]
+  };
+  if(type==='check'||type==='found'||type==='adjr'||type==='adjl') return{
+    why:`<div class="ep-why-block why-${type==='found'?'found':type.startsWith('adj')?'adj':'check'}">i=${i}, j=${j}.<br>maxLeft1=${ml1===INF?'+∞':ml1===-INF?'-∞':ml1}, minRight1=${mr1===INF?'+∞':mr1===-INF?'-∞':mr1}<br>maxLeft2=${ml2===INF?'+∞':ml2===-INF?'-∞':ml2}, minRight2=${mr2===INF?'+∞':mr2===-INF?'-∞':mr2}<br><br>${type==='found'?`<strong>Both conditions satisfied!</strong> Valid partition.`:type==='adjr'?`maxLeft1=${ml1}>minRight2=${mr2} → i is too big. hi=i-1.`:`maxLeft2=${ml2}>minRight1=${mr1} → i is too small. lo=i+1.`}</div>`,
+    inv:[{icon:type==='found'?'✅':type==='adjr'?'←':'→',cls:type==='found'?'':'inv-warn',text:type==='found'?`Valid partition found at i=${i}, j=${j}.`:type==='adjr'?`i too large: hi=${i-1}.`:`i too small: lo=${i+1}.`}]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ──────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-init','cl-init2','cl-init3'],cls:'hl-init'},
+  check:{ids:['cl-mid','cl-ml1','cl-mr1','cl-ml2','cl-mr2','cl-check'],cls:'hl-check'},
+  found:{ids:['cl-odd','cl-even'],cls:'hl-found'},
+  adjr: {ids:['cl-adjr'],cls:'hl-adj'},
+  adjl: {ids:['cl-adjl'],cls:'hl-adj'},
+};
+function highlightCode(type){
+  document.querySelectorAll('#code-clean .code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+let activeCodeTab='clean';
+function switchCodeTab(tab){
+  activeCodeTab=tab;
+  document.getElementById('code-clean').style.display=tab==='clean'?'block':'none';
+  document.getElementById('code-cf').style.display=tab==='cf'?'block':'none';
+  document.getElementById('ctab-clean').classList.toggle('active',tab==='clean');
+  document.getElementById('ctab-cf').classList.toggle('active',tab==='cf');
+}
+
+// ─── computeSteps ────────────────────────────────────────────────────────
+function computeSteps(A,B){
+  const steps=[];
+  // Ensure A is shorter
+  if(A.length>B.length){[A,B]=[B,A];}
+  const m=A.length,n=B.length;
+  const half=Math.floor((m+n+1)/2);
+  let iters=0;
+
+  const getML=(arr,k)=>k>0?arr[k-1]:-INF;
+  const getMR=(arr,k)=>k<arr.length?arr[k]:INF;
+  const fmtV=(v)=>v>=INF?'+∞':v<=-INF?'-∞':String(v);
+
+  const snap=(type,desc,lo,hi,i,extra={})=>{
+    const j=half-i;
+    const ml1=getML(A,i),mr1=getMR(A,i),ml2=getML(B,j),mr2=getMR(B,j);
+    steps.push({type,desc,A,B,m,n,lo,hi,i,j,ml1,mr1,ml2,mr2,half,iters,
+      result:null,...extra,
+      explain:makeExplain(type,{i,j,ml1,mr1,ml2,mr2,m,n,iters})});
+  };
+
+  snap('init',`📐 <strong>Init.</strong> A(len=${m}), B(len=${n}). half=${half}. Binary search i in [0,${m}]; j=half−i.`,0,m,Math.floor(m/2));
+
+  let lo=0,hi=m;
+  while(lo<=hi){
+    iters++;
+    const i=lo+Math.floor((hi-lo)/2);
+    const j=half-i;
+    const ml1=getML(A,i),mr1=getMR(A,i),ml2=getML(B,j),mr2=getMR(B,j);
+
+    snap('check',`🔍 Iter ${iters}: i=${i},j=${j}. Check ml1≤mr2 (${fmtV(ml1)}≤${fmtV(mr2)}) AND ml2≤mr1 (${fmtV(ml2)}≤${fmtV(mr1)}).`,lo,hi,i);
+
+    if(ml1<=mr2&&ml2<=mr1){
+      const total=m+n;
+      let median;
+      if(total%2===1){median=Math.max(ml1,ml2);}
+      else{median=(Math.max(ml1,ml2)+Math.min(mr1,mr2))/2;}
+      snap('found',`✅ Valid partition! i=${i},j=${j}. ${total%2===1?`Odd total → median=max(${fmtV(ml1)},${fmtV(ml2)})=${median}`:`Even total → median=(max(${fmtV(ml1)},${fmtV(ml2)})+min(${fmtV(mr1)},${fmtV(mr2)}))/2=${median}`}`,lo,hi,i,{median,result:{answer:median}});
+      steps[steps.length-1].result={answer:median};
+      return steps;
+    } else if(ml1>mr2){
+      snap('adjr',`← i too large (ml1=${fmtV(ml1)}>mr2=${fmtV(mr2)}). hi=${i-1}.`,lo,hi,i);
+      hi=i-1;
+    } else {
+      snap('adjl',`→ i too small (ml2=${fmtV(ml2)}>mr1=${fmtV(mr1)}). lo=${i+1}.`,lo,hi,i);
+      lo=i+1;
+    }
+  }
+  snap('init',`End.`,lo,hi,lo,{result:{answer:-1}});
+  steps[steps.length-1].result={answer:-1};
+  return steps;
+}
+
+// ─── GLOBALS ────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=800;
+let A=[], B=[];
+
+function fmtNum(v){return v>=INF?'+∞':v<=-INF?'-∞':String(v);}
+
+// ─── BUILD UI ────────────────────────────────────────────────────────────
+function buildUI(){
+  A=document.getElementById('inA').value.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x));
+  B=document.getElementById('inB').value.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x));
+  if(!A.length||!B.length)return;
+
+  steps=computeSteps([...A],[...B]);
+  currentStep=0;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('cxIter').textContent='—';
+  document.getElementById('resultBadge').textContent='median = —';
+  document.getElementById('resultBadge').className='result-badge';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build merged bar (static, colored at end)
+  const merged=[...steps[0].A,...steps[0].B].sort((a,b)=>a-b);
+  const mb=document.getElementById('mergedBar');
+  mb.innerHTML='';
+  merged.forEach(v=>{
+    const cell=document.createElement('div');cell.className='mb-cell';
+    cell.textContent=v;mb.appendChild(cell);
+  });
+
+  renderStep(0);
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const {A:arrA,B:arrB,i,j,m,n,ml1,mr1,ml2,mr2,lo,hi}=st;
+  const isFound=st.type==='found';
+  const isAdjR=st.type==='adjr';
+  const isAdjL=st.type==='adjl';
+
+  // ── Partition strips ──
+  const po=document.getElementById('partitionOuter');
+  po.className='partition-outer '+(isFinal?'po-found':isAdjR||isAdjL?'po-adj':'po-search');
+  document.getElementById('phIter').textContent=`iter ${st.iters}`;
+
+  // Build A cells
+  const ca=document.getElementById('cellsA');
+  ca.innerHTML='';
+  const prA=document.getElementById('ptrRowA');
+  prA.innerHTML='';
+  // dummy spacer for label
+  const spacerL=document.createElement('div');spacerL.style.width='42px';spacerL.style.flexShrink='0';prA.appendChild(spacerL);
+  // Build ptr labels for A
+  for(let k=0;k<=arrA.length;k++){
+    const pl=document.createElement('div');
+    pl.className='ptl';
+    pl.style.width='6px';pl.style.minWidth='0';
+    if(k===i){pl.style.width='10px';pl.style.background='rgba(255,209,102,.3)';pl.style.color='#7a4800';pl.textContent='|';}
+    prA.appendChild(pl);
+    if(k<arrA.length){
+      const gap=document.createElement('div');gap.style.width='3px';gap.style.flexShrink='0';prA.appendChild(gap);
+    }
+  }
+  for(let k=0;k<arrA.length;k++){
+    const cell=document.createElement('div');
+    const cls=k<i?(k===i-1?'ac-ml':'ac-left'):k===i?'ac-mright':'ac-right';
+    cell.className=`ac ${isFinal?'ac-found':cls}`;
+    cell.textContent=arrA[k];
+    ca.appendChild(cell);
+    if(k===i-1){
+      const cut=document.createElement('div');cut.className='cut-marker';
+      ca.appendChild(cut);
+    }
+  }
+  if(i===arrA.length){const cut=document.createElement('div');cut.className='cut-marker';ca.appendChild(cut);}
+
+  // Build B cells
+  const cb=document.getElementById('cellsB');
+  cb.innerHTML='';
+  for(let k=0;k<arrB.length;k++){
+    const cell=document.createElement('div');
+    const cls=k<j?(k===j-1?'ac-ml':'ac-left'):k===j?'ac-mright':'ac-right';
+    cell.className=`ac ${isFinal?'ac-found':cls}`;
+    cell.textContent=arrB[k];
+    cb.appendChild(cell);
+    if(k===j-1){
+      const cut=document.createElement('div');cut.className='cut-marker';
+      cb.appendChild(cut);
+    }
+  }
+  if(j===arrB.length){const cut=document.createElement('div');cut.className='cut-marker';cb.appendChild(cut);}
+
+  // ── Boundary panel ──
+  const bo=document.getElementById('boundaryOuter');
+  const check1=ml1<=mr2, check2=ml2<=mr1;
+  bo.className=`boundary-outer ${isFinal?'bo-valid':isAdjR?'bo-adj-l':isAdjL?'bo-adj-r':'bo-checking'}`;
+
+  document.getElementById('fbML1V').textContent=fmtNum(ml1);
+  document.getElementById('fbMR2V').textContent=fmtNum(mr2);
+  document.getElementById('fbML2V').textContent=fmtNum(ml2);
+  document.getElementById('fbMR1V').textContent=fmtNum(mr1);
+  document.getElementById('fbOp1').textContent=check1?'≤ ✓':'> ✗';
+  document.getElementById('fbOp2').textContent=check2?'≤ ✓':'> ✗';
+  document.getElementById('fbML1').className=`fb fb-ml1 ${isFinal?'fb-valid':!check1?'fb-bad':''}`;
+  document.getElementById('fbMR2').className=`fb fb-mr2 ${isFinal?'fb-valid':!check1?'fb-bad':''}`;
+  document.getElementById('fbML2').className=`fb fb-ml2 ${isFinal?'fb-valid':!check2?'fb-bad':''}`;
+  document.getElementById('fbMR1').className=`fb fb-mr1 ${isFinal?'fb-valid':!check2?'fb-bad':''}`;
+
+  const cc=document.getElementById('crossChecks');
+  cc.innerHTML=`
+    <div class="cc-chip ${isFinal?'cc-pass':check1?'cc-pass':'cc-fail'}">maxL1(${fmtNum(ml1)}) ≤ minR2(${fmtNum(mr2)}) ${check1?'✓':'✗'}</div>
+    <div class="cc-chip ${isFinal?'cc-pass':check2?'cc-pass':'cc-fail'}">maxL2(${fmtNum(ml2)}) ≤ minR1(${fmtNum(mr1)}) ${check2?'✓':'✗'}</div>`;
+
+  const ab=document.getElementById('adjBanner');
+  if(isFinal){ab.className='adj-banner ab-valid';ab.textContent=`✅ Valid partition! Median = ${st.median}`;}
+  else if(isAdjR){ab.className='adj-banner ab-right';ab.textContent=`maxL1(${fmtNum(ml1)})>minR2(${fmtNum(mr2)}) → i too big → hi=${i-1}`;}
+  else if(isAdjL){ab.className='adj-banner ab-left';ab.textContent=`maxL2(${fmtNum(ml2)})>minR1(${fmtNum(mr1)}) → i too small → lo=${i+1}`;}
+  else{ab.className='adj-banner ab-init';ab.textContent=`checking: i=${i}, j=${j}…`;}
+
+  // ── Merged bar ──
+  document.getElementById('medianOuter').className='median-outer '+(isFinal?'mo-active':'');
+  const merged=[...arrA,...arrB].sort((a,b)=>a-b);
+  const total=m+n;
+  const isOdd=total%2===1;
+  const midIdx=Math.floor((total-1)/2);
+  const mb=document.getElementById('mergedBar');
+  mb.innerHTML='';
+  merged.forEach((v,k)=>{
+    const cell=document.createElement('div');
+    const isMedian=isFinal&&(k===midIdx||((!isOdd)&&k===midIdx+1));
+    cell.className=`mb-cell ${isMedian?'mbc-median':k<=midIdx?'mbc-left':'mbc-right'}`;
+    cell.textContent=v;mb.appendChild(cell);
+  });
+  document.getElementById('mhResult').textContent=isFinal?`median = ${st.median}`:'—';
+  if(isFinal){
+    const mf=isOdd?`median = max(maxL1,maxL2) = max(${fmtNum(ml1)},${fmtNum(ml2)}) = ${st.median}`:
+      `median = (max(${fmtNum(ml1)},${fmtNum(ml2)}) + min(${fmtNum(mr1)},${fmtNum(mr2)})) / 2 = ${st.median}`;
+    document.getElementById('medianFormula').textContent=mf;
+  } else {
+    document.getElementById('medianFormula').textContent=`searching… partition i=${i??'?'}, j=${j??'?'}`;
+  }
+
+  // ── Result badge ──
+  const rb=document.getElementById('resultBadge');
+  if(isFinal){
+    rb.textContent=`median = ${st.median}`;
+    rb.className='result-badge rb-new';
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  sp.className=`step-panel ${isFinal?'sp-found':isAdjR||isAdjL?'sp-adj':'sp-search'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(!isFinal&&i!=null){
+    spb.innerHTML=mkBox('i',i,'A cut','spbox sb-blue')+
+      mkBox('j',j,'B cut','spbox sb-pur')+
+      mkBox('lo',lo,'','spbox sb-blue')+
+      mkBox('hi',hi,'','spbox sb-pur');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('median',st.median,'answer','spbox sb-grn')+
+      mkBox('i',i,'A cut','spbox sb-blue')+mkBox('j',j,'B cut','spbox sb-pur')+
+      mkBox('iters',st.iters,'','spbox sb-yel');
+  } else {
+    spb.innerHTML=mkBox('m',m,'|A|','spbox sb-blue')+mkBox('n',n,'|B|','spbox sb-pur');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:   `Binary search partition i in A. j = half−i keeps combined left = combined right. Try i=${i}.`,
+    check:  `Iter ${st.iters}: i=${i}, j=${j}. maxL1=${fmtNum(ml1)}, minR2=${fmtNum(mr2)}, maxL2=${fmtNum(ml2)}, minR1=${fmtNum(mr1)}. ${check1&&check2?'Both conditions met!':!check1?'maxL1>minR2 → adjust left.':'maxL2>minR1 → adjust right.'}`,
+    found:  `✅ Valid partition at i=${i}, j=${j}. ${total%2===1?`Odd total → median=max(maxL1,maxL2)=${st.median}`:`Even → median=(max+min)/2=${st.median}`}`,
+    adjr:   `maxL1(${fmtNum(ml1)}) > minR2(${fmtNum(mr2)}): too many elements from A in left half. Decrease i: hi=${i-1}.`,
+    adjl:   `maxL2(${fmtNum(ml2)}) > minR1(${fmtNum(mr1)}): too few elements from A in left half. Increase i: lo=${i+1}.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={found:'var(--accent3)',adjr:'var(--accent)',adjl:'var(--pur)',check:'var(--accent4)',init:'var(--accent3)'}[st.type]||'var(--accent3)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vI',  'vcI',   i!=null?i:'—');
+  setVar('vJ',  'vcJ',   j!=null?j:'—');
+  setVar('vLo', 'vcLo',  lo!=null?lo:'—');
+  setVar('vHi', 'vcHi',  hi!=null?hi:'—');
+  setVar('vML1','vcML1', fmtNum(ml1));
+  setVar('vMR1','vcMR1', fmtNum(mr1));
+  setVar('vML2','vcML2', fmtNum(ml2));
+  setVar('vMR2','vcMR2', fmtNum(mr2));
+
+  if(isFinal&&st.result){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ MEDIAN = ${st.median}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.median);
+    document.getElementById('bestMeta').textContent=`|A|=${m}, |B|=${n}, total=${total} · ${st.iters} iter${st.iters!==1?'s':''}`;
+    document.getElementById('cxAnswer').textContent=String(st.median);
+    document.getElementById('cxIter').textContent=String(st.iters);
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

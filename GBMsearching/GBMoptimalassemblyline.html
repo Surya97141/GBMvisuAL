@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optimal Assembly Line — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.1rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.fw{width:300px;} .field input.sm{width:80px;}
+.field input:focus{border-color:var(--accent3);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#028a5b;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* Station color palette */
+:root{
+  --sc0:#2196f3;--sc1:#c084fc;--sc2:#06d6a0;--sc3:#ffd166;
+  --sc4:#e63946;--sc5:#f97316;--sc6:#84cc16;--sc7:#ec4899;
+}
+
+/* ══ UNIQUE VISUAL 1: ASSEMBLY LINE STRIP ══ */
+.asm-section{margin-bottom:14px;}
+.asm-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;transition:border-color .3s;}
+.asm-outer.ao-check{border-color:var(--accent4);}
+.asm-outer.ao-feasible{border-color:var(--accent3);}
+.asm-outer.ao-infeasible{border-color:var(--accent);}
+.asm-outer.ao-done{border-color:var(--accent3);}
+.asm-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.ash-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ash-status{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;}
+/* Step cells row */
+.asm-cells{display:flex;gap:3px;flex-wrap:nowrap;margin-bottom:6px;}
+.step-cell{
+  display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;
+}
+.sc-box{
+  width:46px;height:46px;border-radius:8px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.sc-dur{font-size:.78rem;font-weight:700;}
+.sc-idx{font-family:'Space Mono',monospace;font-size:.46rem;color:var(--muted);margin-top:1px;}
+/* Station label below each cell */
+.sc-station{font-family:'Space Mono',monospace;font-size:.48rem;font-weight:700;padding:1px 5px;border-radius:3px;margin-top:2px;}
+/* Separator between stations */
+.station-sep{width:4px;align-self:stretch;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem;flex-shrink:0;}
+/* Running sum strip below */
+.asm-sums{display:flex;gap:3px;flex-wrap:nowrap;margin-top:4px;}
+.sum-cell{width:46px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.5rem;font-weight:700;flex-shrink:0;transition:all .3s;}
+
+/* ══ UNIQUE VISUAL 2: FEASIBILITY CHECKER ══ */
+.feasibility-section{margin-bottom:14px;}
+.feasibility-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.feasibility-outer.fo-check{border-color:var(--accent4);}
+.feasibility-outer.fo-ok   {border-color:var(--accent3);}
+.feasibility-outer.fo-fail {border-color:var(--accent);}
+.feasibility-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.fh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+/* Station rows */
+.station-rows{display:flex;flex-direction:column;gap:5px;}
+.station-row{display:flex;gap:8px;align-items:center;}
+.sr-label{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;min-width:68px;color:var(--muted);}
+.sr-bar-wrap{flex:1;height:22px;background:#e8e2d4;border-radius:5px;overflow:hidden;position:relative;}
+.sr-bar{height:100%;border-radius:5px;transition:width .4s;display:flex;align-items:center;padding:0 6px;}
+.sr-bar-lbl{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;color:white;white-space:nowrap;}
+.sr-total{font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;min-width:38px;text-align:right;}
+.sr-overflow{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;color:var(--accent);min-width:60px;}
+/* Max bar indicator */
+.max-line{position:absolute;top:0;right:0;height:100%;width:2px;background:rgba(255,255,255,.6);}
+
+/* ══ UNIQUE VISUAL 3: BINARY SEARCH RANGE BAR ══ */
+.bs-section{margin-bottom:14px;}
+.bs-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.bs-outer.bso-active{border-color:var(--accent4);}
+.bs-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.bsh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.bsh-iter{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--accent4);}
+/* Range display */
+.bs-range-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.bsr-box{border:1.5px solid var(--border);border-radius:7px;padding:6px 12px;text-align:center;flex:1;}
+.bsr-lo {border-color:var(--accent2);background:rgba(33,150,243,.06);}
+.bsr-mid{border-color:var(--accent4);background:rgba(255,209,102,.1);}
+.bsr-hi {border-color:var(--pur);background:rgba(192,84,252,.06);}
+.bsr-ans{border-color:var(--accent3);background:rgba(6,214,160,.08);}
+.bsr-lbl{font-family:'Space Mono',monospace;font-size:.5rem;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.bsr-v  {font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--ink);}
+/* History rows */
+.bs-history{display:flex;flex-direction:column;gap:4px;}
+.bsh-row{display:flex;gap:8px;align-items:center;}
+.bsh-i  {font-family:'Space Mono',monospace;font-size:.55rem;color:var(--muted);min-width:28px;}
+.bsh-bar-wrap{flex:1;height:16px;background:#e8e2d4;border-radius:4px;overflow:hidden;position:relative;}
+.bsh-bar{height:100%;border-radius:4px;position:absolute;display:flex;align-items:center;justify-content:center;transition:all .4s;}
+.bshb-check{background:rgba(255,209,102,.5);}
+.bshb-ok   {background:rgba(6,214,160,.45);}
+.bshb-fail {background:rgba(230,57,70,.35);}
+.bsh-mid-tick{position:absolute;top:0;height:100%;width:2px;background:#ffd166;border-radius:1px;}
+.bsh-bar-lbl{font-family:'Space Mono',monospace;font-size:.48rem;font-weight:700;color:#7a4800;z-index:1;white-space:nowrap;}
+.bsh-info{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);min-width:80px;text-align:right;}
+.bsh-info.bi-ok  {color:var(--accent3);}
+.bsh-info.bi-fail{color:var(--accent);}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-check{border-color:var(--accent4);}
+.step-panel.sp-ok   {border-color:var(--accent3);}
+.step-panel.sp-fail {border-color:var(--accent);}
+.step-panel.sp-done {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.result-badge{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;padding:7px 18px;border-radius:8px;
+  background:rgba(6,214,160,.12);border:2px solid var(--accent3);color:#024d37;
+  transition:all .3s;display:inline-block;margin-bottom:14px;}
+.result-badge.rb-new{animation:rbPop .5s cubic-bezier(.34,1.56,.64,1);}
+@keyframes rbPop{from{transform:scale(1.15);}to{transform:none;}}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;}
+.ep-why-block.why-init{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-why-block.why-check{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-ok  {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-why-block.why-fail{border-left-color:var(--accent); background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init {background:rgba(6,214,160,.12); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-check{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-ok   {background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-fail {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.2);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.5rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#012a1e;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Optimal Assembly Line</h1>
+    <div class="sub">Binary Search on Answer · Greedy Feasibility · O(n log S)</div>
+  </div>
+  <div class="family-badge">Binary Search · Greedy</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Step Durations</label>
+      <input type="text" id="inSteps" value="15, 15, 30, 30, 45" class="fw">
+    </div>
+    <div class="field">
+      <label>Num Stations</label>
+      <input type="number" id="inK" value="3" min="1" class="sm">
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="340">2×</button>
+        <button class="speed-btn" data-ms="130">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.2);border-color:#2196f3;border-radius:3px"></div> station 1</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.2);border-color:#c084fc;border-radius:3px"></div> station 2</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.2);border-color:#06d6a0;border-radius:3px"></div> station 3</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> station 4+</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;border-radius:3px"></div> over max → needs extra station</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: ASSEMBLY LINE STRIP -->
+  <div class="asm-section">
+    <div class="section-label">Assembly line — steps grouped into stations (max duration = mid)</div>
+    <div class="asm-outer" id="asmOuter">
+      <div class="asm-header">
+        <div class="ash-label" id="ashLabel">steps colored by assigned station</div>
+        <div class="ash-status" id="ashStatus">—</div>
+      </div>
+      <div class="asm-cells" id="asmCells"></div>
+      <div class="asm-sums" id="asmSums"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: FEASIBILITY CHECKER -->
+  <div class="feasibility-section">
+    <div class="section-label">Greedy feasibility — each station accumulates steps until max is hit</div>
+    <div class="feasibility-outer" id="feasibilityOuter">
+      <div class="feasibility-header">
+        <div class="fh-title">max allowed per station = <span id="fhMax">—</span></div>
+        <div style="font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;" id="fhResult">—</div>
+      </div>
+      <div class="station-rows" id="stationRows"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: BINARY SEARCH RANGE BAR -->
+  <div class="bs-section">
+    <div class="section-label">Binary search on answer — converging on minimum feasible max</div>
+    <div class="bs-outer" id="bsOuter">
+      <div class="bs-header">
+        <div class="bsh-title">lo=max(step), hi=sum(all steps)</div>
+        <div class="bsh-iter">iter: <span id="bsIter">0</span></div>
+      </div>
+      <div class="bs-range-row">
+        <div class="bsr-box bsr-lo"><div class="bsr-lbl">lo</div><div class="bsr-v" id="bsLo">—</div></div>
+        <div class="bsr-box bsr-mid"><div class="bsr-lbl">mid</div><div class="bsr-v" id="bsMid">—</div></div>
+        <div class="bsr-box bsr-hi"><div class="bsr-lbl">hi</div><div class="bsr-v" id="bsHi">—</div></div>
+        <div class="bsr-box bsr-ans"><div class="bsr-lbl">answer</div><div class="bsr-v" id="bsAns">—</div></div>
+      </div>
+      <div class="bs-history" id="bsHistory">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">iterations appear here…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px;">
+    <div class="result-badge" id="resultBadge">optimal max = —</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted)">
+      step <span id="stepIdx">0</span> of <span id="stepTotalLabel">—</span>
+    </div>
+  </div>
+
+  <div class="step-panel sp-check" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--pur-dark)">O(n log S)</div>
+      <div class="cx-sub">S=sum(steps)</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:var(--accent2)">O(1)</div>
+      <div class="cx-sub">greedy check</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Iters</div>
+      <div class="cx-val" id="cxIter" style="color:#7a5a00">—</div>
+      <div class="cx-sub">BS steps</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Answer</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">optimal max</div>
+    </div>
+  </div>
+
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Optimal Assembly Line</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Optimized</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-feas"><span class="ck">bool</span> <span class="cf">feasible</span>(v,k,<span class="ck">int</span> maxDur){</span>
+<span class="code-line" id="cl-f2">  <span class="ck">int</span> stations=<span class="cn">1</span>, cur=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-f3">  <span class="ck">for</span>(<span class="ck">int</span> d:v){</span>
+<span class="code-line" id="cl-f4">    <span class="ck">if</span>(cur+d>maxDur){stations++;cur=<span class="cn">0</span>;}</span>
+<span class="code-line" id="cl-f5">    cur+=d;</span>
+<span class="code-line" id="cl-f6">  }</span>
+<span class="code-line" id="cl-f7">  <span class="ck">return</span> stations&lt;=k;</span>
+<span class="code-line" id="cl-f8">}</span>
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">assembly</span>(vector&lt;<span class="ck">int</span>&gt;&amp; v,<span class="ck">int</span> k){</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> lo=*max_element(v),</span>
+<span class="code-line" id="cl-init2">      hi=accumulate(v,<span class="cn">0</span>), ans=hi;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(lo&lt;=hi){</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid=lo+(hi-lo)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-ok">    <span class="ck">if</span>(<span class="cf">feasible</span>(v,k,mid)){ans=mid;hi=mid-<span class="cn">1</span>;}</span>
+<span class="code-line" id="cl-fail">    <span class="ck">else</span>               lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> ans;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CODEFORCES OPTIMIZED</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#pragma GCC optimize</span>(<span class="cn">"O3,unroll-loops"</span>)</span>
+<span class="code-line"><span class="ck">#pragma GCC target</span>(<span class="cn">"avx2,bmi,bmi2"</span>)</span>
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">solve</span>(){</span>
+<span class="code-line">  <span class="ck">int</span> n,k; cin&gt;&gt;n&gt;&gt;k;</span>
+<span class="code-line">  vector&lt;<span class="ck">int</span>&gt; v(n); <span class="ck">for</span>(<span class="ck">auto</span>&amp;x:v)cin&gt;&gt;x;</span>
+<span class="code-line">  <span class="ck">int</span> lo=*max_element(v.begin(),v.end());</span>
+<span class="code-line">  <span class="ck">long long</span> hi=accumulate(v.begin(),v.end(),0LL);</span>
+<span class="code-line">  <span class="ck">long long</span> ans=hi;</span>
+<span class="code-line">  <span class="ck">while</span>(lo&lt;=hi){</span>
+<span class="code-line">    <span class="ck">long long</span> mid=(lo+hi)&gt;&gt;<span class="cn">1</span>;</span>
+<span class="code-line">    <span class="cc">// inline feasibility — avoids fn call overhead</span></span>
+<span class="code-line">    <span class="ck">int</span> st=<span class="cn">1</span>,cur=<span class="cn">0</span>;</span>
+<span class="code-line">    <span class="ck">for</span>(<span class="ck">int</span> d:v){<span class="ck">if</span>(cur+d>mid){st++;cur=<span class="cn">0</span>;}cur+=d;}</span>
+<span class="code-line">    <span class="ck">if</span>(st&lt;=k){ans=mid;hi=mid-<span class="cn">1</span>;}</span>
+<span class="code-line">    <span class="ck">else</span> lo=mid+<span class="cn">1</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  cout&lt;&lt;ans&lt;&lt;<span class="cn">'\n'</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">int</span> <span class="cf">main</span>(){ios::sync_with_stdio(<span class="cn">0</span>);cin.tie(<span class="cn">0</span>);solve();}</span>
+</pre>
+    </div>
+  </div>
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLo"><div class="var-name">lo</div><div class="var-value" id="vLo" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcHi"><div class="var-name">hi</div><div class="var-value" id="vHi" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcMid"><div class="var-name">mid (candidate)</div><div class="var-value" id="vMid" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcAns"><div class="var-name">ans (best)</div><div class="var-value" id="vAns" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcSt"><div class="var-name">stations used</div><div class="var-value" id="vSt" style="color:#e2e8f0">—</div></div>
+      <div class="var-card" id="vcIter"><div class="var-name">iteration</div><div class="var-value" id="vIter" style="color:var(--accent4)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Optimal Max Duration</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ OPTIMAL ASSEMBLY LINE</div>
+</div>
+</div>
+
+<script>
+// Station color palette
+const STATION_COLORS=[
+  {bg:'rgba(33,150,243,.18)',border:'#2196f3',text:'#0d47a1',bar:'#2196f3'},
+  {bg:'rgba(192,84,252,.15)',border:'#c084fc',text:'#5b1a9a',bar:'#c084fc'},
+  {bg:'rgba(6,214,160,.18)', border:'#06d6a0',text:'#024d37',bar:'#06d6a0'},
+  {bg:'rgba(255,209,102,.2)',border:'#ffd166',text:'#7a4800',bar:'#ffd166'},
+  {bg:'rgba(230,57,70,.12)', border:'#e63946',text:'#b71c1c',bar:'#e63946'},
+  {bg:'rgba(249,115,22,.15)',border:'#f97316',text:'#7c2d12',bar:'#f97316'},
+  {bg:'rgba(132,204,22,.15)',border:'#84cc16',text:'#3a5c09',bar:'#84cc16'},
+  {bg:'rgba(236,72,153,.15)',border:'#ec4899',text:'#831843',bar:'#ec4899'},
+];
+
+// ─── GREEDY PARTITION ──────────────────────────────────────────────────
+function greedyPartition(steps,maxDur){
+  const stationOf=[]; // stationOf[i] = which station step i belongs to
+  const stationTotals=[]; // total duration per station
+  let st=0, cur=0;
+  for(let i=0;i<steps.length;i++){
+    if(cur+steps[i]>maxDur){st++;cur=0;}
+    stationOf.push(st);
+    cur+=steps[i];
+    if(stationTotals.length<=st) stationTotals.push(0);
+    stationTotals[st]+=steps[i];
+  }
+  return{stationOf,stationTotals,numStations:st+1};
+}
+
+// ─── EXPLAIN ─────────────────────────────────────────────────────────
+function makeExplain(type,args){
+  const{lo,hi,mid,k,n,steps,numSt,ans,iters}=args||{};
+  const totalSum=steps?steps.reduce((a,b)=>a+b,0):0;
+  const maxStep=steps?Math.max(...steps):0;
+  if(type==='init') return{
+    why:`<div class="ep-why-block why-init">Binary search on the answer: the optimal max-station duration lies in [max(steps), sum(steps)].<br><br>For each candidate value <strong>mid</strong>, check feasibility greedily: assign steps left to right, starting a new station whenever adding the next step would exceed mid. Count stations needed.<br><br>If stations ≤ k → feasible, save ans=mid, try smaller (hi=mid-1). Otherwise lo=mid+1.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Lower bound = max(steps):</strong> no matter how we split, every step must fit in some station. So min possible max ≥ max single step.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Upper bound = sum(steps):</strong> worst case is 1 station doing everything. Optimal answer is in [max, sum].`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Monotonicity:</strong> if mid is feasible (stations ≤ k), then any larger value is also feasible. This makes binary search valid. O(n log S) total.`},
+    ]
+  };
+  if(type==='check'||type==='ok'||type==='fail') return{
+    why:`<div class="ep-why-block why-${type}">mid=${mid}. Greedy: assign steps left→right, new station when sum would exceed ${mid}. Result: ${numSt} station${numSt!==1?'s':''} needed, k=${k}.<br><br>${type==='ok'?`${numSt} ≤ ${k} → <strong>Feasible! Save ans=${mid}, try smaller (hi=${mid-1}).</strong>`:`${numSt} > ${k} → <strong>Infeasible. Need larger max (lo=${mid+1}).</strong>`}</div>`,
+    inv:[{icon:type==='ok'?'✓':'✗',cls:type==='ok'?'':'inv-warn',text:`mid=${mid}: ${numSt} stations needed, k=${k}. ${type==='ok'?`Feasible → ans=${mid}.`:'Infeasible → increase lo.'}`}]
+  };
+  if(type==='done') return{
+    why:`<div class="ep-why-block why-done">lo > hi. Search complete. Minimum feasible max duration = ${ans}.<br>With max=${ans}, we can distribute all steps into exactly ${k} or fewer stations.</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>Answer: ${ans}.</strong> Optimal max station duration with ${k} stations.`},
+      {icon:'📐',cls:'inv-warn',text:`O(n log S): ${iters} iterations × O(n) greedy = O(n log(sum-max)).`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-init','cl-init2','cl-while'],cls:'hl-init'},
+  check:{ids:['cl-mid','cl-feas','cl-f2','cl-f3','cl-f4','cl-f5'],cls:'hl-check'},
+  ok:   {ids:['cl-ok'],cls:'hl-ok'},
+  fail: {ids:['cl-fail'],cls:'hl-fail'},
+  done: {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('#code-clean .code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+let activeCodeTab='clean';
+function switchCodeTab(tab){
+  activeCodeTab=tab;
+  document.getElementById('code-clean').style.display=tab==='clean'?'block':'none';
+  document.getElementById('code-cf').style.display=tab==='cf'?'block':'none';
+  document.getElementById('ctab-clean').classList.toggle('active',tab==='clean');
+  document.getElementById('ctab-cf').classList.toggle('active',tab==='cf');
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────
+function computeSteps(steps,k){
+  const results=[];
+  const n=steps.length;
+  const lo0=Math.max(...steps);
+  const hi0=steps.reduce((a,b)=>a+b,0);
+  let ans=hi0, iters=0;
+  const bsLog=[];
+
+  const snap=(type,desc,lo,hi,mid,extra={})=>{
+    const part=mid!=null?greedyPartition(steps,mid):{stationOf:[],stationTotals:[],numStations:0};
+    results.push({type,desc,lo,hi,mid,k,n,steps,ans,iters,bsLog:[...bsLog],
+      partition:part,result:null,...extra,
+      explain:makeExplain(type,{lo,hi,mid,k,n,steps,numSt:part.numStations,ans,iters})});
+  };
+
+  snap('init',`📐 <strong>Init.</strong> n=${n} steps, k=${k} stations. lo=${lo0} (max step), hi=${hi0} (sum). Binary search for min feasible max.`,lo0,hi0,null);
+
+  let lo=lo0,hi=hi0;
+  while(lo<=hi){
+    iters++;
+    const mid=lo+Math.floor((hi-lo)/2);
+    const part=greedyPartition(steps,mid);
+    const numSt=part.numStations;
+    const feasible=numSt<=k;
+
+    snap('check',`🔍 Iter ${iters}: mid=${mid}. Greedy → ${numSt} station${numSt!==1?'s':''}. ${feasible?`✓ ≤ ${k} → save ans=${mid}, hi=${mid-1}`:` ✗ > ${k} → lo=${mid+1}`}.`,lo,hi,mid,{numSt,feasible});
+
+    if(feasible){
+      ans=mid;
+      bsLog.push({iter:iters,lo,hi,mid,ok:true,numSt});
+      snap('ok',`✓ mid=${mid} feasible (${numSt}≤${k}). Save ans=${mid}. Try smaller: hi=${mid-1}.`,lo,hi,mid,{numSt,feasible:true});
+      hi=mid-1;
+    } else {
+      bsLog.push({iter:iters,lo,hi,mid,ok:false,numSt});
+      snap('fail',`✗ mid=${mid} infeasible (${numSt}>${k}). Need larger: lo=${mid+1}.`,lo,hi,mid,{numSt,feasible:false});
+      lo=mid+1;
+    }
+  }
+
+  snap('done',`🎉 <strong>Optimal max = ${ans}</strong>. ${k} stations can handle all steps with max duration ${ans}.`,lo,hi,null,
+    {result:{answer:ans},ans});
+  results[results.length-1].result={answer:ans};
+  return results;
+}
+
+// ─── GLOBALS ─────────────────────────────────────────────────────────
+let steps_g=[], currentStep=0, playing=false, timer=null, speed=750;
+let stepsVal=[], kVal=0;
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────
+function buildUI(){
+  stepsVal=document.getElementById('inSteps').value.split(',').map(s=>parseInt(s.trim())).filter(x=>!isNaN(x)&&x>0);
+  kVal=Math.max(1,Math.min(stepsVal.length,parseInt(document.getElementById('inK').value)||1));
+  document.getElementById('inK').value=kVal;
+  if(!stepsVal.length)return;
+
+  steps_g=computeSteps(stepsVal,kVal);
+  currentStep=0;
+
+  document.getElementById('stepTotal').textContent=`/ ${steps_g.length} steps`;
+  document.getElementById('stepTotalLabel').textContent=steps_g.length;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('cxAnswer').textContent='—';
+  document.getElementById('cxIter').textContent='—';
+  document.getElementById('resultBadge').textContent='optimal max = —';
+  document.getElementById('resultBadge').className='result-badge';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build step cells
+  const ac=document.getElementById('asmCells');
+  const as=document.getElementById('asmSums');
+  ac.innerHTML=''; as.innerHTML='';
+  stepsVal.forEach((d,i)=>{
+    const cell=document.createElement('div');cell.className='step-cell';
+    const box=document.createElement('div');box.className='sc-box';box.id=`sc-${i}`;
+    box.innerHTML=`<div class="sc-dur">${d}</div>`;
+    const stLabel=document.createElement('div');stLabel.className='sc-station';stLabel.id=`ssl-${i}`;
+    cell.appendChild(box);cell.appendChild(stLabel);
+    ac.appendChild(cell);
+    const sum=document.createElement('div');sum.className='sum-cell';sum.id=`sum-${i}`;
+    as.appendChild(sum);
+  });
+
+  renderStep(0);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps_g.length)return;
+  const st=steps_g[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const{steps,k,mid,partition,lo,hi,ans,feasible,numSt}=st;
+  const n=steps.length;
+
+  // ── Assembly line strip ──
+  const ao=document.getElementById('asmOuter');
+  ao.className='asm-outer '+(isFinal?'ao-done':st.type==='ok'?'ao-feasible':st.type==='fail'?'ao-infeasible':'ao-check');
+  document.getElementById('ashStatus').textContent=
+    isFinal?`optimal = ${ans}`:
+    mid!=null?`mid=${mid}, ${numSt??'?'} stations${numSt!=null?` (k=${k})`:''}`:
+    `lo=${lo??'?'}, hi=${hi??'?'}`;
+  document.getElementById('ashStatus').style.color=
+    isFinal?'var(--accent3)':st.type==='ok'?'var(--accent3)':st.type==='fail'?'var(--accent)':'var(--muted)';
+
+  // Color each step cell by station
+  const part=partition;
+  let runSum=0;
+  for(let i=0;i<n;i++){
+    const box=document.getElementById(`sc-${i}`);
+    const stLbl=document.getElementById(`ssl-${i}`);
+    const sumCell=document.getElementById(`sum-${i}`);
+    if(!box)continue;
+    const stIdx=part.stationOf[i]??0;
+    const col=STATION_COLORS[Math.min(stIdx,STATION_COLORS.length-1)];
+    // Check if this station is over-budget (only possible if single step > mid, shouldn't happen since lo=max)
+    const stTotal=part.stationTotals[stIdx]??0;
+    const isOver=mid!=null&&stTotal>mid;
+    box.style.background=isOver?'rgba(230,57,70,.2)':col.bg;
+    box.style.borderColor=isOver?'#e63946':col.border;
+    box.style.color=isOver?'#b71c1c':col.text;
+    if(stLbl){
+      stLbl.textContent=`S${stIdx+1}`;
+      stLbl.style.background=col.bg;stLbl.style.color=col.text;
+    }
+    // Running sum within station
+    runSum+=steps[i];
+    // Reset when station changes
+    if(i>0&&part.stationOf[i]!==part.stationOf[i-1])runSum=steps[i];
+    if(sumCell){
+      sumCell.style.background=col.bg;
+      sumCell.style.borderRadius='4px';
+      sumCell.style.border=`1px solid ${col.border}`;
+      sumCell.style.color=col.text;
+      sumCell.style.fontFamily='Space Mono,monospace';
+      sumCell.style.fontSize='.5rem';
+      sumCell.style.fontWeight='700';
+      sumCell.style.display='flex';
+      sumCell.style.alignItems='center';
+      sumCell.style.justifyContent='center';
+      sumCell.textContent=`Σ${runSum}`;
+    }
+  }
+
+  // ── Feasibility checker ──
+  const fo=document.getElementById('feasibilityOuter');
+  fo.className='feasibility-outer '+(isFinal?'fo-ok':st.type==='ok'?'fo-ok':st.type==='fail'?'fo-fail':'fo-check');
+  document.getElementById('fhMax').textContent=mid??'—';
+  const fhRes=document.getElementById('fhResult');
+  fhRes.textContent=isFinal?`✅ ans=${ans}`:numSt!=null?`${numSt} stations ${numSt<=k?'≤':'>'} k=${k} → ${numSt<=k?'feasible ✓':'infeasible ✗'}`:'—';
+  fhRes.style.color=isFinal?'var(--accent3)':numSt!=null?(numSt<=k?'var(--accent3)':'var(--accent)'):'var(--muted)';
+
+  const sr=document.getElementById('stationRows');
+  sr.innerHTML='';
+  if(mid!=null&&part.stationTotals.length>0){
+    const maxVal=mid;
+    part.stationTotals.forEach((total,si)=>{
+      const col=STATION_COLORS[Math.min(si,STATION_COLORS.length-1)];
+      const pct=Math.min(100,total/maxVal*100);
+      const isOver=total>maxVal;
+      const row=document.createElement('div');row.className='station-row';
+      row.innerHTML=`<div class="sr-label" style="color:${col.text}">Station ${si+1}</div>
+        <div class="sr-bar-wrap">
+          <div class="sr-bar" style="width:${pct}%;background:${isOver?'#e63946':col.bar}">
+            <span class="sr-bar-lbl">steps: ${stepsInStation(part,si,steps)}</span>
+          </div>
+          <div class="max-line"></div>
+        </div>
+        <div class="sr-total" style="color:${isOver?'var(--accent)':col.text}">${total}</div>
+        <div class="sr-overflow">${isOver?`⚠ over!`:total===maxVal?'= max':'< max'}</div>`;
+      sr.appendChild(row);
+    });
+  } else {
+    sr.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">station breakdown appears here…</span>';
+  }
+
+  // ── Binary search bar ──
+  document.getElementById('bsOuter').className='bs-outer bso-active';
+  document.getElementById('bsIter').textContent=st.iters;
+  document.getElementById('bsLo').textContent=lo??'—';
+  document.getElementById('bsHi').textContent=hi??'—';
+  document.getElementById('bsMid').textContent=mid??'—';
+  document.getElementById('bsAns').textContent=ans!=null?ans:'—';
+
+  const bsh=document.getElementById('bsHistory');
+  const lo0=stepsVal.reduce((a,b)=>Math.max(a,b),0);
+  const hi0=stepsVal.reduce((a,b)=>a+b,0);
+  const range=hi0-lo0||1;
+  if(st.bsLog&&st.bsLog.length>0){
+    bsh.innerHTML='';
+    st.bsLog.forEach(log=>{
+      const lp=((log.lo-lo0)/range*100).toFixed(1);
+      const wp=((log.hi-log.lo)/range*100).toFixed(1);
+      const mp=((log.mid-lo0)/range*100).toFixed(1);
+      const row=document.createElement('div');row.className='bsh-row';
+      row.innerHTML=`<div class="bsh-i">i${log.iter}</div>
+        <div class="bsh-bar-wrap">
+          <div class="bsh-bar ${log.ok?'bshb-ok':'bshb-fail'}" style="left:${lp}%;width:${Math.max(parseFloat(wp),1)}%">
+            <span class="bsh-bar-lbl">[${log.lo},${log.hi}]</span>
+          </div>
+          <div class="bsh-mid-tick" style="left:${mp}%"></div>
+        </div>
+        <div class="bsh-info ${log.ok?'bi-ok':'bi-fail'}">${log.ok?`✓ mid=${log.mid}`:`✗ mid=${log.mid}`}</div>`;
+      bsh.appendChild(row);
+    });
+    // Preview current mid
+    if(!isFinal&&mid!=null){
+      const lp2=((lo-lo0)/range*100).toFixed(1);
+      const wp2=((hi-lo)/range*100).toFixed(1);
+      const mp2=((mid-lo0)/range*100).toFixed(1);
+      const row=document.createElement('div');row.className='bsh-row';
+      row.innerHTML=`<div class="bsh-i" style="color:var(--accent4)">i${st.iters}→</div>
+        <div class="bsh-bar-wrap">
+          <div class="bsh-bar bshb-check" style="left:${lp2}%;width:${Math.max(parseFloat(wp2),1)}%;opacity:.65">
+            <span class="bsh-bar-lbl">[${lo},${hi}]</span>
+          </div>
+          <div class="bsh-mid-tick" style="left:${mp2}%"></div>
+        </div>
+        <div class="bsh-info" style="color:var(--accent4)">mid=${mid}</div>`;
+      bsh.appendChild(row);
+    }
+  } else {
+    bsh.innerHTML='<span style="font-family:\'Space Mono\',monospace;font-size:.7rem;color:var(--muted)">iterations appear here…</span>';
+  }
+
+  // ── Result badge ──
+  const rb=document.getElementById('resultBadge');
+  if(isFinal){rb.textContent=`optimal max = ${ans}`;rb.className='result-badge rb-new';}
+  else if(st.type==='ok'){rb.textContent=`best so far = ${ans}`;}
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  sp.className=`step-panel ${isFinal?'sp-done':st.type==='ok'?'sp-ok':st.type==='fail'?'sp-fail':'sp-check'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+  if(mid!=null){
+    spb.innerHTML=mkBox('mid',mid,'candidate','spbox sb-yel')+
+      mkBox('stations',numSt??'?',`of k=${k}`,(numSt??0)<=k?'spbox sb-grn':'spbox sb-red')+
+      mkBox('lo',lo,'','spbox sb-blue')+
+      mkBox('ans',ans,'best','spbox sb-grn');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('answer',ans,'optimal max','spbox sb-grn')+
+      mkBox('iters',st.iters,'BS steps','spbox sb-yel');
+  } else {
+    spb.innerHTML=mkBox('lo',lo0,'min possible','spbox sb-blue')+mkBox('hi',hi0,'max possible','spbox sb-pur');
+  }
+
+  // ── Narrative ──
+  const narrs={
+    init:   `Binary search in [${lo0}, ${hi0}]. For each candidate max duration mid, greedily check if ${k} stations suffice.`,
+    check:  `mid=${mid}: greedy assigns ${numSt} station${numSt!==1?'s':''} to cover all steps. ${numSt!=null?(numSt<=k?`${numSt}≤${k} → feasible!`:`${numSt}>${k} → infeasible.`):''}`,
+    ok:     `✓ mid=${mid} feasible (${numSt} station${numSt!==1?'s':''} ≤ k=${k}). Save ans=${ans}. Try smaller: hi=${hi}.`,
+    fail:   `✗ mid=${mid} infeasible (${numSt} station${numSt!==1?'s':''} > k=${k}). Increase lo: lo=${lo}.`,
+    done:   `✅ Optimal max station duration = <strong>${ans}</strong>. With ${k} stations, no station needs more than ${ans}.`,
+  };
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={ok:'var(--accent3)',fail:'var(--accent)',check:'var(--accent4)',done:'var(--accent3)',init:'var(--accent3)'}[st.type]||'var(--accent3)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narrs[st.type]||'';
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // ── Right vars ──
+  setVar('vLo',  'vcLo',  lo??'—');
+  setVar('vHi',  'vcHi',  hi??'—');
+  setVar('vMid', 'vcMid', mid??'—');
+  setVar('vAns', 'vcAns', ans??'—');
+  setVar('vSt',  'vcSt',  numSt??'—');
+  setVar('vIter','vcIter',st.iters);
+
+  if(isFinal&&st.result){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ OPTIMAL MAX = ${st.result.answer}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=`${kVal} stations · n=${n} steps · ${st.iters} iter${st.iters!==1?'s':''}`;
+    document.getElementById('cxAnswer').textContent=String(st.result.answer);
+    document.getElementById('cxIter').textContent=String(st.iters);
+  }
+
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps_g.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps_g.length-1;
+}
+
+function stepsInStation(part,si,steps){
+  const list=[];
+  for(let i=0;i<steps.length;i++) if(part.stationOf[i]===si) list.push(steps[i]);
+  return list.join('+');
+}
+
+// ─── TABS ────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps_g.length)updateExplain(steps_g[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps_g.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps_g.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>
