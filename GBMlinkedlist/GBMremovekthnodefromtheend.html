@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remove Kth Node From End — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:260px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:50%;border:2px solid;flex-shrink:0;}
+
+/* ── LINKED LIST CANVAS ── */
+.list-section{margin-bottom:16px;}
+.list-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;overflow-x:auto;transition:border-color .3s;min-height:160px;}
+.list-outer.lo-advance{border-color:var(--accent2);}
+.list-outer.lo-found  {border-color:var(--accent);}
+.list-outer.lo-done   {border-color:var(--accent3);}
+
+/* pointer labels above nodes */
+.ptr-row{display:flex;gap:0;margin-bottom:6px;min-width:max-content;}
+.ptr-cell{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.ptr-label{font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;padding:2px 6px;border-radius:4px;margin-bottom:3px;white-space:nowrap;}
+.pl-first{background:rgba(33,150,243,.2);color:#0d47a1;border:1px solid var(--accent2);}
+.pl-second{background:rgba(192,84,252,.2);color:var(--pur-dark);border:1px solid var(--pur);}
+.pl-both{background:rgba(6,214,160,.2);color:#024d37;border:1px solid var(--accent3);}
+.pl-prev{background:rgba(255,209,102,.2);color:#7a4800;border:1px solid var(--accent4);}
+.ptr-spacer{width:68px;flex-shrink:0;} /* matches node+arrow width */
+
+/* nodes row */
+.nodes-row{display:flex;align-items:center;flex-wrap:nowrap;min-width:max-content;}
+.node-wrap{display:flex;align-items:center;flex-shrink:0;}
+
+.node-box{
+  width:52px;height:52px;border-radius:8px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem;
+  background:var(--surface);color:var(--ink);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);position:relative;
+  flex-shrink:0;
+}
+.node-idx{font-size:.42rem;color:var(--muted);margin-top:1px;}
+
+/* node states */
+.ns-normal  {background:var(--surface);border-color:var(--border);color:var(--ink);}
+.ns-first   {background:rgba(33,150,243,.18);border-color:var(--accent2);border-width:2.5px;color:#0d47a1;
+  box-shadow:0 3px 10px rgba(33,150,243,.3);}
+.ns-second  {background:rgba(192,84,252,.15);border-color:var(--pur);border-width:2.5px;color:var(--pur-dark);
+  box-shadow:0 3px 10px rgba(192,84,252,.25);}
+.ns-both    {background:rgba(6,214,160,.18);border-color:var(--accent3);border-width:2.5px;color:#024d37;
+  box-shadow:0 3px 10px rgba(6,214,160,.3);}
+.ns-prev    {background:rgba(255,209,102,.18);border-color:var(--accent4);border-width:2.5px;color:#7a4800;}
+.ns-target  {
+  background:rgba(230,57,70,.18);border-color:var(--accent);border-width:3px;color:#7a0000;
+  transform:scale(1.14) translateY(-5px);
+  box-shadow:0 6px 18px rgba(230,57,70,.45);z-index:4;
+  animation:tgtpulse .8s ease infinite alternate;
+}
+@keyframes tgtpulse{from{box-shadow:0 4px 10px rgba(230,57,70,.3);}to{box-shadow:0 8px 22px rgba(230,57,70,.65);}}
+.ns-removed {
+  background:rgba(230,57,70,.08);border-color:rgba(230,57,70,.3);
+  color:var(--muted);opacity:.35;transform:scale(.85);
+  text-decoration:line-through;
+}
+.ns-done    {background:rgba(6,214,160,.15);border-color:var(--accent3);color:#024d37;}
+
+/* arrows between nodes */
+.arrow-wrap{display:flex;flex-direction:column;align-items:center;width:16px;flex-shrink:0;}
+.arrow-normal{color:var(--border);font-size:.85rem;}
+.arrow-bypass{
+  position:relative;display:flex;align-items:center;
+  width:100px;flex-shrink:0;
+}
+
+/* GAP BRACKET */
+.gap-section{margin-bottom:14px;}
+.gap-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;transition:border-color .3s;}
+.gap-outer.go-active{border-color:var(--accent2);}
+.gap-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px;}
+.gap-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.gap-chip{padding:4px 12px;border-radius:6px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;border:2px solid;flex-shrink:0;}
+.gc-first {border-color:var(--accent2);background:rgba(33,150,243,.1);color:#0d47a1;}
+.gc-gap   {border-color:var(--border);background:rgba(200,195,180,.12);color:var(--muted);border-style:dashed;}
+.gc-second{border-color:var(--pur);background:rgba(192,84,252,.1);color:var(--pur-dark);}
+.gc-target{border-color:var(--accent);background:rgba(230,57,70,.08);color:#7a0000;}
+.gap-arrow{color:var(--muted);font-family:'Space Mono',monospace;font-size:.75rem;}
+.gap-k-badge{font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;
+  padding:3px 10px;border-radius:5px;
+  background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a5a00;}
+
+/* PHASE BADGE */
+.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:14px;display:inline-block;}
+.pb-setup{background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
+.pb-advance{background:rgba(192,84,252,.1);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.pb-found{background:rgba(230,57,70,.1);border:1.5px solid var(--accent);color:#7a0000;}
+.pb-done{background:rgba(6,214,160,.12);border:1.5px solid var(--accent3);color:#024d37;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-setup  {border-color:var(--accent2);}
+.step-panel.sp-advance{border-color:var(--pur);}
+.step-panel.sp-found  {border-color:var(--accent);}
+.step-panel.sp-done   {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);border-width:2px;background:rgba(230,57,70,.04);}
+.spbox.sb-grn {border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-setup{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-advance{border-left-color:var(--pur);background:rgba(192,84,252,.05);}
+.ep-why-block.why-found{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*18+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-setup  {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-advance{background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-found  {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-done   {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.list-repr-title{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:4px;letter-spacing:2px;text-transform:uppercase;}
+.list-repr{font-family:'Space Mono',monospace;font-size:.62rem;color:#9ca3af;padding:7px 9px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:5px;line-height:1.7;word-break:break-all;margin-bottom:12px;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Remove Kth Node From End</h1>
+    <div class="sub">Two Pointers · K-Gap Technique · O(n) · O(1)</div>
+  </div>
+  <div class="family-badge">Linked List · Two Pointers</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>Linked List  (comma-separated values)</label>
+      <input type="text" id="inList" value="0,1,2,3,4,5,6,7,8,9">
+      <div class="hint">Singly linked list — will be built left to right</div>
+    </div>
+    <div class="field">
+      <label>k</label>
+      <input type="text" id="inK" value="4" style="width:70px;">
+      <div class="hint">kth from end</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.18);border-color:#2196f3;"></div> first (fast)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.15);border-color:#c084fc;"></div> second (slow)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.18);border-color:#f5a623;"></div> prev (before target)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.18);border-color:#e63946;"></div> target (kth from end)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;"></div> done / bypassed</div>
+  </div>
+
+  <!-- PHASE BADGE -->
+  <div id="phaseBadge" class="phase-badge pb-setup">Phase 1: Advance first by k steps</div>
+
+  <!-- LINKED LIST DISPLAY -->
+  <div class="list-section">
+    <div class="section-label">Singly linked list — pointer labels shown above nodes</div>
+    <div class="list-outer" id="listOuter">
+      <div id="ptrRow" class="ptr-row"></div>
+      <div id="nodesRow" class="nodes-row"></div>
+    </div>
+  </div>
+
+  <!-- GAP DISPLAY -->
+  <div class="gap-section">
+    <div class="section-label">Gap between first and second — always = k</div>
+    <div class="gap-outer" id="gapOuter">
+      <div class="gap-title" id="gapTitle">Gap will appear after setup phase</div>
+      <div class="gap-row" id="gapRow"></div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch the two-pointer k-gap technique execute.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">single pass</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">two pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">k</div>
+      <div class="cx-val" id="cxK" style="color:#7a5a00">—</div>
+      <div class="cx-sub">from end</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(230,57,70,.3)">
+      <div class="cx-lbl">Removed</div>
+      <div class="cx-val" id="cxRemoved" style="color:var(--accent)">—</div>
+      <div class="cx-sub">node value</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Remove Kth Node From End</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">void</span> <span class="cf">removeKthNodeFromEnd</span>(</span>
+<span class="code-line" id="cl-sg2">    LinkedList* head, <span class="ck">int</span> k){</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> counter=<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-ptrs">  LinkedList *first=head, *second=head;</span>
+<span class="code-line" id="cl-adv">  <span class="cc">// Phase 1: advance first by k steps</span></span>
+<span class="code-line" id="cl-adv2">  <span class="ck">while</span>(counter!=k){</span>
+<span class="code-line" id="cl-adv3">   first=first->next;</span>
+<span class="code-line" id="cl-adv4">   counter++;</span>
+<span class="code-line" id="cl-adv5">  }</span>
+<span class="code-line" id="cl-head">  <span class="cc">// Phase 2: if first is at end, remove head</span></span>
+<span class="code-line" id="cl-head2">  <span class="ck">if</span>(first->next==<span class="cn">nullptr</span>){</span>
+<span class="code-line" id="cl-head3">   head->value=head->next->value;</span>
+<span class="code-line" id="cl-head4">   head->next=head->next->next;</span>
+<span class="code-line" id="cl-head5">   <span class="ck">return</span>;</span>
+<span class="code-line" id="cl-head6">  }</span>
+<span class="code-line" id="cl-move">  <span class="cc">// Phase 3: advance both until first reaches end</span></span>
+<span class="code-line" id="cl-move2">  <span class="ck">while</span>(first->next!=<span class="cn">nullptr</span>){</span>
+<span class="code-line" id="cl-move3">   first=first->next;</span>
+<span class="code-line" id="cl-move4">   second=second->next;</span>
+<span class="code-line" id="cl-move5">  }</span>
+<span class="code-line" id="cl-rem">  <span class="cc">// second->next is the target</span></span>
+<span class="code-line" id="cl-rem2">  second->next=second->next->next;</span>
+<span class="code-line" id="cl-ret">}</span></pre>
+  </div>
+
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ Why the k-gap works</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// List has n nodes. Kth from end = (n-k)th from start.
+//
+// Phase 1: advance first by k-1 steps.
+//   first is now at index k-1 (0-based).
+//   Gap between first and second = k-1.
+//
+// Phase 2: advance both together.
+//   When first reaches the LAST node (index n-1),
+//   second has moved (n-1)-(k-1) = n-k steps.
+//   second is now at index n-k-1 = one BEFORE the target.
+//   → second->next is the kth from end!
+//
+// Special case: if after Phase 1, first->next==nullptr,
+//   then k == n → remove the HEAD.
+//   Since we can't change the head pointer itself,
+//   copy next node's value into head and skip next.</span></pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">k-1 gap</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">single pass</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">head edge case</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcFirst"> <div class="var-name">first (val)</div>  <div class="var-value" id="vFirst"  style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcSecond"><div class="var-name">second (val)</div> <div class="var-value" id="vSecond" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcGap">   <div class="var-name">gap (steps)</div>  <div class="var-value" id="vGap"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcPhase"> <div class="var-name">phase</div>         <div class="var-value" id="vPhase"  style="color:#e2e8f0;font-size:.72rem">—</div></div>
+    </div>
+    <div class="list-repr-title">List after removal</div>
+    <div class="list-repr" id="listRepr">—</div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Removed Node</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ NODE REMOVED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {k, firstIdx, secondIdx, n, targetVal, counter} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-setup">We need to remove the ${k}th node from the end. Without knowing the length, we use two pointers. <strong>Phase 1:</strong> advance "first" k-1 steps ahead of "second". This creates a gap of k-1 between them.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> after Phase 1, the gap between first and second is exactly k-1 nodes. Both then move together until first reaches the last node.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why k-1 and not k?</strong> When first is at the last node (index n-1), second must be at index n-k (one before the target, so second.next = target). Difference = (n-1)-(n-k) = k-1.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Head removal edge case:</strong> if after Phase 1, first.next == null, then k == n (remove head). Since we can't change the head pointer, copy next node's value into head and skip next.`},
+    ]
+  };
+  if(type==='advance') return {
+    why:`<div class="ep-why-block why-setup">Phase 1: advancing first. counter=${counter}, k=${k}. first is now at index ${firstIdx} (value ${args.firstVal}). Gap between first and second = ${firstIdx - secondIdx}.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>counter = ${counter}, k = ${k}.</strong> Keep advancing until counter == k (gap = k-1).`}]
+  };
+  if(type==='headcase') return {
+    why:`<div class="ep-why-block why-found">Special case! first.next == null means first reached the end after k-1 steps → k == n → the head is the target. Copy head.next.value into head and skip head.next.</div>`,
+    inv:[{icon:'🔑',cls:'inv-key',text:`<strong>Can't delete head directly</strong> (caller holds the pointer). Instead: head.value = head.next.value; head.next = head.next.next.`}]
+  };
+  if(type==='move') return {
+    why:`<div class="ep-why-block why-advance">Phase 3: advancing both pointers together. first is at index ${firstIdx} (val ${args.firstVal}), second is at index ${secondIdx} (val ${args.secondVal}). Gap maintained at k-1 = ${firstIdx-secondIdx}.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>Both move together.</strong> Gap stays k-1. When first hits last node, second.next = target.`}]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block why-found">first reached the last node! second.next is the ${k}th from end (value ${targetVal}). Bypass it: second.next = second.next.next.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>second.next = target (val=${targetVal}).</strong> Set second.next = second.next.next to remove it. O(n) time, O(1) space.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">Done! The ${k}th node from end (value ${targetVal}) has been removed. List length reduced by 1. No extra space used — just two pointer variables.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Removed value ${targetVal}.</strong> Single-pass O(n), O(1) space.`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init:    {ids:['cl-sig','cl-sg2','cl-init','cl-ptrs','cl-adv','cl-adv2'],cls:'hl-setup'},
+  advance: {ids:['cl-adv2','cl-adv3','cl-adv4','cl-adv5'],cls:'hl-setup'},
+  headcase:{ids:['cl-head','cl-head2','cl-head3','cl-head4','cl-head5','cl-head6'],cls:'hl-found'},
+  move:    {ids:['cl-move','cl-move2','cl-move3','cl-move4','cl-move5'],cls:'hl-advance'},
+  found:   {ids:['cl-rem','cl-rem2'],cls:'hl-found'},
+  done:    {ids:['cl-ret'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
+  const {type,k,firstIdx,secondIdx,firstVal,secondVal,targetVal,counter,n} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`List of <strong>${n}</strong> nodes. k=<strong>${k}</strong>. We'll advance "first" ${k-1} step${k-1!==1?'s':''} ahead, then move both together until "first" hits the end. "second" will land one before the target.`};
+  if(type==='advance') return {color:'var(--accent2)',
+    text:`Phase 1: first advanced to index ${firstIdx} (val=<strong>${firstVal}</strong>). counter=${counter}/${k-1}. Gap = ${firstIdx-secondIdx}. ${counter<k-1?'Keep advancing...':'Gap established!'}` };
+  if(type==='headcase') return {color:'var(--accent)',
+    text:`⚠️ Special case: first.next == null → k==${n}, the <strong>head is the target</strong>. Copying head.next value into head and skipping head.next (since we can't reassign head pointer).`};
+  if(type==='move') return {color:'var(--pur-dark)',
+    text:`Phase 3: both move. first=[${firstIdx}] val=${firstVal}, second=[${secondIdx}] val=${secondVal}. Gap = k-1 = ${firstIdx-secondIdx}. Moving until first.next == null.`};
+  if(type==='found') return {color:'var(--accent)',
+    text:`🎯 first.next == null. second=[${secondIdx}] val=${secondVal}. <strong>second.next = target = val ${targetVal}</strong>. Bypassing: second.next = second.next.next.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Node with value <strong>${targetVal}</strong> (${k}th from end) removed. O(n) time · O(1) space.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(vals, k){
+  if(!vals.length || k<1 || k>vals.length) return [];
+  const n = vals.length;
+  const steps = [];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,vals:[...vals],k,n,
+    result:null,...extra,
+    explain:makeExplain(type,{k,n,...extra})
+  });
+
+  // initial state: both at index 0
+  snap('init',`📌 <strong>Start.</strong> n=${n}, k=${k}. first=second=head. Phase 1: advance first by ${k} steps.`,
+    {firstIdx:0,secondIdx:0,firstVal:vals[0],secondVal:vals[0],counter:0,targetIdx:null,targetVal:null});
+
+  // Phase 1: advance first k times (gap = k between first and second)
+  let fIdx=0, sIdx=0, counter=0;
+  while(counter < k){
+    fIdx++;
+    counter++;
+    snap('advance',`Phase 1: first → [${fIdx}]=${vals[fIdx]??'(end)'}. step=${counter}/${k}. Gap=${fIdx-sIdx}.`,
+      {firstIdx:fIdx,secondIdx:sIdx,firstVal:vals[fIdx]??null,secondVal:vals[sIdx],counter});
+  }
+
+  // After k advances: check head case (fIdx == n means k == n)
+  if(fIdx >= n){
+    // head is the kth from end (fIdx == n means first is beyond last node)
+    const newVals=[...vals];
+    newVals[0]=newVals[1];
+    newVals.splice(1,1);
+    const safeF=Math.min(fIdx,n-1);
+    snap('headcase',`⚠️ first went past end → k==${n} → remove HEAD (val=${vals[0]}).`,
+      {firstIdx:n-1,secondIdx:sIdx,firstVal:vals[n-1],secondVal:vals[sIdx],counter,targetIdx:0,targetVal:vals[0],resultVals:newVals});
+    snap('done',`✅ Head (val=${vals[0]}) removed. List: ${newVals.join(' → ')}`,
+      {firstIdx:n-1,secondIdx:sIdx,firstVal:vals[n-1],secondVal:vals[sIdx],counter,targetIdx:0,targetVal:vals[0],resultVals:newVals,result:{targetVal:vals[0],resultVals:newVals}});
+    steps[steps.length-1].result={targetVal:vals[0],resultVals:newVals};
+    return steps;
+  }
+
+  // Phase 3: advance both until first.next == null
+  while(fIdx < n-1){
+    fIdx++;
+    sIdx++;
+    const isLast = fIdx===n-1;
+    snap(isLast?'found':'move',
+      isLast
+        ? `🎯 first.next==null. second=[${sIdx}] val=${vals[sIdx]}. Target = second.next = val ${vals[sIdx+1]}.`
+        : `Phase 3: both advance. first=[${fIdx}]=${vals[fIdx]}, second=[${sIdx}]=${vals[sIdx]}.`,
+      {firstIdx:fIdx,secondIdx:sIdx,firstVal:vals[fIdx],secondVal:vals[sIdx],counter,
+       targetIdx:isLast?sIdx+1:null,targetVal:isLast?vals[sIdx+1]:null});
+  }
+
+  // Remove: second.next = second.next.next
+  const tgtIdx=sIdx+1;
+  const tgtVal=vals[tgtIdx];
+  const newVals=[...vals];
+  newVals.splice(tgtIdx,1);
+
+  snap('done',`✅ Removed val=${tgtVal}. List: ${newVals.join(' → ')}`,
+    {firstIdx:fIdx,secondIdx:sIdx,firstVal:vals[fIdx],secondVal:vals[sIdx],counter,
+     targetIdx:tgtIdx,targetVal:tgtVal,resultVals:newVals,result:{targetVal:tgtVal,resultVals:newVals}});
+  steps[steps.length-1].result={targetVal:tgtVal,resultVals:newVals};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let vals=[], k=0;
+
+// ─── RENDER LIST ──────────────────────────────────────────────────────────────
+function renderList(st){
+  const pr=document.getElementById('ptrRow');
+  const nr=document.getElementById('nodesRow');
+  pr.innerHTML=''; nr.innerHTML='';
+
+  const{firstIdx,secondIdx,targetIdx,type,resultVals}=st;
+  const isFinal=!!st.result;
+  const displayVals=isFinal&&resultVals?resultVals:st.vals;
+
+  // For each node position, figure out which state
+  const origVals=st.vals;
+  let origPos=0;  // track position in original list when showing result
+
+  if(isFinal&&resultVals){
+    // Show final list — all done
+    displayVals.forEach((v,i)=>{
+      // ptr label (empty for done)
+      const pc=document.createElement('div'); pc.className='ptr-cell';
+      const spacer=document.createElement('div'); spacer.className='ptr-spacer';
+      pc.appendChild(spacer); pr.appendChild(pc);
+
+      // node
+      const nw=document.createElement('div'); nw.className='node-wrap';
+      const box=document.createElement('div');
+      box.className='node-box ns-done';
+      box.innerHTML=`<span>${v}</span><span class="node-idx">${i}</span>`;
+      nw.appendChild(box);
+
+      if(i<displayVals.length-1){
+        const aw=document.createElement('div'); aw.className='arrow-wrap';
+        aw.innerHTML='<span class="arrow-normal">→</span>';
+        nw.appendChild(aw);
+      } else {
+        const aw=document.createElement('div'); aw.className='arrow-wrap';
+        aw.innerHTML='<span style="font-family:Space Mono,monospace;font-size:.6rem;color:var(--muted)">null</span>';
+        nw.appendChild(aw);
+      }
+      nr.appendChild(nw);
+    });
+    return;
+  }
+
+  origVals.forEach((v,i)=>{
+    const isFirst  = i===firstIdx;
+    const isSecond = i===secondIdx;
+    const isTarget = i===targetIdx&&targetIdx!=null;
+    const isPrev   = i===secondIdx&&type==='found';
+
+    // Ptr label cell
+    const pc=document.createElement('div'); pc.className='ptr-cell';
+    const labels=[];
+    if(isFirst&&isSecond)     labels.push({cls:'pl-both',    txt:'first=second'});
+    else{
+      if(isFirst)             labels.push({cls:'pl-first',   txt:'first'});
+      if(isPrev)              labels.push({cls:'pl-prev',    txt:'second(prev)'});
+      else if(isSecond)       labels.push({cls:'pl-second',  txt:'second'});
+    }
+    if(labels.length){
+      labels.forEach(l=>{
+        const lb=document.createElement('div'); lb.className=`ptr-label ${l.cls}`; lb.textContent=l.txt;
+        pc.appendChild(lb);
+      });
+    } else {
+      pc.style.height='24px';
+    }
+    pr.appendChild(pc);
+
+    // Node
+    const nw=document.createElement('div'); nw.className='node-wrap';
+    const box=document.createElement('div');
+    const state=
+      isTarget&&(type==='found'||type==='done'||type==='headcase')?'ns-target':
+      isPrev&&type==='found'?'ns-prev':
+      isFirst&&isSecond?'ns-both':
+      isFirst?'ns-first':
+      isSecond?'ns-second':
+      'ns-normal';
+    box.className=`node-box ${state}`;
+    box.innerHTML=`<span>${v}</span><span class="node-idx">${i}</span>`;
+    nw.appendChild(box);
+
+    // Arrow
+    if(i<origVals.length-1){
+      const aw=document.createElement('div'); aw.className='arrow-wrap';
+      // Bypass arrow when target found
+      if(i===secondIdx&&type==='found'&&i+1===targetIdx){
+        aw.style.cssText='width:16px;align-items:center;display:flex;flex-direction:column;';
+        aw.innerHTML='<span style="color:var(--accent);font-size:.85rem">⤳</span>';
+      } else {
+        aw.innerHTML=`<span class="arrow-normal" style="color:${(isFirst||isSecond)&&!isTarget?'var(--accent2)':'var(--border)'}">→</span>`;
+      }
+      nw.appendChild(aw);
+    } else {
+      const aw=document.createElement('div'); aw.className='arrow-wrap';
+      aw.innerHTML='<span style="font-family:Space Mono,monospace;font-size:.6rem;color:var(--muted)">null</span>';
+      nw.appendChild(aw);
+    }
+    nr.appendChild(nw);
+  });
+
+  // Phase badge
+  const pb=document.getElementById('phaseBadge');
+  if(type==='init'||type==='advance'){
+    pb.className='phase-badge pb-setup'; pb.textContent=`Phase 1: Advance first by k-1=${k-1} steps`;
+  } else if(type==='headcase'){
+    pb.className='phase-badge pb-found'; pb.textContent='Edge case: k==n → remove head';
+  } else if(type==='move'){
+    pb.className='phase-badge pb-advance'; pb.textContent='Phase 3: Advance both until first.next==null';
+  } else if(type==='found'){
+    pb.className='phase-badge pb-found'; pb.textContent=`🎯 Found! second.next = target (val=${st.targetVal})`;
+  } else {
+    pb.className='phase-badge pb-done'; pb.textContent=`✅ Done — removed val=${st.targetVal}`;
+  }
+}
+
+// ─── RENDER GAP ───────────────────────────────────────────────────────────────
+function renderGap(st){
+  const go=document.getElementById('gapOuter');
+  const gt=document.getElementById('gapTitle');
+  const gr=document.getElementById('gapRow');
+  const{firstIdx,secondIdx,type,targetIdx,k,firstVal,secondVal,targetVal}=st;
+
+  const gap=firstIdx-secondIdx;
+  go.className=`gap-outer ${type!=='init'?'go-active':''}`;
+
+  if(type==='init'||firstIdx===secondIdx){
+    gt.textContent='Gap = 0 (setup not started yet)';
+    gr.innerHTML='';
+    return;
+  }
+
+  const mkChip=(txt,cls)=>`<div class="gap-chip ${cls}">${txt}</div>`;
+  let html='';
+
+  if(type==='advance'){
+    gt.textContent=`Phase 1: gap = ${gap} (target = ${k})`;
+    html+=mkChip(`second[${secondIdx}]=${secondVal}`,'gc-second');
+    for(let i=0;i<gap-1;i++) html+=`<div class="gap-arrow">→</div><div class="gap-chip gc-gap">...</div>`;
+    html+=`<div class="gap-arrow">→</div>`;
+    html+=mkChip(`first[${firstIdx}]=${firstVal}`,'gc-first');
+    html+=`<div class="gap-k-badge">gap = ${gap}</div>`;
+  } else if(type==='move'||type==='found'){
+    gt.textContent=`Phase 3: gap locked at ${gap} = k = ${k}`;
+    html+=mkChip(`second[${secondIdx}]=${secondVal}`,'gc-second');
+    html+=`<div class="gap-arrow">→</div><div class="gap-chip gc-gap">${gap-1} node${gap-1!==1?'s':''}</div><div class="gap-arrow">→</div>`;
+    html+=mkChip(`first[${firstIdx}]=${firstVal}`,'gc-first');
+    if(type==='found'){
+      html+=`<div class="gap-arrow"> | </div>`;
+      html+=mkChip(`target[${targetIdx}]=${targetVal}`,'gc-target');
+    }
+    html+=`<div class="gap-k-badge">gap = ${gap} = k</div>`;
+  } else {
+    gt.textContent='Complete';
+    gr.innerHTML='';
+    return;
+  }
+  gr.innerHTML=html;
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  vals=document.getElementById('inList').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  k=parseInt(document.getElementById('inK').value);
+  if(!vals.length||isNaN(k)||k<1||k>vals.length){
+    alert('Please enter a valid list and k (1 ≤ k ≤ list length).');return;
+  }
+  steps=computeSteps(vals,k);
+  currentStep=0;
+  document.getElementById('cxK').textContent=k;
+  document.getElementById('cxRemoved').textContent='—';
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('listRepr').textContent='—';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const{type,firstIdx,secondIdx,firstVal,secondVal,gap,targetVal}=st;
+
+  // List + gap
+  renderList(st);
+  renderGap(st);
+
+  // List outer border
+  const lo=document.getElementById('listOuter');
+  lo.className=`list-outer ${type==='advance'||type==='init'?'lo-advance':type==='found'||type==='headcase'?'lo-found':isFinal?'lo-done':'lo-advance'}`;
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
+  if(type==='advance'){
+    sp.className='step-panel sp-setup';
+    spt.textContent=`Phase 1: first → [${firstIdx}] = ${firstVal}`;
+    spb.innerHTML=mkBox('first idx',firstIdx,'spbox sb-blue')+
+      mkBox('first val',firstVal,'spbox sb-blue')+
+      mkBox('counter',st.counter,'spbox sb-yel')+
+      mkBox('gap',firstIdx-secondIdx,'spbox sb-yel');
+  } else if(type==='move'){
+    sp.className='step-panel sp-advance';
+    spt.textContent=`Phase 3: first=[${firstIdx}], second=[${secondIdx}]`;
+    spb.innerHTML=mkBox('first',`[${firstIdx}]=${firstVal}`,'spbox sb-blue')+
+      mkBox('second',`[${secondIdx}]=${secondVal}`,'spbox sb-pur')+
+      mkBox('gap',firstIdx-secondIdx,'spbox sb-yel');
+  } else if(type==='found'){
+    sp.className='step-panel sp-found';
+    spt.textContent=`Target: second.next = val ${st.targetVal}`;
+    spb.innerHTML=mkBox('second',`[${secondIdx}]=${secondVal}`,'spbox sb-pur')+
+      mkBox('target',`val=${st.targetVal}`,'spbox sb-red')+
+      mkBox('action','bypass!','spbox sb-red');
+  } else if(type==='headcase'){
+    sp.className='step-panel sp-found';
+    spt.textContent=`Edge case: k==${vals.length} → remove head`;
+    spb.innerHTML=mkBox('k',k,'spbox sb-red')+mkBox('n',vals.length,'spbox sb-red')+mkBox('k==n','remove head','spbox sb-red');
+  } else if(type==='done'){
+    sp.className='step-panel sp-done';
+    spt.textContent=`Removed node val=${st.targetVal}`;
+    spb.innerHTML=mkBox('removed',st.targetVal,'spbox sb-red')+
+      mkBox('list',st.resultVals?.join('→')??'','spbox sb-grn');
+  } else {
+    sp.className='step-panel sp-setup';
+    spt.textContent=`Starting — n=${vals.length}, k=${k}`;
+    spb.innerHTML=mkBox('n',vals.length,'spbox sb-blue')+mkBox('k',k,'spbox sb-yel');
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeText').innerHTML=narr.text;
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(type);
+
+  // Right vars
+  setVar('vFirst','vcFirst',firstVal??'—');
+  setVar('vSecond','vcSecond',secondVal??'—');
+  setVar('vGap','vcGap',(firstIdx-secondIdx)||'0');
+  setVar('vPhase','vcPhase',
+    type==='init'||type==='advance'?'1: advance first':
+    type==='headcase'?'edge: k==n':
+    type==='move'?'3: move both':
+    type==='found'?'found target!':'done');
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ Removed val=${st.result.targetVal} · List: ${st.result.resultVals.join(' → ')}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`val = ${st.result.targetVal}`;
+    document.getElementById('bestMeta').textContent=`${k}th from end · O(n) · O(1)`;
+    document.getElementById('cxRemoved').textContent=st.result.targetVal;
+    document.getElementById('listRepr').textContent=st.result.resultVals.join(' → ');
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain) return;
+  const cls={init:'',advance:'',headcase:'',move:'',found:'',done:''};
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>

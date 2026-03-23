@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Merging Linked Lists — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:220px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.field input.err{border-color:var(--accent);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ══ UNIQUE VISUAL: Y-SHAPE SVG CANVAS ══ */
+.ysection{margin-bottom:14px;}
+.youter{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;transition:border-color .3s;}
+.youter.yo-scan   {border-color:var(--accent2);}
+.youter.yo-found  {border-color:var(--accent4);}
+.youter.yo-none   {border-color:var(--accent);}
+#ycanvas{display:block;font-family:'Space Mono',monospace;}
+
+/* ══ PHASE BADGE ══ */
+.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:12px;display:inline-block;}
+.pb-len  {background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
+.pb-scan {background:rgba(192,84,252,.1);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.pb-found{background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a5a00;animation:phbounce .4s ease;}
+@keyframes phbounce{from{transform:scale(1.08);}to{transform:none;}}
+.pb-none {background:rgba(230,57,70,.1);border:1.5px solid var(--accent);color:#7a0000;}
+.pb-init {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+
+/* ══ POINTER STATUS STRIP ══ */
+.ptr-strip{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.ptr-card{flex:1;min-width:110px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;transition:all .3s;}
+.ptr-card.pc-a{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ptr-card.pc-b{border-color:var(--pur);background:rgba(192,84,252,.05);}
+.ptr-card.pc-eq{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:eqflash .5s ease;}
+@keyframes eqflash{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+.ptr-name{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.ptr-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--ink);}
+.ptr-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* ══ STEP PANEL ══ */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-len  {border-color:var(--accent2);}
+.step-panel.sp-scan {border-color:var(--pur);}
+.step-panel.sp-found{border-color:var(--accent4);}
+.step-panel.sp-none {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spbox.sb-yel {border-color:var(--accent4);border-width:2px;background:rgba(255,209,102,.06);}
+.spbox.sb-grn {border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-len{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ep-why-block.why-scan{border-left-color:var(--pur);}
+.ep-why-block.why-found{border-left-color:var(--accent4);background:rgba(255,209,102,.06);}
+.ep-why-block.why-none{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
+.inv-row.inv-key .inv-text strong{color:var(--accent);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+.done-banner.db-found{background:var(--accent4);color:#3a2800;}
+.done-banner.db-none {background:var(--accent);color:#fff;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*22+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-len  {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-scan {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-none {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;}
+.best-box.bb-found{opacity:1;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.3);}
+.best-box.bb-none {opacity:1;background:rgba(230,57,70,.06);border:1px solid rgba(230,57,70,.3);}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+.bl-found{color:var(--accent4);}.bl-none{color:var(--accent);}
+.best-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+.done-bar.db-found{background:var(--accent4);color:#3a2800;}
+.done-bar.db-none{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Merging Linked Lists</h1>
+    <div class="sub">Intersection Detection · Length Equalization · Two Pointers</div>
+  </div>
+  <div class="family-badge">Linked List · Two Pointers</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>List One  (comma-separated)</label>
+      <input type="text" id="inL1" value="2,3,1,4">
+      <div class="hint">e.g. 2,3,1,4 — the unique prefix of L1</div>
+    </div>
+    <div class="field">
+      <label>List Two  (comma-separated)</label>
+      <input type="text" id="inL2" value="8,7,1,4">
+      <div class="hint">e.g. 8,7,1,4 — the unique prefix of L2</div>
+    </div>
+    <div class="field">
+      <label>Intersection at value</label>
+      <input type="text" id="inInter" value="1" style="width:90px;">
+      <div class="hint">Shared tail (leave empty = no intersection)</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- PHASE BADGE -->
+  <div id="phaseBadge" class="phase-badge pb-init">Press RUN to begin</div>
+
+  <!-- Y-SHAPE CANVAS -->
+  <div class="ysection">
+    <div class="section-label">Y-shape — shared tail highlighted · active pointers shown above nodes</div>
+    <div class="youter" id="youter">
+      <canvas id="ycanvas" width="680" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- POINTER STATUS -->
+  <div class="ptr-strip">
+    <div class="ptr-card" id="pcA">
+      <div class="ptr-name">Pointer A (L1)</div>
+      <div class="ptr-val" id="paVal">—</div>
+      <div class="ptr-sub" id="paSub">at head</div>
+    </div>
+    <div class="ptr-card" id="pcB">
+      <div class="ptr-name">Pointer B (L2)</div>
+      <div class="ptr-val" id="pbVal">—</div>
+      <div class="ptr-sub" id="pbSub">at head</div>
+    </div>
+    <div class="ptr-card" id="pcEq" style="opacity:.3">
+      <div class="ptr-name">A == B?</div>
+      <div class="ptr-val" id="peqVal">—</div>
+      <div class="ptr-sub" id="peqSub">comparing</div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch the intersection detection algorithm execute.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(m+n)</div>
+      <div class="cx-sub">one pass each</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">two pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">L1 len</div>
+      <div class="cx-val" id="cxL1" style="color:#7a5a00">—</div>
+      <div class="cx-sub">nodes</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">L2 len</div>
+      <div class="cx-val" id="cxL2" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">nodes</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Merging Linked Lists</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">LinkedList* <span class="cf">mergingLinkedLists</span>(</span>
+<span class="code-line" id="cl-sg2">    LinkedList* l1, LinkedList* l2){</span>
+<span class="code-line" id="cl-len">  <span class="cc">// Phase 1: measure lengths</span></span>
+<span class="code-line" id="cl-len2">  <span class="ck">int</span> lenA=<span class="cn">0</span>, lenB=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-la">  LinkedList* a=l1; LinkedList* b=l2;</span>
+<span class="code-line" id="cl-la2">  <span class="ck">while</span>(a){lenA++;a=a->next;}</span>
+<span class="code-line" id="cl-lb">  <span class="ck">while</span>(b){lenB++;b=b->next;}</span>
+<span class="code-line" id="cl-adv">  <span class="cc">// Phase 2: advance longer list</span></span>
+<span class="code-line" id="cl-adv2">  a=l1; b=l2;</span>
+<span class="code-line" id="cl-adv3">  <span class="ck">while</span>(lenA>lenB){a=a->next;lenA--;}</span>
+<span class="code-line" id="cl-adv4">  <span class="ck">while</span>(lenB>lenA){b=b->next;lenB--;}</span>
+<span class="code-line" id="cl-scan">  <span class="cc">// Phase 3: advance together</span></span>
+<span class="code-line" id="cl-scan2">  <span class="ck">while</span>(a!=b){</span>
+<span class="code-line" id="cl-scan3">   a=a->next;</span>
+<span class="code-line" id="cl-scan4">   b=b->next;</span>
+<span class="code-line" id="cl-scan5">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> a; <span class="cc">// null if no intersection</span></span>
+<span class="code-line" id="cl-ret2">}</span></pre>
+  </div>
+
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">⚡ Why length-equalization works</div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// If two lists intersect, they share a tail.
+// Let:  m = L1 length,  n = L2 length
+//       k = shared tail length
+// L1 unique prefix = m - k nodes
+// L2 unique prefix = n - k nodes
+//
+// If we skip abs(m-n) nodes from the longer
+// list, both pointers are now equidistant
+// from the intersection.
+// Advancing together → they meet at it.
+//
+// If no intersection: both reach null
+// simultaneously (a == b == null) → return null
+//
+// Alternative O(1) space trick (no lengths):
+//   When a reaches null, redirect to head of L2.
+//   When b reaches null, redirect to head of L1.
+//   After at most m+n steps, a==b (intersection or null).
+//   Both travel exactly m+n steps total!</span></pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">equidistant trick</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">null = no intersect</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">pointer identity</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcLenA"><div class="var-name">lenA</div><div class="var-value" id="vLenA" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcLenB"><div class="var-name">lenB</div><div class="var-value" id="vLenB" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcDiff"><div class="var-name">|lenA-lenB|</div><div class="var-value" id="vDiff" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcStep"><div class="var-name">scan step</div><div class="var-value" id="vStep" style="color:var(--accent3)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox" style="border:1px solid #2a2a3e;">
+      <div class="best-label bl-found" id="bestLabel">Result</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">—</div>
+</div>
+</div>
+
+<script>
+// ─── DATA MODEL ────────────────────────────────────────────────────────────────
+// We build a "virtual" node structure for the visualizer.
+// Each node: {id, val, listMembership: 'l1'|'l2'|'shared'}
+// l1Full and l2Full are the full sequences of node IDs (shared tail reused).
+
+function buildLists(l1Unique, l2Unique, sharedVals){
+  // Create nodes
+  let nextId = 0;
+  const mkNode = (val, mem) => ({id: nextId++, val, mem});
+
+  const l1Nodes = l1Unique.map(v => mkNode(v, 'l1'));
+  const l2Nodes = l2Unique.map(v => mkNode(v, 'l2'));
+  const sharedNodes = sharedVals.map(v => mkNode(v, 'shared'));
+
+  const l1Full = [...l1Nodes, ...sharedNodes];
+  const l2Full = [...l2Nodes, ...sharedNodes];
+
+  return {l1Full, l2Full, sharedNodes, l1Nodes, l2Nodes};
+}
+
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {lenA, lenB, diff, scanStep, aIdx, bIdx, hasInter, interVal} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block why-len">Two lists potentially share a tail. Key insight: if L1 has m nodes and L2 has n nodes, and they intersect, both have the same suffix. Skipping abs(m-n) nodes from the longer list makes both pointers equidistant from the intersection.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> once we've equalized lengths, advancing both pointers by the same number of steps keeps them equidistant from the intersection. They must meet there.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why null works:</strong> if there's no intersection, both pointers reach null at the same time. a==b==null → return null. No special case needed.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Pointer identity not value:</strong> we compare pointers (addresses), not values. Two nodes with the same value but different identity are NOT an intersection.`},
+    ]
+  };
+  if(type==='lenA') return {
+    why:`<div class="ep-why-block why-len">Counting L1 length by walking from head to tail. lenA = ${lenA??'counting…'} nodes.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>Phase 1:</strong> measure both lengths to compute the skip amount = |lenA - lenB|.`}]
+  };
+  if(type==='lenB') return {
+    why:`<div class="ep-why-block why-len">L1 has ${lenA} nodes. Now counting L2. lenB = ${lenB??'counting…'} nodes. Difference = |${lenA}-${lenB??'?'}| = ${lenB!=null?Math.abs(lenA-lenB):'?'}.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>diff = ${diff??'?'}.</strong> The longer list's pointer skips this many nodes so both pointers are equidistant from any intersection.`}]
+  };
+  if(type==='advance') return {
+    why:`<div class="ep-why-block why-len">Phase 2: advancing the longer list (${lenA>lenB?'L1':'L2'}) by ${diff} step${diff!==1?'s':''}. Now both pointers are the same distance from the intersection (or null).</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>After equalization:</strong> a is at L1[${aIdx}], b is at L2[${bIdx}]. Both are ${Math.max(lenA,lenB)-diff} steps from null.`}]
+  };
+  if(type==='scan') return {
+    why:`<div class="ep-why-block why-scan">Phase 3: advancing both pointers together. Step ${scanStep}. a=[L1 idx ${aIdx}], b=[L2 idx ${bIdx}]. They're not equal yet — keep advancing.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>Both move in lock-step.</strong> If there's an intersection, they will reach it simultaneously because they're equidistant from it.`}]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block why-found">a == b! Both pointers landed on the same node (value ${interVal}). This is the intersection node — the first shared node of the two lists. Return it.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Intersection found at value ${interVal}.</strong> O(m+n) time, O(1) space.`}]
+  };
+  if(type==='none') return {
+    why:`<div class="ep-why-block why-none">a == b == null. Both pointers reached the end simultaneously without ever pointing to the same non-null node. The lists don't intersect. Return null.</div>`,
+    inv:[{icon:'🔑',cls:'inv-key',text:`<strong>No intersection.</strong> a==b==null is the termination condition — the while loop ends and we return a (null).`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init:   {ids:['cl-sig','cl-sg2','cl-len','cl-len2','cl-la'],cls:'hl-len'},
+  lenA:   {ids:['cl-la2'],cls:'hl-len'},
+  lenB:   {ids:['cl-lb'],cls:'hl-len'},
+  advance:{ids:['cl-adv','cl-adv2','cl-adv3','cl-adv4'],cls:'hl-len'},
+  scan:   {ids:['cl-scan','cl-scan2','cl-scan3','cl-scan4','cl-scan5'],cls:'hl-scan'},
+  found:  {ids:['cl-ret'],cls:'hl-found'},
+  none:   {ids:['cl-ret'],cls:'hl-none'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── NARRATIVE ────────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
+  const {type,lenA,lenB,diff,scanStep,aIdx,bIdx,interVal,l1Full,l2Full} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`L1 = [${l1Full.map(n=>n.val).join(',')}] (${l1Full.length} nodes), L2 = [${l2Full.map(n=>n.val).join(',')}] (${l2Full.length} nodes). Phase 1: measure both lengths.`};
+  if(type==='lenA') return {color:'var(--accent2)',
+    text:`Walking L1 to count length. lenA = <strong>${lenA}</strong>. Now counting L2.`};
+  if(type==='lenB') return {color:'var(--accent2)',
+    text:`lenA=<strong>${lenA}</strong>, lenB=<strong>${lenB}</strong>. Difference = <strong>${diff}</strong>. ${diff>0?`Advance ${lenA>lenB?'L1':'L2'} by ${diff} node${diff!==1?'s':''} to equalize.`:'Both same length — skip equalization.'}`};
+  if(type==='advance') return {color:'var(--accent2)',
+    text:`Phase 2: skipped ${diff} node${diff!==1?'s':''} from ${lenA>lenB?'L1':'L2'}. Both pointers now equidistant from intersection (if any).`};
+  if(type==='scan') return {color:'var(--pur-dark)',
+    text:`Phase 3 step ${scanStep}: a=val <strong>${l1Full[aIdx]?.val??'null'}</strong>, b=val <strong>${l2Full[bIdx]?.val??'null'}</strong>. Not equal yet → advance both.`};
+  if(type==='found') return {color:'var(--accent4)',
+    text:`✅ <strong>a == b!</strong> Intersection found at node with value <strong>${interVal}</strong>. Return this node.`};
+  if(type==='none') return {color:'var(--accent)',
+    text:`❌ a == b == <strong>null</strong>. Both pointers reached end together — no intersection. Return null.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── COMPUTE STEPS ────────────────────────────────────────────────────────────
+function computeSteps(lists){
+  const {l1Full, l2Full, sharedNodes} = lists;
+  const n1=l1Full.length, n2=l2Full.length;
+  const hasInter=sharedNodes.length>0;
+  const interIdx1=hasInter?l1Full.indexOf(sharedNodes[0]):-1;
+  const interIdx2=hasInter?l2Full.indexOf(sharedNodes[0]):-1;
+  const steps=[];
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,l1Full,l2Full,n1,n2,hasInter,
+    result:null,...extra,
+    explain:makeExplain(type,{n1,n2,...extra})
+  });
+
+  snap('init',`📌 Start. L1=[${l1Full.map(n=>n.val)}] L2=[${l2Full.map(n=>n.val)}]`,
+    {lenA:n1,lenB:n2,diff:Math.abs(n1-n2),aIdx:0,bIdx:0,scanStep:0});
+
+  // Phase 1a: walk L1
+  snap('lenA',`Phase 1: counting L1 length = ${n1}`,
+    {lenA:n1,lenB:null,diff:null,aIdx:n1,bIdx:0,scanStep:0});
+
+  // Phase 1b: walk L2
+  const diff=Math.abs(n1-n2);
+  snap('lenB',`Phase 1: lenA=${n1}, lenB=${n2}, diff=${diff}`,
+    {lenA:n1,lenB:n2,diff,aIdx:0,bIdx:0,scanStep:0});
+
+  // Phase 2: advance longer
+  let aIdx=0, bIdx=0;
+  if(n1>n2) aIdx=n1-n2;
+  if(n2>n1) bIdx=n2-n1;
+  snap('advance',`Phase 2: equalized — a=[${aIdx}], b=[${bIdx}]`,
+    {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep:0});
+
+  // Phase 3: scan together
+  let scanStep=0;
+  while(aIdx<n1 && bIdx<n2 && l1Full[aIdx]!==l2Full[bIdx]){
+    aIdx++; bIdx++; scanStep++;
+    snap('scan',`Phase 3 step ${scanStep}: a=[${aIdx}]=${l1Full[aIdx]?.val??'null'}, b=[${bIdx}]=${l2Full[bIdx]?.val??'null'}`,
+      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep});
+  }
+
+  // Result
+  if(aIdx<n1 && bIdx<n2 && l1Full[aIdx]===l2Full[bIdx]){
+    const interVal=l1Full[aIdx].val;
+    snap('found',`✅ Intersection at node val=${interVal}`,
+      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep,interVal,
+       result:{found:true,interVal,interNode:l1Full[aIdx]}});
+    steps[steps.length-1].result={found:true,interVal};
+  } else {
+    snap('none','❌ No intersection — return null',
+      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep,interVal:null,
+       result:{found:false}});
+    steps[steps.length-1].result={found:false};
+  }
+  return steps;
+}
+
+// ─── CANVAS DRAWING ───────────────────────────────────────────────────────────
+const NW=46, NH=46, NARR=18, PAD=14;
+
+function drawCanvas(st){
+  const canvas=document.getElementById('ycanvas');
+  const ctx=canvas.getContext('2d');
+  const {l1Full,l2Full,type,aIdx,bIdx,interVal} = st;
+  const n1=l1Full.length, n2=l2Full.length;
+
+  // Find shared start index
+  let sharedStart1=-1;
+  for(let i=0;i<n1;i++) if(l1Full[i].mem==='shared'){sharedStart1=i;break;}
+  const sharedLen=sharedStart1>=0?n1-sharedStart1:0;
+  const unique1=sharedStart1>=0?sharedStart1:n1;
+  const unique2=l2Full.length-sharedLen;
+
+  // Layout: compute max columns needed
+  const cols=Math.max(unique1,unique2)+sharedLen+1; // +1 for null
+  const W=Math.max(cols*(NW+NARR)+PAD*2, 300);
+  const H=sharedLen>0?160:110;
+  canvas.width=W; canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+
+  const ROW1=sharedLen>0?30:50, ROW2=sharedLen>0?110:50, ROW_SHARED=sharedLen>0?70:50;
+  const isFinal=!!st.result;
+
+  function nodeX(colIdx){ return PAD + colIdx*(NW+NARR); }
+
+  function drawNode(x, y, val, state, label){
+    // Node box
+    ctx.save();
+    const radius=7;
+    ctx.beginPath();
+    ctx.roundRect(x,y,NW,NH,radius);
+    if(state==='shared')    { ctx.fillStyle='rgba(255,209,102,.18)'; ctx.strokeStyle='#f5a623'; ctx.lineWidth=2.5; }
+    else if(state==='l1cur'){ ctx.fillStyle='rgba(33,150,243,.22)';  ctx.strokeStyle='#2196f3'; ctx.lineWidth=3; }
+    else if(state==='l2cur'){ ctx.fillStyle='rgba(192,84,252,.18)';  ctx.strokeStyle='#c084fc'; ctx.lineWidth=3; }
+    else if(state==='inter'){ ctx.fillStyle='rgba(255,209,102,.3)';  ctx.strokeStyle='#f5a623'; ctx.lineWidth=3;
+      // Glow
+      ctx.shadowColor='rgba(255,209,102,.6)'; ctx.shadowBlur=14; }
+    else if(state==='done') { ctx.fillStyle='rgba(6,214,160,.12)';   ctx.strokeStyle='rgba(6,214,160,.4)'; ctx.lineWidth=1.5; }
+    else                    { ctx.fillStyle='#fffdf7';               ctx.strokeStyle='#d4ccb8'; ctx.lineWidth=1.5; }
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Value
+    ctx.save();
+    ctx.font='bold 16px Space Mono, monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=
+      state==='l1cur'?'#0d47a1':
+      state==='l2cur'?'#5b1a9a':
+      state==='shared'||state==='inter'?'#7a4800':
+      state==='done'?'#024d37':
+      '#1a1a2e';
+    ctx.fillText(String(val), x+NW/2, y+NH/2-4);
+    ctx.restore();
+
+    // Pointer label above
+    if(label){
+      ctx.save();
+      const lbY=y-18;
+      labels.push({text:label,x:x+NW/2,y:lbY,color:
+        label.includes('a')&&!label.includes('b')?'#2196f3':
+        label.includes('b')&&!label.includes('a')?'#c084fc':
+        '#f5a623'});
+      ctx.restore();
+    }
+  }
+
+  function drawArrow(x1,y1,x2,y2,color){
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.strokeStyle=color||'#d4ccb8';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+    // Arrowhead
+    const ang=Math.atan2(y2-y1,x2-x1);
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-8*Math.cos(ang-.4),y2-8*Math.sin(ang-.4));
+    ctx.lineTo(x2-8*Math.cos(ang+.4),y2-8*Math.sin(ang+.4));
+    ctx.closePath();
+    ctx.fillStyle=color||'#d4ccb8';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function nullNode(x,y){
+    ctx.save();
+    ctx.font='10px Space Mono,monospace';
+    ctx.fillStyle='#8a8070';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('null',x,y+NH/2);
+    ctx.restore();
+  }
+
+  const labels=[];
+
+  // Draw L1 unique prefix
+  for(let i=0;i<unique1;i++){
+    const node=l1Full[i];
+    const x=nodeX(i), y=ROW1;
+    const isACur=(type!=='lenA'&&type!=='init')&&i===aIdx;
+    const isDone=(type!=='lenA'&&type!=='init')&&i<aIdx;
+    const isInter=isFinal&&st.result?.found&&node.val===interVal;
+    const state=isInter?'inter':isACur?'l1cur':isDone?'done':'normal';
+    const label=isACur?(i===bIdx&&i<n2&&l1Full[i]===l2Full[i]?'a=b':'a'):null;
+    drawNode(x,y,node.val,state,label);
+    if(i<unique1-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#b0c4de');
+  }
+
+  // Draw L2 unique prefix
+  for(let i=0;i<unique2;i++){
+    const node=l2Full[i];
+    const x=nodeX(Math.max(0,unique1-unique2)+i), y=ROW2;
+    const isBCur=(type!=='lenA'&&type!=='lenB'&&type!=='init')&&i===bIdx;
+    const isDone=(type!=='lenA'&&type!=='lenB'&&type!=='init')&&i<bIdx;
+    const state=isBCur?'l2cur':isDone?'done':'normal';
+    const label=isBCur?'b':null;
+    drawNode(x,y,node.val,state,label);
+    if(i<unique2-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#d8b4fe');
+  }
+
+  // Convergence arrows (Y-shape) to shared
+  if(sharedLen>0){
+    const sharedX0=nodeX(Math.max(unique1,unique2));
+    // From L1 last unique → first shared
+    const l1LastX=nodeX(unique1-1)+NW;
+    drawArrow(l1LastX, ROW1+NH/2, sharedX0, ROW_SHARED+NH/2, '#f5a623');
+    // From L2 last unique → first shared
+    const l2LastX=nodeX(Math.max(0,unique1-unique2)+unique2-1)+NW;
+    drawArrow(l2LastX, ROW2+NH/2, sharedX0, ROW_SHARED+NH/2, '#f5a623');
+  } else if(unique1===0&&unique2===0){
+    // Both start at shared
+  }
+
+  // Draw shared tail
+  for(let i=0;i<sharedLen;i++){
+    const node=l1Full[unique1+i];
+    const x=nodeX(Math.max(unique1,unique2)+i), y=ROW_SHARED;
+    const col1=unique1+i, col2=unique2+i;
+    const isACur=col1===aIdx;
+    const isBCur=col2===bIdx;
+    const isInter=isFinal&&st.result?.found&&node.val===interVal&&i===0;
+    const state=isInter?'inter':'shared';
+    const label=isACur&&isBCur?'a=b':isACur?'a':isBCur?'b':null;
+    drawNode(x,y,node.val,state,label);
+    if(i<sharedLen-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#f5a623');
+  }
+
+  // Null at end
+  const endCol=Math.max(unique1,unique2)+sharedLen;
+  const endY=sharedLen>0?ROW_SHARED:ROW1;
+  const lastX=nodeX(endCol-1)+NW;
+  drawArrow(lastX,endY+NH/2,lastX+NARR-4,endY+NH/2,'#d4ccb8');
+  nullNode(lastX+NARR-4, endY);
+
+  // Draw labels on top
+  labels.forEach(lb=>{
+    ctx.save();
+    ctx.font='bold 9px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillStyle=lb.color;
+    // Badge
+    const tw=ctx.measureText(lb.text).width+8;
+    ctx.fillStyle=lb.color+'22';
+    ctx.beginPath();
+    ctx.roundRect(lb.x-tw/2,lb.y-13,tw,13,3);
+    ctx.fill();
+    ctx.fillStyle=lb.color;
+    ctx.font='bold 9px Space Mono,monospace';
+    ctx.fillText(lb.text,lb.x,lb.y);
+    ctx.restore();
+  });
+
+  // Outer border
+  const yo=document.getElementById('youter');
+  yo.className=`youter ${type==='found'?'yo-found':type==='none'?'yo-none':type==='scan'||type==='advance'?'yo-scan':''}`;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let lists=null;
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildUI(){
+  const l1Raw=document.getElementById('inL1').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  const l2Raw=document.getElementById('inL2').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  const interRaw=document.getElementById('inInter').value.trim();
+
+  // Parse intersection: could be "1,4" (multiple shared nodes) or "1" or ""
+  let shared=[];
+  if(interRaw.length>0){
+    // Find where shared tail starts in each list by matching from right
+    // User inputs the full lists including shared: parse where the shared part begins
+    // Simple approach: the shared portion is the suffix of both lists that matches
+    // We'll let user specify shared VALUES as a comma list after the split point
+    shared=interRaw.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  }
+
+  // Remove shared suffix from l1Raw and l2Raw if they end with shared
+  // (user might have typed the full list including shared tail)
+  function stripShared(arr,sh){
+    if(!sh.length) return arr;
+    const tail=arr.slice(arr.length-sh.length);
+    if(tail.join()===sh.join()) return arr.slice(0,arr.length-sh.length);
+    return arr;
+  }
+  const l1Unique=stripShared(l1Raw,shared);
+  const l2Unique=stripShared(l2Raw,shared);
+
+  if(!l1Raw.length||!l2Raw.length){alert('Please enter valid lists.');return;}
+
+  lists=buildLists(l1Unique,l2Unique,shared);
+  steps=computeSteps(lists);
+  currentStep=0;
+
+  document.getElementById('cxL1').textContent=lists.l1Full.length;
+  document.getElementById('cxL2').textContent=lists.l2Full.length;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').style.border='1px solid #2a2a3e';
+  document.getElementById('bestBox').style.background='transparent';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── VAR FLASH ────────────────────────────────────────────────────────────────
+let prevVars={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVars[elId]!==undefined&&prevVars[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVars[elId]=s;
+}
+
+// ─── RENDER STEP ──────────────────────────────────────────────────────────────
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+  const {type,lenA,lenB,diff,scanStep,aIdx,bIdx,interVal,l1Full,l2Full} = st;
+  const isFinal=!!st.result;
+
+  // Canvas
+  drawCanvas(st);
+
+  // Phase badge
+  const pb=document.getElementById('phaseBadge');
+  if(type==='init'){pb.className='phase-badge pb-len';pb.textContent='Initializing…';}
+  else if(type==='lenA'){pb.className='phase-badge pb-len';pb.textContent=`Phase 1: Counting L1 → lenA = ${lenA}`;}
+  else if(type==='lenB'){pb.className='phase-badge pb-len';pb.textContent=`Phase 1: lenA=${lenA} lenB=${lenB} diff=${diff}`;}
+  else if(type==='advance'){pb.className='phase-badge pb-len';pb.textContent=`Phase 2: Equalized — skip ${diff} from ${lenA>lenB?'L1':'L2'}`;}
+  else if(type==='scan'){pb.className='phase-badge pb-scan';pb.textContent=`Phase 3: Advancing both — step ${scanStep}`;}
+  else if(type==='found'){pb.className='phase-badge pb-found';pb.textContent=`✅ Intersection found! val = ${interVal}`;}
+  else{pb.className='phase-badge pb-none';pb.textContent='❌ No intersection — return null';}
+
+  // Pointer strip
+  const aVal=aIdx<l1Full.length?l1Full[aIdx].val:'null';
+  const bVal=bIdx<l2Full.length?l2Full[bIdx].val:'null';
+  const isEq=(type==='found')||(type==='none');
+  document.getElementById('paVal').textContent=`val = ${aVal}`;
+  document.getElementById('paSub').textContent=`L1 index ${aIdx}`;
+  document.getElementById('pbVal').textContent=`val = ${bVal}`;
+  document.getElementById('pbSub').textContent=`L2 index ${bIdx}`;
+  document.getElementById('pcA').className=`ptr-card pc-a`;
+  document.getElementById('pcB').className=`ptr-card pc-b`;
+  document.getElementById('pcEq').className=`ptr-card ${isEq?'pc-eq':''}`;
+  document.getElementById('pcEq').style.opacity=type==='scan'||isEq?'1':'.3';
+  document.getElementById('peqVal').textContent=isEq?(type==='found'?'YES ✓':'YES (null)'):type==='scan'?'NO':'—';
+  document.getElementById('peqSub').textContent=isEq?(type==='found'?'intersection!':'no intersection'):'comparing…';
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  const mkBox=(lbl,val,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
+  sp.className=`step-panel ${type==='found'?'sp-found':type==='none'?'sp-none':type==='scan'||type==='advance'?'sp-scan':'sp-len'}`;
+  document.getElementById('spTitle').textContent=st.desc.replace(/<[^>]+>/g,'');
+  const spb=document.getElementById('spBody');
+  if(type==='lenA'||type==='lenB'){
+    spb.innerHTML=mkBox('lenA',lenA??'—','spbox sb-blue')+mkBox('lenB',lenB??'—','spbox sb-pur')+(diff!=null?mkBox('diff',diff,'spbox sb-yel'):'');
+  } else if(type==='advance'){
+    spb.innerHTML=mkBox('lenA',lenA,'spbox sb-blue')+mkBox('lenB',lenB,'spbox sb-pur')+mkBox('diff',diff,'spbox sb-yel')+mkBox('skip',`${lenA>lenB?'L1':'L2'}×${diff}`,'spbox sb-yel');
+  } else if(type==='scan'){
+    spb.innerHTML=mkBox('a val',aVal,'spbox sb-blue')+mkBox('b val',bVal,'spbox sb-pur')+mkBox('a==b','NO','spbox sb-red')+mkBox('step',scanStep,'spbox sb-yel');
+  } else if(type==='found'){
+    spb.innerHTML=mkBox('a==b','YES ✓','spbox sb-yel')+mkBox('val',interVal,'spbox sb-yel');
+  } else if(type==='none'){
+    spb.innerHTML=mkBox('a==b','null','spbox sb-red')+mkBox('result','null','spbox sb-red');
+  } else {
+    spb.innerHTML=mkBox('L1',l1Full.length,'spbox sb-blue')+mkBox('L2',l2Full.length,'spbox sb-pur');
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeText').innerHTML=narr.text;
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(type);
+
+  // Right vars
+  setVar('vLenA','vcLenA',lenA??'—');
+  setVar('vLenB','vcLenB',lenB??'—');
+  setVar('vDiff','vcDiff',diff!=null?diff:'—');
+  setVar('vStep','vcStep',scanStep>0?scanStep:'—');
+
+  // Done
+  if(isFinal){
+    const found=st.result.found;
+    document.getElementById('doneBanner').className=`done-banner show ${found?'db-found':'db-none'}`;
+    document.getElementById('doneBanner').textContent=found?`★ Intersection at val = ${st.result.interVal}`:'★ No intersection — returns null';
+    document.getElementById('doneBar').className=`done-bar show ${found?'db-found':'db-none'}`;
+    document.getElementById('doneBar').textContent=found?`★ val = ${st.result.interVal}`:'★ null';
+    document.getElementById('bestBox').className=`best-box ${found?'bb-found':'bb-none'}`;
+    document.getElementById('bestLabel').className=`best-label ${found?'bl-found':'bl-none'}`;
+    document.getElementById('bestLabel').textContent=found?'Intersection Node':'No Intersection';
+    document.getElementById('bestVal').textContent=found?`val = ${st.result.interVal}`:'null';
+    document.getElementById('bestMeta').textContent=found?`L1[${aIdx}] == L2[${bIdx}]`:`a == b == null`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain) return;
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{ if(steps.length) renderStep(currentStep); });
+
+buildUI();
+</script>
+</body>
+</html>

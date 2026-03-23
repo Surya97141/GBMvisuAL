@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sum of Linked Lists — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:220px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ── THREE-LIST DISPLAY ── */
+.lists-section{margin-bottom:16px;}
+.lists-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;overflow-x:auto;transition:border-color .3s;}
+.lists-outer.lo-active{border-color:var(--accent4);}
+.lists-outer.lo-carry {border-color:var(--pur);}
+.lists-outer.lo-done  {border-color:var(--accent3);}
+
+.list-row{display:flex;align-items:center;margin-bottom:8px;min-width:max-content;}
+.list-label{font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;width:56px;flex-shrink:0;padding:3px 6px;border-radius:4px;text-align:right;margin-right:10px;}
+.ll-l1  {background:rgba(33,150,243,.12);color:#0d47a1;}
+.ll-l2  {background:rgba(192,84,252,.12);color:var(--pur-dark);}
+.ll-res {background:rgba(6,214,160,.12); color:#024d37;}
+.ll-num {background:rgba(0,0,0,.04);     color:var(--muted);font-size:.6rem;}
+
+.list-row .sep{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);margin:0 8px;align-self:center;}
+
+/* INDIVIDUAL NODES */
+.node-unit{display:flex;align-items:center;flex-shrink:0;}
+.dnode{
+  width:48px;height:48px;border-radius:8px;border:2px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-weight:700;font-size:.95rem;
+  background:var(--surface);color:var(--ink);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;position:relative;
+}
+.dn-pos{font-size:.42rem;color:var(--muted);margin-top:1px;}
+.dn-arrow{font-size:.85rem;color:var(--border);margin:0 3px;flex-shrink:0;}
+.dn-null{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);
+  padding:3px 6px;border:1px dashed var(--border);border-radius:4px;margin-left:3px;}
+
+/* Node states */
+.dns-normal{background:var(--surface);border-color:var(--border);color:var(--ink);}
+.dns-l1    {background:rgba(33,150,243,.15);border-color:var(--accent2);color:#0d47a1;}
+.dns-l2    {background:rgba(192,84,252,.12);border-color:var(--pur);color:var(--pur-dark);}
+.dns-cur-l1{background:#e3f2fd;border-color:var(--accent2);border-width:3px;color:#0d47a1;
+  transform:scale(1.12) translateY(-4px);box-shadow:0 6px 16px rgba(33,150,243,.35);z-index:3;}
+.dns-cur-l2{background:#f3e5f5;border-color:var(--pur);border-width:3px;color:var(--pur-dark);
+  transform:scale(1.12) translateY(-4px);box-shadow:0 6px 16px rgba(192,84,252,.3);z-index:3;}
+.dns-res   {background:rgba(6,214,160,.18);border-color:var(--accent3);color:#024d37;
+  animation:resnew .45s cubic-bezier(.34,1.56,.64,1);}
+@keyframes resnew{from{transform:scale(1.2);opacity:.4;}to{transform:none;opacity:1;}}
+.dns-done  {background:rgba(6,214,160,.12);border-color:rgba(6,214,160,.35);color:#024d37;}
+.dns-ghost {opacity:.25;}
+
+/* ── COLUMN DETAIL ── */
+.col-section{margin-bottom:14px;}
+.col-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;transition:border-color .3s;}
+.col-outer.co-active{border-color:var(--accent4);}
+.col-outer.co-carry {border-color:var(--pur);}
+.col-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.col-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.col-box{flex:1;min-width:72px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.col-box.cb-l1  {border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.col-box.cb-l2  {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.col-box.cb-cin {border-color:var(--pur-dark);background:rgba(124,58,237,.06);}
+.col-box.cb-sum {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.col-box.cb-dig {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.07);}
+.col-box.cb-cout{border-color:var(--pur);background:rgba(192,84,252,.08);}
+.cb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.cb-val{font-family:'Space Mono',monospace;font-size:1rem;font-weight:700;color:var(--ink);}
+.cb-sub{font-size:.58rem;color:var(--muted);margin-top:1px;}
+
+/* CARRY STRIP */
+.carry-strip{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.carry-label{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.carry-chip{padding:3px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;border:1.5px solid;transition:all .3s;}
+.cc-zero{background:var(--surface);border-color:var(--border);color:var(--muted);}
+.cc-one {background:rgba(192,84,252,.15);border-color:var(--pur);color:var(--pur-dark);
+  animation:carryon .4s cubic-bezier(.34,1.56,.64,1);}
+@keyframes carryon{from{transform:scale(1.3);opacity:.4;}to{transform:none;opacity:1;}}
+
+/* NUMERIC VALUE STRIP */
+.num-strip{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.num-pill{font-family:'Space Mono',monospace;font-size:.72rem;padding:4px 12px;border-radius:6px;border:1.5px solid;font-weight:700;}
+.np-l1  {border-color:var(--accent2);background:rgba(33,150,243,.08);color:#0d47a1;}
+.np-l2  {border-color:var(--pur);background:rgba(192,84,252,.07);color:var(--pur-dark);}
+.np-plus{color:var(--muted);font-size:.9rem;}
+.np-eq  {color:var(--muted);}
+.np-res {border-color:var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*20+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-init  {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-col   {background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-carry {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-done  {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Sum of Linked Lists</h1>
+    <div class="sub">Digit-by-Digit Addition · Carry Propagation · LSB First</div>
+  </div>
+  <div class="family-badge">Linked List · Math</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>List 1 (LSB first, digits 0–9)</label>
+      <input type="text" id="inL1" value="2,4,7,1">
+      <div class="hint">e.g. 2,4,7,1 = 1742 (least significant digit first)</div>
+    </div>
+    <div class="field">
+      <label>List 2 (LSB first)</label>
+      <input type="text" id="inL2" value="9,4,5">
+      <div class="hint">e.g. 9,4,5 = 549</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- NUMERIC VALUE STRIP -->
+  <div class="num-strip" id="numStrip"></div>
+
+  <!-- THREE LISTS DISPLAY -->
+  <div class="lists-section">
+    <div class="section-label">Three lists — LSB on left, new result node appended each step</div>
+    <div class="lists-outer" id="listsOuter">
+      <div class="list-row" id="rowL1"></div>
+      <div class="list-row" id="rowL2"></div>
+      <div class="list-row" id="rowRes"></div>
+    </div>
+  </div>
+
+  <!-- CARRY STRIP -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <div class="section-label" style="margin:0">Carry:</div>
+    <div class="carry-chip cc-zero" id="carryChip">carry = 0</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted)" id="carryDesc">no carry yet</div>
+  </div>
+
+  <!-- COLUMN DETAIL -->
+  <div class="col-section">
+    <div class="section-label">Current column addition</div>
+    <div class="col-outer" id="colOuter">
+      <div class="col-title" id="colTitle">Column detail will appear step by step</div>
+      <div class="col-body" id="colBody"></div>
+    </div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch digit-by-digit addition with carry propagation.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(max(m,n))</div>
+      <div class="cx-sub">one pass each list</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(max(m,n))</div>
+      <div class="cx-sub">result list</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Result</div>
+      <div class="cx-val" id="cxResult" style="color:#7a5a00">—</div>
+      <div class="cx-sub">sum value</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Columns</div>
+      <div class="cx-val" id="cxCols" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">processed</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Sum of Linked Lists</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">LinkedList*</span> <span class="cf">sumOfLinkedLists</span>(</span>
+<span class="code-line" id="cl-sg2">    LinkedList* l1, LinkedList* l2){</span>
+<span class="code-line" id="cl-dummy">  LinkedList dummy(<span class="cn">0</span>);</span>
+<span class="code-line" id="cl-cur">  LinkedList* cur=&dummy;</span>
+<span class="code-line" id="cl-carry">  <span class="ck">int</span> carry=<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(l1||l2||carry){</span>
+<span class="code-line" id="cl-d1">   <span class="ck">int</span> d1=l1?l1->value:<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-d2">   <span class="ck">int</span> d2=l2?l2->value:<span class="cn">0</span>;</span>
+<span class="code-line" id="cl-sum">   <span class="ck">int</span> sum=d1+d2+carry;</span>
+<span class="code-line" id="cl-dig">   <span class="ck">int</span> digit=sum%<span class="cn">10</span>;</span>
+<span class="code-line" id="cl-cout">   carry=sum/<span class="cn">10</span>;</span>
+<span class="code-line" id="cl-new">   cur->next=<span class="ck">new</span> LinkedList(digit);</span>
+<span class="code-line" id="cl-adv">   cur=cur->next;</span>
+<span class="code-line" id="cl-nl1">   <span class="ck">if</span>(l1) l1=l1->next;</span>
+<span class="code-line" id="cl-nl2">   <span class="ck">if</span>(l2) l2=l2->next;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> dummy.next;</span>
+<span class="code-line" id="cl-ret2">}</span></pre>
+  </div>
+
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;">⚡ Key insight: LSB first = perfect</div>
+    </div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// Normally, addition works right-to-left
+// in a number. Linked lists are traversed
+// left-to-right. So storing digits LSB-first
+// means we naturally traverse in the
+// CORRECT addition order: units → tens → …
+//
+// Loop condition: l1 || l2 || carry
+// This handles 3 cases elegantly:
+//   l1 exhausted → d1 = 0
+//   l2 exhausted → d2 = 0
+//   Both done but carry=1 → emit extra node
+//
+// Dummy head trick: avoids special-casing
+// the first result node. dummy.next is the
+// real head of the result list.
+//
+// sum = d1 + d2 + carry_in
+// digit = sum % 10   ← what goes in result
+// carry_out = sum / 10  ← 0 or 1</span></pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">LSB-first natural</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">dummy head</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">3-way loop</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">carry propagation</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcD1">   <div class="var-name">d1 (L1 digit)</div><div class="var-value" id="vD1"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcD2">   <div class="var-name">d2 (L2 digit)</div><div class="var-value" id="vD2"    style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcCarry"><div class="var-name">carry_in</div>      <div class="var-value" id="vCarry" style="color:var(--pur-dark)">0</div></div>
+      <div class="var-card" id="vcSum">  <div class="var-name">sum</div>           <div class="var-value" id="vSum"   style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcDig">  <div class="var-name">digit (sum%10)</div><div class="var-value" id="vDig"   style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcCout"> <div class="var-name">carry_out</div>     <div class="var-value" id="vCout"  style="color:var(--pur-dark)">—</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Result List</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ SUM COMPUTED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {col, d1, d2, carryIn, sum, digit, carryOut, l1, l2, n1, n2} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block">Digits are stored LSB-first — units digit comes first in the list. This is perfect for addition because we naturally traverse left-to-right in the correct order. Use a dummy head to avoid special-casing the first result node. Loop while l1 || l2 || carry so we handle lists of different lengths and a final carry.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> at each step, carry is either 0 or 1. The result list built so far correctly represents the sum of all processed digits including carry.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>LSB-first advantage:</strong> normal decimal addition goes right-to-left. Since digits are stored head→LSB, traversing the linked list IS going right-to-left through the number. No reversal needed!`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Loop condition l1||l2||carry:</strong> if both lists are exhausted but carry=1, we still need to emit one more node. This handles 999+1=1000 naturally.`},
+    ]
+  };
+  if(type==='col') return {
+    why:`<div class="ep-why-block">Column ${col}: d1=${d1} (${l1?'from L1':'L1 exhausted→0'}), d2=${d2} (${l2?'from L2':'L2 exhausted→0'}), carry_in=${carryIn}. Sum = ${d1}+${d2}+${carryIn} = ${sum}. Digit = ${sum}%10 = <strong>${digit}</strong>. New carry = ${sum}/10 = <strong>${carryOut}</strong>.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>digit = ${digit}</strong> goes into result. carry_out = ${carryOut} passes to next column.`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block">All columns processed, carry=${carryOut||0}. Result list built with ${col} nodes. dummy.next is the real head. Return it.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Done.</strong> O(max(m,n)) time and space.`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init: {ids:['cl-sig','cl-sg2','cl-dummy','cl-cur','cl-carry','cl-while'],cls:'hl-init'},
+  col:  {ids:['cl-d1','cl-d2','cl-sum','cl-dig','cl-cout','cl-new','cl-adv','cl-nl1','cl-nl2'],cls:'hl-col'},
+  carry:{ids:['cl-cout'],cls:'hl-carry'},
+  done: {ids:['cl-ret','cl-ret2'],cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── PLAIN ENGLISH ────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
+  const {type, col, d1, d2, carryIn, sum, digit, carryOut, l1, l2} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`L1 = <strong>${l1.join(' → ')}</strong> (${listToNum(l1)}), L2 = <strong>${l2.join(' → ')}</strong> (${listToNum(l2)}). Stored LSB-first so we can add left-to-right. Building result list with dummy head.`};
+  if(type==='col'){
+    const d1src=l1?`L1[${col-1}]=${d1}`:`L1 done→0`;
+    const d2src=l2?`L2[${col-1}]=${d2}`:`L2 done→0`;
+    const carryStr=carryIn>0?` + carry ${carryIn}`:'';
+    return {color:carryOut>0?'var(--pur-dark)':'var(--accent4)',
+      text:`Column ${col}: <strong>${d1src}</strong> + <strong>${d2src}</strong>${carryStr} = <strong>${sum}</strong>. Digit = <strong>${digit}</strong>, carry_out = <strong>${carryOut}</strong>.${carryOut?` ⚡ Carry propagates!`:''}`};
+  }
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Done! Both lists exhausted${carryIn>0?', final carry emitted':''} . Result = <strong>${st.resDigits?.join(' → ')}</strong> = <strong>${listToNum(st.resDigits)}</strong>`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+function listToNum(arr){
+  if(!arr||!arr.length) return 0;
+  return arr.reduce((acc,d,i)=>acc+d*Math.pow(10,i),0);
+}
+
+// ─── computeSteps ─────────────────────────────────────────────────────────────
+function computeSteps(l1, l2){
+  const steps = [];
+  const n1=l1.length, n2=l2.length;
+  let carry=0, col=0;
+  const resDigits=[];
+  let i1=0, i2=0;
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,l1:[...l1],l2:[...l2],n1,n2,
+    col, carry,
+    resDigits:[...resDigits],
+    i1, i2,
+    result:null,...extra,
+    explain:makeExplain(type,{col,carryIn:carry,l1:i1<n1,l2:i2<n2,...extra})
+  });
+
+  snap('init',`📌 <strong>Start.</strong> L1=[${l1.join(',')}] = ${listToNum(l1)}, L2=[${l2.join(',')}] = ${listToNum(l2)}.`,
+    {d1:null,d2:null,sum:null,digit:null,carryOut:null,carryIn:0});
+
+  while(i1<n1 || i2<n2 || carry>0){
+    const d1=i1<n1?l1[i1]:0;
+    const d2=i2<n2?l2[i2]:0;
+    const carryIn=carry;
+    const sum=d1+d2+carryIn;
+    const digit=sum%10;
+    const carryOut=Math.floor(sum/10);
+    col++;
+    resDigits.push(digit);
+    carry=carryOut;
+    if(i1<n1) i1++;
+    if(i2<n2) i2++;
+
+    snap('col',`Column ${col}: ${d1}+${d2}+${carryIn}=${sum} → digit=${digit}, carry=${carryOut}`,
+      {d1,d2,sum,digit,carryOut,carryIn,
+       l1HasMore:i1<n1, l2HasMore:i2<n2});
+  }
+
+  snap('done',`✅ Sum = ${listToNum(resDigits)}`,
+    {d1:0,d2:0,sum:0,digit:0,carryOut:0,carryIn:0,
+     result:{resDigits:[...resDigits],sum:listToNum(resDigits)}});
+  steps[steps.length-1].result={resDigits:[...resDigits],sum:listToNum(resDigits)};
+  return steps;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let l1=[], l2=[];
+
+// ─── RENDER NODE ──────────────────────────────────────────────────────────────
+function makeNode(val, stateClass, pos, showArrow=true){
+  const unit=document.createElement('div'); unit.className='node-unit';
+  const box=document.createElement('div');
+  box.className=`dnode ${stateClass}`;
+  box.innerHTML=`<span>${val??'?'}</span><span class="dn-pos">[${pos}]</span>`;
+  unit.appendChild(box);
+  if(showArrow){
+    const arr=document.createElement('span'); arr.className='dn-arrow'; arr.textContent='→';
+    unit.appendChild(arr);
+  }
+  return unit;
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────────
+function renderLists(st){
+  const{type,l1,l2,i1,i2,n1,n2,col,resDigits,d1,d2}=st;
+  const isFinal=!!st.result;
+
+  // Build each row
+  ['rowL1','rowL2','rowRes'].forEach(id=>document.getElementById(id).innerHTML='');
+
+  // Label
+  function addLabel(rowId, text, cls){
+    const el=document.getElementById(rowId);
+    const lb=document.createElement('div'); lb.className=`list-label ${cls}`; lb.textContent=text;
+    el.appendChild(lb);
+  }
+  addLabel('rowL1','L1','ll-l1');
+  addLabel('rowL2','L2','ll-l2');
+  addLabel('rowRes','Res','ll-res');
+
+  // L1 nodes
+  const rowL1=document.getElementById('rowL1');
+  l1.forEach((v,i)=>{
+    const isCur=i===i1-1&&type==='col'&&i<n1;
+    const isPast=i<i1-1;
+    const cls=isCur?'dns-cur-l1':isPast?'dns-done':'dns-l1';
+    rowL1.appendChild(makeNode(v,cls,i,i<n1-1));
+  });
+  const nl1=document.createElement('div'); nl1.className='dn-null'; nl1.textContent='null';
+  rowL1.appendChild(nl1);
+
+  // L2 nodes
+  const rowL2=document.getElementById('rowL2');
+  l2.forEach((v,i)=>{
+    const isCur=i===i2-1&&type==='col'&&i<n2;
+    const isPast=i<i2-1;
+    const cls=isCur?'dns-cur-l2':isPast?'dns-done':'dns-l2';
+    rowL2.appendChild(makeNode(v,cls,i,i<n2-1));
+  });
+  const nl2=document.createElement('div'); nl2.className='dn-null'; nl2.textContent='null';
+  rowL2.appendChild(nl2);
+
+  // Result nodes
+  const rowRes=document.getElementById('rowRes');
+  resDigits.forEach((v,i)=>{
+    const isNew=i===resDigits.length-1&&type==='col';
+    rowRes.appendChild(makeNode(v,isNew?'dns-res':'dns-done',i,i<resDigits.length-1));
+  });
+  const nlr=document.createElement('div'); nlr.className='dn-null'; nlr.textContent='null';
+  rowRes.appendChild(nlr);
+
+  // Outer border
+  const lo=document.getElementById('listsOuter');
+  lo.className=`lists-outer ${type==='col'&&st.carryOut>0?'lo-carry':type==='col'?'lo-active':isFinal?'lo-done':''}`;
+}
+
+function renderCarry(st){
+  const cc=document.getElementById('carryChip');
+  const cd=document.getElementById('carryDesc');
+  const carry=st.carry;
+  cc.className=`carry-chip ${carry>0?'cc-one':'cc-zero'}`;
+  cc.textContent=`carry = ${carry}`;
+  if(st.type==='col'){
+    cd.textContent=st.carryOut>0?`⚡ carry ${st.carryOut} → next column!`:`no carry`;
+  } else if(st.type==='init'){
+    cd.textContent='no carry yet';
+  } else {
+    cd.textContent=carry>0?'carry propagated':'no carry';
+  }
+}
+
+function renderColDetail(st){
+  const co=document.getElementById('colOuter');
+  const ct=document.getElementById('colTitle');
+  const cb=document.getElementById('colBody');
+  if(st.type!=='col'){
+    co.className='col-outer'; ct.textContent='Column detail will appear step by step'; cb.innerHTML=''; return;
+  }
+  const{col,d1,d2,carryIn,sum,digit,carryOut}=st;
+  co.className=`col-outer ${carryOut>0?'co-carry':'co-active'}`;
+  ct.textContent=`Column ${col}: ${d1} + ${d2} + carry(${carryIn}) = ${sum}`;
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="col-box ${cls}"><div class="cb-lbl">${lbl}</div><div class="cb-val">${val}</div><div class="cb-sub">${sub}</div></div>`;
+  cb.innerHTML=
+    mkBox('d1',d1,`L1[${col-1}]`,'cb-l1')+
+    mkBox('d2',d2,`L2[${col-1}]`,'cb-l2')+
+    mkBox('carry in',carryIn,'from prev','cb-cin')+
+    mkBox('sum',sum,`${d1}+${d2}+${carryIn}`,'cb-sum')+
+    mkBox('digit',digit,'sum % 10','cb-dig')+
+    mkBox('carry out',carryOut,'sum / 10','cb-cout');
+}
+
+function renderNumStrip(l1, l2, resDigits){
+  const ns=document.getElementById('numStrip');
+  const n1=listToNum(l1), n2=listToNum(l2), nr=listToNum(resDigits);
+  ns.innerHTML=`
+    <div class="num-pill np-l1">L1 = ${n1}</div>
+    <span class="np-plus">+</span>
+    <div class="num-pill np-l2">L2 = ${n2}</div>
+    <span class="np-eq">=</span>
+    <div class="num-pill np-res">${resDigits.length>0?nr:'?'}</div>
+  `;
+}
+
+// ─── VAR FLASH ────────────────────────────────────────────────────────────────
+let prevVars={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVars[elId]!==undefined&&prevVars[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVars[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+
+  renderLists(st);
+  renderCarry(st);
+  renderColDetail(st);
+  renderNumStrip(st.l1, st.l2, st.resDigits);
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeText').innerHTML=narr.text;
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(st.type);
+
+  // Vars
+  setVar('vD1','vcD1',st.d1!=null?st.d1:'—');
+  setVar('vD2','vcD2',st.d2!=null?st.d2:'—');
+  setVar('vCarry','vcCarry',st.carryIn!=null?st.carryIn:st.carry);
+  setVar('vSum','vcSum',st.sum!=null?st.sum:'—');
+  setVar('vDig','vcDig',st.digit!=null?st.digit:'—');
+  setVar('vCout','vcCout',st.carryOut!=null?st.carryOut:'—');
+  document.getElementById('vCarry').style.color=st.carry>0?'var(--pur)':'#6b7280';
+
+  // Done
+  if(isFinal){
+    const res=st.result.resDigits;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ Result: ${res.join(' → ')} = ${st.result.sum}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=res.join(' → ')+` (= ${st.result.sum})`;
+    document.getElementById('bestMeta').textContent=`${listToNum(l1)} + ${listToNum(l2)} = ${st.result.sum}`;
+    document.getElementById('cxResult').textContent=st.result.sum;
+    document.getElementById('cxCols').textContent=res.length;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────────
+function buildUI(){
+  l1=document.getElementById('inL1').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v)&&v>=0&&v<=9);
+  l2=document.getElementById('inL2').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v)&&v>=0&&v<=9);
+  if(!l1.length||!l2.length){alert('Please enter valid digit lists (0–9).');return;}
+
+  steps=computeSteps(l1,l2);
+  currentStep=0;
+  document.getElementById('cxResult').textContent='—';
+  document.getElementById('cxCols').textContent='—';
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain) return;
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+
+buildUI();
+</script>
+</body>
+</html>
