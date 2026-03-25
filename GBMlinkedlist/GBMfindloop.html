@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Loop — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:220px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ══ PHASE BADGE ══ */
+.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:12px;display:inline-block;transition:all .3s;}
+.pb-init  {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+.pb-p1    {background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
+.pb-meet  {background:rgba(255,209,102,.18);border:1.5px solid var(--accent4);color:#7a5a00;animation:phb .5s ease;}
+.pb-p2    {background:rgba(192,84,252,.12);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.pb-found {background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;animation:phb .5s ease;}
+@keyframes phb{from{transform:scale(1.07);}to{transform:none;}}
+
+/* ══ LEGEND ══ */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:50%;border:2px solid;flex-shrink:0;}
+
+/* ══ MAIN CANVAS ══ */
+.canvas-section{margin-bottom:14px;}
+.canvas-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:6px;transition:border-color .3s;overflow:hidden;}
+.canvas-outer.co-p1   {border-color:var(--accent2);}
+.canvas-outer.co-meet {border-color:var(--accent4);}
+.canvas-outer.co-p2   {border-color:var(--pur);}
+.canvas-outer.co-found{border-color:var(--accent3);}
+#mainCanvas{display:block;margin:0 auto;}
+
+/* ══ POINTER STRIP ══ */
+.ptr-strip{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.ptr-card{flex:1;min-width:110px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;transition:all .3s;}
+.ptr-card.pc-slow{border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.ptr-card.pc-fast{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ptr-card.pc-meet{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .5s ease;}
+.ptr-card.pc-found{border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.1);animation:vflash .5s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.ptr-name{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.ptr-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.ptr-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* ══ STEP PANEL ══ */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-p1   {border-color:var(--accent2);}
+.step-panel.sp-meet {border-color:var(--accent4);}
+.step-panel.sp-p2   {border-color:var(--pur);}
+.step-panel.sp-found{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.spbox.sb-grn {border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-yel {border-color:var(--accent4);border-width:2px;background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*20+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-p1   {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-meet {background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-p2   {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-found{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash2 .4s ease;}
+@keyframes vflash2{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Find Loop</h1>
+    <div class="sub">Floyd's Cycle Detection · Tortoise &amp; Hare · O(n) · O(1)</div>
+  </div>
+  <div class="family-badge">Linked List · Two Pointers</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>List values  (comma-separated)</label>
+      <input type="text" id="inVals" value="0,1,2,3,4,5,6,7,8,9">
+      <div class="hint">All node values in order from head</div>
+    </div>
+    <div class="field">
+      <label>Loop connects tail → index</label>
+      <input type="text" id="inLoop" value="4" style="width:80px;">
+      <div class="hint">0-based index of loop start</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="100">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div id="phaseBadge" class="phase-badge pb-init">Press RUN to begin</div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.2);border-color:#06d6a0;"></div> slow (tortoise)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.2);border-color:#2196f3;"></div> fast (hare)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#f5a623;"></div> meeting point</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.2);border-color:#c084fc;"></div> loop origin ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.12);border-color:#e63946;"></div> tail→loop arrow</div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-section">
+    <div class="section-label">Circular linked list — slow moves ×1 · fast moves ×2 per step</div>
+    <div class="canvas-outer" id="canvasOuter">
+      <canvas id="mainCanvas" width="640" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- POINTER STRIP -->
+  <div class="ptr-strip">
+    <div class="ptr-card" id="pcSlow">
+      <div class="ptr-name">Slow (tortoise)</div>
+      <div class="ptr-val" id="psVal">—</div>
+      <div class="ptr-sub" id="psSub">moves ×1</div>
+    </div>
+    <div class="ptr-card" id="pcFast">
+      <div class="ptr-name">Fast (hare)</div>
+      <div class="ptr-val" id="pfVal">—</div>
+      <div class="ptr-sub" id="pfSub">moves ×2</div>
+    </div>
+    <div class="ptr-card" id="pcMeet" style="opacity:.3">
+      <div class="ptr-name">slow == fast?</div>
+      <div class="ptr-val" id="pmVal">—</div>
+      <div class="ptr-sub" id="pmSub">phase 1</div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch Floyd's cycle detection execute.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">two phases</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">just 2 ptrs</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Meet step</div>
+      <div class="cx-val" id="cxMeet" style="color:#7a5a00">—</div>
+      <div class="cx-sub">phase 1</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Loop origin</div>
+      <div class="cx-val" id="cxOrigin" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">value</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Find Loop (Floyd's)</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">LinkedList* <span class="cf">findLoop</span>(LinkedList* head){</span>
+<span class="code-line" id="cl-ptrs">  LinkedList *slow=head->next;</span>
+<span class="code-line" id="cl-ptrs2">  LinkedList *fast=head->next->next;</span>
+<span class="code-line" id="cl-p1">  <span class="cc">// Phase 1: find meeting point</span></span>
+<span class="code-line" id="cl-p1w">  <span class="ck">while</span>(slow!=fast){</span>
+<span class="code-line" id="cl-p1s">   slow=slow->next;</span>
+<span class="code-line" id="cl-p1f">   fast=fast->next->next;</span>
+<span class="code-line" id="cl-p1e">  }</span>
+<span class="code-line" id="cl-p2">  <span class="cc">// Phase 2: reset slow to head</span></span>
+<span class="code-line" id="cl-p2r">  slow=head;</span>
+<span class="code-line" id="cl-p2w">  <span class="ck">while</span>(slow!=fast){</span>
+<span class="code-line" id="cl-p2s">   slow=slow->next;</span>
+<span class="code-line" id="cl-p2f">   fast=fast->next;</span>
+<span class="code-line" id="cl-p2e">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> slow; <span class="cc">// loop origin</span></span>
+<span class="code-line" id="cl-ret2">}</span></pre>
+  </div>
+
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">⚡ Floyd's Math — Why Phase 2 works</div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// Let:  F = distance from head to loop start
+//        C = loop circumference
+//        D = distance from loop start to meeting pt
+//
+// At meeting point:
+//   slow traveled: F + D
+//   fast traveled: F + D + kC  (lapped k times)
+//   fast = 2×slow:
+//   F + D + kC = 2(F + D)
+//   → kC = F + D
+//   → F = kC - D
+//
+// So: distance from head to loop origin (F)
+//     equals distance from meeting point
+//     to loop origin (kC - D)!
+//
+// Reset slow to head, keep fast at meeting pt.
+// Both advance by 1. They meet at loop origin!</span></pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">F = kC - D</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">fast = 2×slow</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">O(1) space</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">guaranteed meet</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcSlow"><div class="var-name">slow (val)</div><div class="var-value" id="vSlow" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcFast"><div class="var-name">fast (val)</div><div class="var-value" id="vFast" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcStep"><div class="var-name">p1 steps</div><div class="var-value" id="vStep" style="color:var(--accent4)">0</div></div>
+      <div class="var-card" id="vcP2">  <div class="var-name">p2 steps</div><div class="var-value" id="vP2"   style="color:var(--pur)">0</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Loop Origin</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet found</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ LOOP ORIGIN FOUND</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, args){
+  const {slowIdx,fastIdx,meetIdx,p2Steps,loopStart,n,loopIdx,F,C,D} = args||{};
+  if(type==='init') return {
+    why:`<div class="ep-why-block">Floyd's cycle detection (tortoise & hare): slow moves 1 step, fast moves 2 steps per iteration. Since fast laps slow inside the loop, they are guaranteed to meet. The meeting point has a beautiful mathematical relationship to the loop origin.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> fast always travels 2× the distance of slow. If there's a cycle, they will meet inside it.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Phase 1:</strong> find meeting point inside the loop (not necessarily the origin). Phase 2: reset slow to head, advance both by 1 — they meet at the loop origin.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>The math:</strong> F (head→origin) = kC - D (meetingPt→origin). So after resetting, both arrive at origin simultaneously.`},
+    ]
+  };
+  if(type==='p1') return {
+    why:`<div class="ep-why-block">Phase 1 step: slow moves to index ${slowIdx} (val ${args.slowVal}), fast moves to index ${fastIdx} (val ${args.fastVal}). Fast has traveled 2× as far as slow. They haven't met yet — keep going.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>slow ≠ fast.</strong> Continue until they land on the same node inside the loop.`}]
+  };
+  if(type==='meet') return {
+    why:`<div class="ep-why-block">slow == fast at index ${meetIdx}! Meeting point found inside the loop. Now reset slow to head. Both will advance 1 step at a time. They will meet exactly at the loop origin.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Meeting point = index ${meetIdx}.</strong> Phase 2 begins: slow → head, fast stays at meeting point.`}]
+  };
+  if(type==='p2') return {
+    why:`<div class="ep-why-block">Phase 2 step ${p2Steps}: slow at index ${slowIdx} (val ${args.slowVal}), fast at index ${fastIdx} (val ${args.fastVal}). Both advance 1 step. They meet when slow crosses F nodes from head = fast crosses (kC-D) from meeting point.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>Both move ×1 now.</strong> slow == fast will happen exactly at the loop origin.`}]
+  };
+  if(type==='found') return {
+    why:`<div class="ep-why-block">slow == fast at index ${loopStart} (val ${args.originVal})! This is the loop origin. F=${F} (head→origin), C=${C} (loop size), D=${D} (origin→meetingPt).</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Loop origin = val ${args.originVal}.</strong> O(n) time, O(1) space.`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+const TYPE_LINES={
+  init: {ids:['cl-sig','cl-ptrs','cl-ptrs2','cl-p1','cl-p1w'],cls:'hl-p1'},
+  p1:   {ids:['cl-p1w','cl-p1s','cl-p1f'],cls:'hl-p1'},
+  meet: {ids:['cl-p2','cl-p2r'],cls:'hl-meet'},
+  p2:   {ids:['cl-p2w','cl-p2s','cl-p2f'],cls:'hl-p2'},
+  found:{ids:['cl-ret'],cls:'hl-found'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── NARRATIVE ────────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
+  const {type,slowIdx,fastIdx,meetIdx,p2Steps,loopStart,vals,slowVal,fastVal,originVal} = st;
+  if(type==='init') return {color:'var(--accent3)',
+    text:`List = [${vals.join(',')}], loop back to index <strong>${st.loopIdx}</strong> (val ${vals[st.loopIdx]}). Slow starts at index 1, fast at index 2. Phase 1: advance until slow == fast.`};
+  if(type==='p1') return {color:'var(--accent2)',
+    text:`Step ${st.p1Steps}: slow → [${slowIdx}] val=<strong>${slowVal}</strong>, fast → [${fastIdx}] val=<strong>${fastVal}</strong>. Not equal yet — slow moves ×1, fast moves ×2.`};
+  if(type==='meet') return {color:'var(--accent4)',
+    text:`⚡ <strong>slow == fast</strong> at index ${meetIdx} val=<strong>${vals[meetIdx]}</strong>! Meeting point found. Reset slow → head. Phase 2: advance both ×1.`};
+  if(type==='p2') return {color:'var(--pur-dark)',
+    text:`Phase 2 step ${p2Steps}: slow=[${slowIdx}] val=<strong>${slowVal}</strong>, fast=[${fastIdx}] val=<strong>${fastVal}</strong>. Not equal yet — both advance ×1.`};
+  if(type==='found') return {color:'var(--accent3)',
+    text:`✅ <strong>slow == fast</strong> at index ${loopStart} val=<strong>${originVal}</strong>! This is the loop origin. F=${st.F}, C=${st.C}, D=${st.D}. Return this node.`};
+  return {text:'',color:'var(--accent4)'};
+}
+
+// ─── COMPUTE STEPS ────────────────────────────────────────────────────────────
+function computeSteps(vals, loopIdx){
+  const n=vals.length;
+  const steps=[];
+
+  // Helper: advance index in circular list
+  // Nodes 0..n-1, last node loops to loopIdx
+  function advance(idx, steps=1){
+    for(let i=0;i<steps;i++){
+      if(idx===n-1) idx=loopIdx;
+      else idx++;
+    }
+    return idx;
+  }
+
+  const snap=(type,desc,extra={})=>steps.push({
+    type,desc,vals:[...vals],n,loopIdx,
+    result:null,...extra,
+    explain:makeExplain(type,{n,loopIdx,...extra})
+  });
+
+  snap('init',`📌 Start. n=${n}, loop back to index ${loopIdx} (val ${vals[loopIdx]}).`,
+    {slowIdx:1,fastIdx:2,slowVal:vals[1],fastVal:vals[2],meetIdx:null,p1Steps:0,p2Steps:0,loopStart:null,F:loopIdx,C:n-loopIdx});
+
+  let sIdx=1, fIdx=2, p1Steps=0;
+
+  // Phase 1
+  while(sIdx!==fIdx){
+    sIdx=advance(sIdx,1);
+    fIdx=advance(fIdx,2);
+    p1Steps++;
+    snap(sIdx===fIdx?'meet':'p1',
+      sIdx===fIdx?`🔶 Meeting point: index ${sIdx} val=${vals[sIdx]}`:`Phase 1 step ${p1Steps}: slow=[${sIdx}], fast=[${fIdx}]`,
+      {slowIdx:sIdx,fastIdx:fIdx,slowVal:vals[sIdx],fastVal:vals[fIdx],meetIdx:sIdx===fIdx?sIdx:null,
+       p1Steps,p2Steps:0,loopStart:null,F:loopIdx,C:n-loopIdx,D:null});
+  }
+
+  const meetIdx=sIdx;
+  const D=(meetIdx-loopIdx+n)%(n-loopIdx)||0; // distance from loop start to meet point inside loop
+  // Actually D = meetIdx - loopIdx if meetIdx >= loopIdx, accounting for circular
+  const loopSize=n-loopIdx;
+  const Dcalc=((meetIdx-loopIdx)%loopSize+loopSize)%loopSize;
+
+  // Phase 2: reset slow to head (0)
+  sIdx=0;
+  let p2Steps=0;
+
+  while(sIdx!==fIdx){
+    sIdx=advance(sIdx,1);
+    fIdx=advance(fIdx,1);
+    p2Steps++;
+    const isFound=sIdx===fIdx;
+    snap(isFound?'found':'p2',
+      isFound?`✅ Loop origin: index ${sIdx} val=${vals[sIdx]}`:`Phase 2 step ${p2Steps}: slow=[${sIdx}], fast=[${fIdx}]`,
+      {slowIdx:sIdx,fastIdx:fIdx,slowVal:vals[sIdx],fastVal:vals[fIdx],meetIdx,
+       p1Steps,p2Steps,loopStart:isFound?sIdx:null,originVal:isFound?vals[sIdx]:null,
+       F:loopIdx,C:loopSize,D:Dcalc,
+       result:isFound?{loopStart:sIdx,originVal:vals[sIdx]}:null});
+    if(isFound){
+      steps[steps.length-1].result={loopStart:sIdx,originVal:vals[sIdx]};
+      break;
+    }
+  }
+  return steps;
+}
+
+// ─── CANVAS ───────────────────────────────────────────────────────────────────
+function drawCanvas(st, canvasEl){
+  const {vals,loopIdx,slowIdx,fastIdx,meetIdx,type,loopStart} = st;
+  const n=vals.length;
+  const W=canvasEl.width, H=canvasEl.height;
+  const ctx=canvasEl.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  // Layout: linear prefix nodes on top row, loop nodes on a circle below
+  const loopSize=n-loopIdx;
+  const prefixCount=loopIdx; // nodes before loop
+
+  const NR=22; // node radius
+  const prefixY=52;
+  const prefixStartX=NR+10;
+  const prefixSpacing=Math.min(54, prefixCount>0?(W-2*(NR+10)-80)/Math.max(prefixCount,1):54);
+
+  // Loop circle center & radius
+  const loopCX=W/2+10, loopCY=H-70;
+  const loopR=Math.min(70, (W-60)/(2*Math.PI)*1.4, (H-prefixY-NR-30));
+
+  // Positions for each node index
+  const pos=[];
+  for(let i=0;i<prefixCount;i++){
+    pos.push({x:prefixStartX+i*prefixSpacing, y:prefixY});
+  }
+  // Loop nodes evenly on circle, starting at top
+  for(let i=0;i<loopSize;i++){
+    const angle=-Math.PI/2 + (2*Math.PI*i/loopSize);
+    pos.push({x:loopCX+loopR*Math.cos(angle), y:loopCY+loopR*Math.sin(angle)});
+  }
+
+  // Draw arrows
+  function drawArrow(x1,y1,x2,y2,color,curved=false){
+    ctx.save();
+    ctx.strokeStyle=color;
+    ctx.fillStyle=color;
+    ctx.lineWidth=2;
+    if(curved){
+      ctx.beginPath();
+      const mx=(x1+x2)/2, my=(y1+y2)/2-30;
+      ctx.moveTo(x1,y1);
+      ctx.quadraticCurveTo(mx,my,x2,y2);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+      ctx.stroke();
+    }
+    // arrowhead
+    const ang=curved?Math.atan2(y2-(y1+y2)/2+30,x2-x1):Math.atan2(y2-y1,x2-x1);
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-9*Math.cos(ang-.35),y2-9*Math.sin(ang-.35));
+    ctx.lineTo(x2-9*Math.cos(ang+.35),y2-9*Math.sin(ang+.35));
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // Draw prefix chain arrows
+  for(let i=0;i<prefixCount-1;i++){
+    const {x:x1,y:y1}=pos[i], {x:x2,y:y2}=pos[i+1];
+    const dx=x2-x1, dy=y2-y1, dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist;
+    drawArrow(x1+NR*ux,y1+NR*uy,x2-NR*ux-6,y2-NR*uy-6,'#c8bfaa');
+  }
+  // Arrow from last prefix → first loop node
+  if(prefixCount>0&&loopSize>0){
+    const {x:x1,y:y1}=pos[prefixCount-1], {x:x2,y:y2}=pos[loopIdx];
+    const dx=x2-x1, dy=y2-y1, dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist;
+    drawArrow(x1+NR*ux,y1+NR*uy,x2-NR*ux-6,y2-NR*uy-6,'#c8bfaa');
+  }
+  // Loop arrows (circle)
+  for(let i=0;i<loopSize;i++){
+    const cur=loopIdx+i;
+    const nxt=i===loopSize-1?loopIdx:cur+1;
+    const {x:x1,y:y1}=pos[cur], {x:x2,y:y2}=pos[nxt];
+    const dx=x2-x1, dy=y2-y1, dist=Math.sqrt(dx*dx+dy*dy);
+    const ux=dx/dist, uy=dy/dist;
+    const isLoop=(i===loopSize-1);
+    drawArrow(x1+NR*ux,y1+NR*uy,x2-NR*ux-6,y2-NR*uy-6,isLoop?'rgba(230,57,70,.6)':'#c8bfaa');
+  }
+
+  // Draw nodes
+  for(let i=0;i<n;i++){
+    const {x,y}=pos[i];
+    const isLoop=i>=loopIdx;
+    const isSlow=i===slowIdx;
+    const isFast=i===fastIdx;
+    const isMeet=type==='meet'&&i===slowIdx&&i===fastIdx;
+    const isFound=(type==='found')&&i===loopStart;
+    const isLoopOrigin=i===loopIdx;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x,y,NR,0,Math.PI*2);
+
+    if(isFound){
+      ctx.fillStyle='rgba(192,84,252,.3)';
+      ctx.strokeStyle='#c084fc'; ctx.lineWidth=3.5;
+      ctx.shadowColor='rgba(192,84,252,.5)'; ctx.shadowBlur=14;
+    } else if(isMeet){
+      ctx.fillStyle='rgba(255,209,102,.35)';
+      ctx.strokeStyle='#f5a623'; ctx.lineWidth=3.5;
+      ctx.shadowColor='rgba(255,209,102,.6)'; ctx.shadowBlur=16;
+    } else if(isSlow&&isFast){
+      ctx.fillStyle='rgba(6,214,160,.25)';
+      ctx.strokeStyle='#06d6a0'; ctx.lineWidth=3;
+    } else if(isSlow){
+      ctx.fillStyle='rgba(6,214,160,.2)';
+      ctx.strokeStyle='#06d6a0'; ctx.lineWidth=2.5;
+      ctx.shadowColor='rgba(6,214,160,.4)'; ctx.shadowBlur=8;
+    } else if(isFast){
+      ctx.fillStyle='rgba(33,150,243,.22)';
+      ctx.strokeStyle='#2196f3'; ctx.lineWidth=2.5;
+      ctx.shadowColor='rgba(33,150,243,.4)'; ctx.shadowBlur=8;
+    } else if(type!=='init'&&type!=='p1'&&i===meetIdx){
+      ctx.fillStyle='rgba(255,209,102,.15)';
+      ctx.strokeStyle='rgba(255,209,102,.5)'; ctx.lineWidth=2;
+    } else if(isLoopOrigin){
+      ctx.fillStyle='rgba(230,57,70,.08)';
+      ctx.strokeStyle='rgba(230,57,70,.35)'; ctx.lineWidth=2;
+    } else if(isLoop){
+      ctx.fillStyle='rgba(200,195,180,.08)';
+      ctx.strokeStyle='#d4ccb8'; ctx.lineWidth=1.5;
+    } else {
+      ctx.fillStyle='#fffdf7';
+      ctx.strokeStyle='#d4ccb8'; ctx.lineWidth=1.5;
+    }
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Node value
+    ctx.save();
+    ctx.font=`bold 13px Space Mono,monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=
+      isFound?'#5b1a9a':
+      isMeet?'#7a4800':
+      (isSlow||isFast)?'#1a1a2e':
+      '#8a8070';
+    ctx.fillText(String(vals[i]),x,y);
+    ctx.restore();
+
+    // Pointer labels
+    const labels=[];
+    if(isSlow&&!isFast) labels.push({txt:'S',col:'#06d6a0'});
+    if(isFast&&!isSlow) labels.push({txt:'F',col:'#2196f3'});
+    if(isSlow&&isFast)  labels.push({txt:'S=F',col:'#f5a623'});
+
+    labels.forEach((lb,li)=>{
+      const lx=x+(NR+14)*Math.cos(-Math.PI/3+li*.5);
+      const ly=y+(NR+10)*Math.sin(-Math.PI/3+li*.5)-6;
+      ctx.save();
+      ctx.font='bold 9px Space Mono,monospace';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=lb.col;
+      ctx.shadowColor=lb.col; ctx.shadowBlur=4;
+      ctx.fillText(lb.txt,lx,ly);
+      ctx.restore();
+    });
+
+    // Index label below
+    ctx.save();
+    ctx.font='9px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(138,128,112,.55)';
+    ctx.fillText(`[${i}]`,x,y+NR+2);
+    ctx.restore();
+  }
+
+  // "loop start" annotation
+  if(loopSize>0){
+    const {x,y}=pos[loopIdx];
+    ctx.save();
+    ctx.font='bold 9px Space Mono,monospace';
+    ctx.fillStyle='rgba(230,57,70,.7)';
+    ctx.textAlign='center';
+    ctx.fillText('loop start',x,y-NR-12);
+    ctx.restore();
+  }
+
+  // Canvas outer class
+  document.getElementById('canvasOuter').className=
+    `canvas-outer ${type==='p1'||type==='init'?'co-p1':type==='meet'?'co-meet':type==='p2'?'co-p2':type==='found'?'co-found':''}`;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildUI(){
+  const vals=document.getElementById('inVals').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  const loopIdx=parseInt(document.getElementById('inLoop').value);
+  if(vals.length<2||isNaN(loopIdx)||loopIdx<0||loopIdx>=vals.length){
+    alert('Need at least 2 values and a valid loop index (0 ≤ idx < n).');return;
+  }
+  steps=computeSteps(vals,loopIdx);
+  currentStep=0;
+
+  // Size canvas
+  const canvas=document.getElementById('mainCanvas');
+  const n=vals.length, loopSize=n-loopIdx, prefixCount=loopIdx;
+  const W=Math.max(600,prefixCount*54+loopSize*40+100);
+  canvas.width=Math.min(W,680);
+  canvas.height=260;
+
+  document.getElementById('cxMeet').textContent='—';
+  document.getElementById('cxOrigin').textContent='—';
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── VAR FLASH ────────────────────────────────────────────────────────────────
+let prevVars={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVars[elId]!==undefined&&prevVars[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVars[elId]=s;
+}
+
+// ─── RENDER STEP ──────────────────────────────────────────────────────────────
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+  const {type,slowIdx,fastIdx,slowVal,fastVal,meetIdx,p1Steps,p2Steps,loopStart,originVal,vals} = st;
+  const isFinal=!!st.result;
+
+  drawCanvas(st, document.getElementById('mainCanvas'));
+
+  // Phase badge
+  const pb=document.getElementById('phaseBadge');
+  if(type==='init'){pb.className='phase-badge pb-init';pb.textContent='Press RUN to begin';}
+  else if(type==='p1'){pb.className='phase-badge pb-p1';pb.textContent=`Phase 1: Chasing — slow moves ×1 · fast moves ×2 (step ${p1Steps})`;}
+  else if(type==='meet'){pb.className='phase-badge pb-meet';pb.textContent=`⚡ Meeting point found! Resetting slow → head`;}
+  else if(type==='p2'){pb.className='phase-badge pb-p2';pb.textContent=`Phase 2: Both move ×1 · step ${p2Steps}`;}
+  else{pb.className='phase-badge pb-found';pb.textContent=`✅ Loop origin = val ${originVal}`;}
+
+  // Pointer strip
+  const isMeetMoment=type==='meet';
+  document.getElementById('pcSlow').className=`ptr-card ${isMeetMoment||type==='p2'?'pc-meet':'pc-slow'}`;
+  document.getElementById('pcFast').className=`ptr-card ${isMeetMoment||type==='p2'?'pc-meet':'pc-fast'}`;
+  document.getElementById('pcMeet').className=`ptr-card ${type==='meet'||type==='p2'||type==='found'?'pc-meet':''}`;
+  document.getElementById('pcMeet').style.opacity=type!=='init'&&type!=='p1'?'1':'.3';
+  document.getElementById('psVal').textContent=slowIdx!=null?`val=${vals[slowIdx]??'?'}`:'—';
+  document.getElementById('psSub').textContent=`index ${slowIdx??'?'}`;
+  document.getElementById('pfVal').textContent=fastIdx!=null?`val=${vals[fastIdx]??'?'}`:'—';
+  document.getElementById('pfSub').textContent=`index ${fastIdx??'?'}`;
+  document.getElementById('pmVal').textContent=meetIdx!=null?`idx=${meetIdx} ✓`:(type==='p2'||type==='found'?`meet=${meetIdx??'?'}`:'—');
+  document.getElementById('pmSub').textContent=meetIdx!=null?'meeting point!':type==='p2'?'phase 2 active':'checking…';
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  sp.className=`step-panel ${type==='p1'||type==='init'?'sp-p1':type==='meet'?'sp-meet':type==='p2'?'sp-p2':'sp-found'}`;
+  document.getElementById('spTitle').textContent=st.desc.replace(/<[^>]+>/g,'');
+  const mkBox=(lbl,val,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
+  const spb=document.getElementById('spBody');
+  if(type==='p1'||type==='init'){
+    spb.innerHTML=mkBox('slow',`[${slowIdx}]=${vals[slowIdx]??'?'}`,'spbox sb-grn')+
+      mkBox('fast',`[${fastIdx}]=${vals[fastIdx]??'?'}`,'spbox sb-blue')+
+      mkBox('p1 steps',p1Steps,'spbox sb-yel');
+  } else if(type==='meet'){
+    spb.innerHTML=mkBox('meet idx',meetIdx,'spbox sb-yel')+mkBox('meet val',vals[meetIdx],'spbox sb-yel')+mkBox('reset slow','→ head','spbox sb-pur');
+  } else if(type==='p2'){
+    spb.innerHTML=mkBox('slow',`[${slowIdx}]=${vals[slowIdx]??'?'}`,'spbox sb-grn')+
+      mkBox('fast',`[${fastIdx}]=${vals[fastIdx]??'?'}`,'spbox sb-blue')+
+      mkBox('p2 steps',p2Steps,'spbox sb-pur');
+  } else {
+    spb.innerHTML=mkBox('origin idx',loopStart,'spbox sb-grn')+mkBox('origin val',originVal,'spbox sb-grn');
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeText').innerHTML=narr.text;
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  updateExplain(st);
+  highlightCode(type);
+
+  setVar('vSlow','vcSlow',slowIdx!=null?vals[slowIdx]??'?':'—');
+  setVar('vFast','vcFast',fastIdx!=null?vals[fastIdx]??'?':'—');
+  setVar('vStep','vcStep',p1Steps??0);
+  setVar('vP2','vcP2',p2Steps??0);
+
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ Loop origin = val ${st.result.originVal} (index ${st.result.loopStart})`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`val = ${st.result.originVal}  [idx ${st.result.loopStart}]`;
+    document.getElementById('bestMeta').textContent=`F=${st.F} · C=${st.C} · D=${st.D}`;
+    document.getElementById('cxMeet').textContent=st.p1Steps;
+    document.getElementById('cxOrigin').textContent=st.result.originVal;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain) return;
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)renderStep(currentStep);});
+buildUI();
+</script>
+</body>
+</html>

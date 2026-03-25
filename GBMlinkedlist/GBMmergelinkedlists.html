@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Merging Linked Lists — Live Visualizer</title>
+<title>Merge Linked Lists — Live Visualizer</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -28,10 +28,9 @@ body::before{content:'';position:fixed;inset:0;
 .controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
 .field{display:flex;flex-direction:column;gap:5px;}
 .field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
-.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:220px;transition:border-color .2s;}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:240px;transition:border-color .2s;}
 .field input:focus{border-color:var(--accent4);}
 .field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
-.field input.err{border-color:var(--accent);}
 .btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
 .btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
 .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
@@ -44,48 +43,63 @@ body::before{content:'';position:fixed;inset:0;
 
 .section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 
-/* ══ UNIQUE VISUAL: Y-SHAPE SVG CANVAS ══ */
-.ysection{margin-bottom:14px;}
-.youter{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;overflow-x:auto;transition:border-color .3s;}
-.youter.yo-scan   {border-color:var(--accent2);}
-.youter.yo-found  {border-color:var(--accent4);}
-.youter.yo-none   {border-color:var(--accent);}
-#ycanvas{display:block;font-family:'Space Mono',monospace;}
-
-/* ══ PHASE BADGE ══ */
-.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:12px;display:inline-block;}
-.pb-len  {background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
-.pb-scan {background:rgba(192,84,252,.1);border:1.5px solid var(--pur);color:var(--pur-dark);}
-.pb-found{background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a5a00;animation:phbounce .4s ease;}
-@keyframes phbounce{from{transform:scale(1.08);}to{transform:none;}}
-.pb-none {background:rgba(230,57,70,.1);border:1.5px solid var(--accent);color:#7a0000;}
+/* PHASE BADGE */
+.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:12px;display:inline-block;transition:all .3s;}
 .pb-init {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+.pb-cmp  {background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a5a00;}
+.pb-l1   {background:rgba(33,150,243,.12);border:1.5px solid var(--accent2);color:#0d47a1;}
+.pb-l2   {background:rgba(192,84,252,.12);border:1.5px solid var(--pur);color:var(--pur-dark);}
+.pb-tail {background:rgba(6,214,160,.1);border:1.5px solid var(--accent3);color:#024d37;}
+.pb-done {background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;animation:phb .4s ease;}
+@keyframes phb{from{transform:scale(1.06);}to{transform:none;}}
 
-/* ══ POINTER STATUS STRIP ══ */
-.ptr-strip{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
-.ptr-card{flex:1;min-width:110px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;transition:all .3s;}
-.ptr-card.pc-a{border-color:var(--accent2);background:rgba(33,150,243,.05);}
-.ptr-card.pc-b{border-color:var(--pur);background:rgba(192,84,252,.05);}
-.ptr-card.pc-eq{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:eqflash .5s ease;}
-@keyframes eqflash{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
-.ptr-name{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
-.ptr-val{font-family:'Space Mono',monospace;font-size:.92rem;font-weight:700;color:var(--ink);}
-.ptr-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+/* LEGEND */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
 
-/* ══ STEP PANEL ══ */
+/* CANVAS */
+.canvas-section{margin-bottom:14px;}
+.canvas-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:8px;transition:border-color .3s;overflow:hidden;}
+.canvas-outer.co-l1  {border-color:var(--accent2);}
+.canvas-outer.co-l2  {border-color:var(--pur);}
+.canvas-outer.co-tail{border-color:var(--accent3);}
+.canvas-outer.co-done{border-color:var(--accent3);}
+#mainCanvas{display:block;margin:0 auto;}
+
+/* COMPARISON PANEL */
+.cmp-section{margin-bottom:14px;}
+.cmp-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;transition:border-color .3s;}
+.cmp-outer.co-l1 {border-color:var(--accent2);}
+.cmp-outer.co-l2 {border-color:var(--pur);}
+.cmp-outer.co-eq {border-color:var(--accent4);}
+.cmp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.cmp-row{display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;}
+.cmp-box{padding:8px 20px;border-radius:8px;border:2px solid;text-align:center;min-width:80px;}
+.cmp-box.cb-l1{border-color:var(--accent2);background:rgba(33,150,243,.08);}
+.cmp-box.cb-l2{border-color:var(--pur);background:rgba(192,84,252,.07);}
+.cmp-box.cb-win{border-width:3px;box-shadow:0 3px 12px rgba(0,0,0,.12);}
+.cmp-val{font-family:'Space Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--ink);}
+.cmp-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:2px;text-transform:uppercase;}
+.cmp-op{font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--muted);}
+.cmp-verdict{font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;padding:4px 14px;border-radius:5px;margin-left:8px;}
+.cv-l1{background:rgba(33,150,243,.15);color:#0d47a1;border:1.5px solid var(--accent2);}
+.cv-l2{background:rgba(192,84,252,.12);color:var(--pur-dark);border:1.5px solid var(--pur);}
+.cv-eq{background:rgba(255,209,102,.15);color:#7a5a00;border:1.5px solid var(--accent4);}
+
+/* STEP PANEL */
 .step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
-.step-panel.sp-len  {border-color:var(--accent2);}
-.step-panel.sp-scan {border-color:var(--pur);}
-.step-panel.sp-found{border-color:var(--accent4);}
-.step-panel.sp-none {border-color:var(--accent);}
+.step-panel.sp-l1  {border-color:var(--accent2);}
+.step-panel.sp-l2  {border-color:var(--pur);}
+.step-panel.sp-tail{border-color:var(--accent3);}
+.step-panel.sp-done{border-color:var(--accent3);}
 .sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .sp-body{display:flex;gap:8px;flex-wrap:wrap;}
 .spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
 .spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
 .spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
 .spbox.sb-yel {border-color:var(--accent4);border-width:2px;background:rgba(255,209,102,.06);}
-.spbox.sb-grn {border-color:var(--accent3);background:rgba(6,214,160,.05);}
-.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
 .spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
 .spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
 
@@ -96,7 +110,7 @@ body::before{content:'';position:fixed;inset:0;
 .nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
 #narrativeText{color:#e2e8f0;}
 
-/* COMPLEXITY */
+/* CX */
 .cx-strip{display:flex;gap:8px;margin-bottom:14px;}
 .cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
 .cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
@@ -116,10 +130,6 @@ body::before{content:'';position:fixed;inset:0;
 @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .ep-pane strong{font-weight:700;}
 .ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
-.ep-why-block.why-len{border-left-color:var(--accent2);background:rgba(33,150,243,.05);}
-.ep-why-block.why-scan{border-left-color:var(--pur);}
-.ep-why-block.why-found{border-left-color:var(--accent4);background:rgba(255,209,102,.06);}
-.ep-why-block.why-none{border-left-color:var(--accent);background:rgba(230,57,70,.05);}
 .ep-inv-block{display:flex;flex-direction:column;gap:6px;}
 .inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
 .inv-icon{font-size:.9rem;flex-shrink:0;}
@@ -129,17 +139,13 @@ body::before{content:'';position:fixed;inset:0;
 .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
 .inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
 .inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
-.inv-row.inv-key{background:rgba(230,57,70,.05);border-color:rgba(230,57,70,.18);}
-.inv-row.inv-key .inv-text strong{color:var(--accent);}
 
 .progress-wrap{margin-bottom:10px;}
 .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
 .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
 .progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
-.done-banner{display:none;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
 .done-banner.show{display:block;animation:fadeUp .4s ease;}
-.done-banner.db-found{background:var(--accent4);color:#3a2800;}
-.done-banner.db-none {background:var(--accent);color:#fff;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .playback{display:flex;gap:8px;margin-bottom:8px;}
 .kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
@@ -153,10 +159,10 @@ body::before{content:'';position:fixed;inset:0;
 pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*22+14px);overflow-y:auto;}
 pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
 .code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
-.code-line.hl-len  {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
-.code-line.hl-scan {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
-.code-line.hl-found{background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
-.code-line.hl-none {background:rgba(230,57,70,.14);border-left-color:var(--accent);color:#e2e8f0;}
+.code-line.hl-l1  {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-l2  {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-tail{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-done{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
 .ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
 
 .vars-panel{flex-shrink:0;padding:12px 13px;}
@@ -167,24 +173,20 @@ pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
 @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 .var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
 .var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
-.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;}
-.best-box.bb-found{opacity:1;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.3);}
-.best-box.bb-none {opacity:1;background:rgba(230,57,70,.06);border:1px solid rgba(230,57,70,.3);}
-.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
-.bl-found{color:var(--accent4);}.bl-none{color:var(--accent);}
-.best-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--bg);}
 .best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
-.done-bar{display:none;margin:0 13px 10px;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
 .done-bar.show{display:block;animation:fadeUp .4s ease;}
-.done-bar.db-found{background:var(--accent4);color:#3a2800;}
-.done-bar.db-none{background:var(--accent);color:#fff;}
 </style>
 </head>
 <body>
 <div class="header">
   <div>
-    <h1>Merging Linked Lists</h1>
-    <div class="sub">Intersection Detection · Length Equalization · Two Pointers</div>
+    <h1>Merge Linked Lists</h1>
+    <div class="sub">Two Sorted Lists · In-Place Weaving · O(n+m) · O(1)</div>
   </div>
   <div class="family-badge">Linked List · Two Pointers</div>
 </div>
@@ -194,19 +196,14 @@ pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
 <div class="viz-panel">
   <div class="controls">
     <div class="field">
-      <label>List One  (comma-separated)</label>
-      <input type="text" id="inL1" value="2,3,1,4">
-      <div class="hint">e.g. 2,3,1,4 — the unique prefix of L1</div>
+      <label>List One  (sorted, comma-separated)</label>
+      <input type="text" id="inL1" value="2,6,7,8">
+      <div class="hint">Must be sorted ascending</div>
     </div>
     <div class="field">
-      <label>List Two  (comma-separated)</label>
-      <input type="text" id="inL2" value="8,7,1,4">
-      <div class="hint">e.g. 8,7,1,4 — the unique prefix of L2</div>
-    </div>
-    <div class="field">
-      <label>Intersection at value</label>
-      <input type="text" id="inInter" value="1" style="width:90px;">
-      <div class="hint">Shared tail (leave empty = no intersection)</div>
+      <label>List Two  (sorted)</label>
+      <input type="text" id="inL2" value="1,3,4,5,9,10">
+      <div class="hint">Must be sorted ascending</div>
     </div>
     <div class="speed-wrap">
       <label>Speed</label>
@@ -221,33 +218,30 @@ pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
     <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
   </div>
 
-  <!-- PHASE BADGE -->
   <div id="phaseBadge" class="phase-badge pb-init">Press RUN to begin</div>
 
-  <!-- Y-SHAPE CANVAS -->
-  <div class="ysection">
-    <div class="section-label">Y-shape — shared tail highlighted · active pointers shown above nodes</div>
-    <div class="youter" id="youter">
-      <canvas id="ycanvas" width="680" height="200"></canvas>
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.18);border-color:#2196f3;"></div> L1 node</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.15);border-color:#c084fc;"></div> L2 node</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#f5a623;"></div> current head (being compared)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.18);border-color:#06d6a0;"></div> woven into result ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.1);border-color:#e63946;"></div> tail pointer</div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-section">
+    <div class="section-label">L1 · L2 · Result — winner node woven in each step</div>
+    <div class="canvas-outer" id="canvasOuter">
+      <canvas id="mainCanvas" width="640" height="240"></canvas>
     </div>
   </div>
 
-  <!-- POINTER STATUS -->
-  <div class="ptr-strip">
-    <div class="ptr-card" id="pcA">
-      <div class="ptr-name">Pointer A (L1)</div>
-      <div class="ptr-val" id="paVal">—</div>
-      <div class="ptr-sub" id="paSub">at head</div>
-    </div>
-    <div class="ptr-card" id="pcB">
-      <div class="ptr-name">Pointer B (L2)</div>
-      <div class="ptr-val" id="pbVal">—</div>
-      <div class="ptr-sub" id="pbSub">at head</div>
-    </div>
-    <div class="ptr-card" id="pcEq" style="opacity:.3">
-      <div class="ptr-name">A == B?</div>
-      <div class="ptr-val" id="peqVal">—</div>
-      <div class="ptr-sub" id="peqSub">comparing</div>
+  <!-- COMPARISON PANEL -->
+  <div class="cmp-section">
+    <div class="section-label">Head comparison — smaller wins, gets appended to result</div>
+    <div class="cmp-outer" id="cmpOuter">
+      <div class="cmp-title" id="cmpTitle">Comparison detail will appear step by step</div>
+      <div class="cmp-row" id="cmpRow"></div>
     </div>
   </div>
 
@@ -260,28 +254,28 @@ pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
   <!-- NARRATIVE -->
   <div class="narrative-bar">
     <div class="nb-label">Plain English</div>
-    <div id="narrativeText">Press RUN to watch the intersection detection algorithm execute.</div>
+    <div id="narrativeText">Press RUN to watch sorted list merging step by step.</div>
   </div>
 
-  <!-- COMPLEXITY -->
+  <!-- CX -->
   <div class="cx-strip">
     <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
-      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(m+n)</div>
-      <div class="cx-sub">one pass each</div>
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n+m)</div>
+      <div class="cx-sub">one pass</div>
     </div>
     <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
       <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
-      <div class="cx-sub">two pointers</div>
+      <div class="cx-sub">in-place rewire</div>
     </div>
     <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
-      <div class="cx-lbl">L1 len</div>
-      <div class="cx-val" id="cxL1" style="color:#7a5a00">—</div>
-      <div class="cx-sub">nodes</div>
+      <div class="cx-lbl">Steps</div>
+      <div class="cx-val" id="cxSteps" style="color:#7a5a00">—</div>
+      <div class="cx-sub">comparisons</div>
     </div>
     <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
-      <div class="cx-lbl">L2 len</div>
-      <div class="cx-val" id="cxL2" style="color:var(--pur-dark)">—</div>
-      <div class="cx-sub">nodes</div>
+      <div class="cx-lbl">New Head</div>
+      <div class="cx-val" id="cxHead" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">value</div>
     </div>
   </div>
 
@@ -319,144 +313,116 @@ pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
 <!-- RIGHT -->
 <div class="state-panel">
   <div class="code-panel">
-    <div class="code-panel-title">C++ — Merging Linked Lists</div>
+    <div class="code-panel-title">C++ — Merge Linked Lists</div>
     <pre class="code-block">
-<span class="code-line" id="cl-sig">LinkedList* <span class="cf">mergingLinkedLists</span>(</span>
+<span class="code-line" id="cl-sig">LinkedList* <span class="cf">mergeLinkedLists</span>(</span>
 <span class="code-line" id="cl-sg2">    LinkedList* l1, LinkedList* l2){</span>
-<span class="code-line" id="cl-len">  <span class="cc">// Phase 1: measure lengths</span></span>
-<span class="code-line" id="cl-len2">  <span class="ck">int</span> lenA=<span class="cn">0</span>, lenB=<span class="cn">0</span>;</span>
-<span class="code-line" id="cl-la">  LinkedList* a=l1; LinkedList* b=l2;</span>
-<span class="code-line" id="cl-la2">  <span class="ck">while</span>(a){lenA++;a=a->next;}</span>
-<span class="code-line" id="cl-lb">  <span class="ck">while</span>(b){lenB++;b=b->next;}</span>
-<span class="code-line" id="cl-adv">  <span class="cc">// Phase 2: advance longer list</span></span>
-<span class="code-line" id="cl-adv2">  a=l1; b=l2;</span>
-<span class="code-line" id="cl-adv3">  <span class="ck">while</span>(lenA>lenB){a=a->next;lenA--;}</span>
-<span class="code-line" id="cl-adv4">  <span class="ck">while</span>(lenB>lenA){b=b->next;lenB--;}</span>
-<span class="code-line" id="cl-scan">  <span class="cc">// Phase 3: advance together</span></span>
-<span class="code-line" id="cl-scan2">  <span class="ck">while</span>(a!=b){</span>
-<span class="code-line" id="cl-scan3">   a=a->next;</span>
-<span class="code-line" id="cl-scan4">   b=b->next;</span>
-<span class="code-line" id="cl-scan5">  }</span>
-<span class="code-line" id="cl-ret">  <span class="ck">return</span> a; <span class="cc">// null if no intersection</span></span>
+<span class="code-line" id="cl-init">  LinkedList *p1=l1, *p2=l2;</span>
+<span class="code-line" id="cl-prev">  LinkedList *p1Prev=<span class="cn">nullptr</span>;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(p1&&p2){</span>
+<span class="code-line" id="cl-cmp">   <span class="ck">if</span>(p1->value&lt;=p2->value){</span>
+<span class="code-line" id="cl-l1">    p1Prev=p1;</span>
+<span class="code-line" id="cl-l1b">    p1=p1->next;</span>
+<span class="code-line" id="cl-l2">   }<span class="ck">else</span>{</span>
+<span class="code-line" id="cl-l2b">    <span class="ck">if</span>(p1Prev) p1Prev->next=p2;</span>
+<span class="code-line" id="cl-l2c">    <span class="ck">else</span> l1=p2; <span class="cc">// new head</span></span>
+<span class="code-line" id="cl-l2d">    p1Prev=p2;</span>
+<span class="code-line" id="cl-l2e">    p2=p2->next;</span>
+<span class="code-line" id="cl-l2f">    p1Prev->next=p1;</span>
+<span class="code-line" id="cl-l2g">   }</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-tail">  <span class="cc">// attach remaining tail</span></span>
+<span class="code-line" id="cl-tail2">  <span class="ck">if</span>(p1Prev) p1Prev->next=p2;</span>
+<span class="code-line" id="cl-tail3">  <span class="ck">else</span> l1=p2;</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> l1;</span>
 <span class="code-line" id="cl-ret2">}</span></pre>
   </div>
 
   <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
-    <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">⚡ Why length-equalization works</div>
+    <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">⚡ Key insight: weaving in-place</div>
     <pre style="font-family:'Space Mono',monospace;font-size:.61rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
-<span style="color:#374151;font-style:italic">// If two lists intersect, they share a tail.
-// Let:  m = L1 length,  n = L2 length
-//       k = shared tail length
-// L1 unique prefix = m - k nodes
-// L2 unique prefix = n - k nodes
+<span style="color:#374151;font-style:italic">// p1 walks L1, p2 walks L2, p1Prev is the
+// tail of the merged result so far.
 //
-// If we skip abs(m-n) nodes from the longer
-// list, both pointers are now equidistant
-// from the intersection.
-// Advancing together → they meet at it.
+// Case A: p1.val &lt;= p2.val
+//   p1 already in correct position.
+//   Just advance p1Prev and p1.
 //
-// If no intersection: both reach null
-// simultaneously (a == b == null) → return null
+// Case B: p2.val &lt; p1.val
+//   p2 node must be INSERTED before p1.
+//   ① p1Prev.next = p2   (splice p2 in)
+//   ② p2 = p2.next       (advance p2)
+//   ③ p1Prev.next.next = p1  (p2 points to p1)
+//   p1Prev slides to the inserted node.
+//   p1 stays (still needs to be compared).
 //
-// Alternative O(1) space trick (no lengths):
-//   When a reaches null, redirect to head of L2.
-//   When b reaches null, redirect to head of L1.
-//   After at most m+n steps, a==b (intersection or null).
-//   Both travel exactly m+n steps total!</span></pre>
+// When one list empties:
+//   Remaining tail of the other is already
+//   sorted — just attach it. O(1) work!</span></pre>
     <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
-      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">equidistant trick</div>
-      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">O(1) space</div>
-      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">null = no intersect</div>
-      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">pointer identity</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">in-place rewire</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">no new nodes</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">O(1) tail attach</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.10);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">p1Prev tracks tail</div>
     </div>
   </div>
 
   <div class="vars-panel">
     <div class="state-title">Live Variables</div>
     <div class="var-grid">
-      <div class="var-card" id="vcLenA"><div class="var-name">lenA</div><div class="var-value" id="vLenA" style="color:var(--accent2)">—</div></div>
-      <div class="var-card" id="vcLenB"><div class="var-name">lenB</div><div class="var-value" id="vLenB" style="color:var(--pur)">—</div></div>
-      <div class="var-card" id="vcDiff"><div class="var-name">|lenA-lenB|</div><div class="var-value" id="vDiff" style="color:var(--accent4)">—</div></div>
-      <div class="var-card" id="vcStep"><div class="var-name">scan step</div><div class="var-value" id="vStep" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcP1">    <div class="var-name">p1 (val)</div>      <div class="var-value" id="vP1"    style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcP2">    <div class="var-name">p2 (val)</div>      <div class="var-value" id="vP2"    style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcPrev">  <div class="var-name">p1Prev (val)</div>  <div class="var-value" id="vPrev"  style="color:var(--accent)">null</div></div>
+      <div class="var-card" id="vcSteps"> <div class="var-name">comparisons</div>   <div class="var-value" id="vSteps" style="color:var(--accent4)">0</div></div>
     </div>
-    <div class="best-box" id="bestBox" style="border:1px solid #2a2a3e;">
-      <div class="best-label bl-found" id="bestLabel">Result</div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">Merged Result</div>
       <div class="best-val" id="bestVal">—</div>
       <div class="best-meta" id="bestMeta">not yet complete</div>
     </div>
   </div>
-  <div class="done-bar" id="doneBar">—</div>
+  <div class="done-bar" id="doneBar">★ LISTS MERGED</div>
 </div>
 </div>
 
 <script>
-// ─── DATA MODEL ────────────────────────────────────────────────────────────────
-// We build a "virtual" node structure for the visualizer.
-// Each node: {id, val, listMembership: 'l1'|'l2'|'shared'}
-// l1Full and l2Full are the full sequences of node IDs (shared tail reused).
-
-function buildLists(l1Unique, l2Unique, sharedVals){
-  // Create nodes
-  let nextId = 0;
-  const mkNode = (val, mem) => ({id: nextId++, val, mem});
-
-  const l1Nodes = l1Unique.map(v => mkNode(v, 'l1'));
-  const l2Nodes = l2Unique.map(v => mkNode(v, 'l2'));
-  const sharedNodes = sharedVals.map(v => mkNode(v, 'shared'));
-
-  const l1Full = [...l1Nodes, ...sharedNodes];
-  const l2Full = [...l2Nodes, ...sharedNodes];
-
-  return {l1Full, l2Full, sharedNodes, l1Nodes, l2Nodes};
-}
-
 // ─── EXPLAIN ──────────────────────────────────────────────────────────────────
 function makeExplain(type, args){
-  const {lenA, lenB, diff, scanStep, aIdx, bIdx, hasInter, interVal} = args||{};
+  const {p1Val,p2Val,prevVal,winner,steps} = args||{};
   if(type==='init') return {
-    why:`<div class="ep-why-block why-len">Two lists potentially share a tail. Key insight: if L1 has m nodes and L2 has n nodes, and they intersect, both have the same suffix. Skipping abs(m-n) nodes from the longer list makes both pointers equidistant from the intersection.</div>`,
+    why:`<div class="ep-why-block">Two sorted lists. We walk both simultaneously with p1 (on L1) and p2 (on L2). p1Prev tracks the tail of the merged result. At each step we compare p1.val vs p2.val — the smaller one is already in position (Case A) or needs to be spliced in (Case B).</div>`,
     inv:[
-      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> once we've equalized lengths, advancing both pointers by the same number of steps keeps them equidistant from the intersection. They must meet there.`},
-      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why null works:</strong> if there's no intersection, both pointers reach null at the same time. a==b==null → return null. No special case needed.`},
-      {icon:'🔑',cls:'inv-pur',text:`<strong>Pointer identity not value:</strong> we compare pointers (addresses), not values. Two nodes with the same value but different identity are NOT an intersection.`},
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> p1Prev always points to the last node of the merged result so far. Everything before p1Prev is sorted and correctly linked.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Case A (p1 ≤ p2):</strong> p1 is already in the right place. Just slide p1Prev and p1 forward.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Case B (p2 < p1):</strong> splice p2 before p1. Three pointer writes: p1Prev.next=p2, advance p2, p1Prev.next.next=p1. Then p1Prev slides to the inserted p2 node.`},
     ]
   };
-  if(type==='lenA') return {
-    why:`<div class="ep-why-block why-len">Counting L1 length by walking from head to tail. lenA = ${lenA??'counting…'} nodes.</div>`,
-    inv:[{icon:'🔒',cls:'',text:`<strong>Phase 1:</strong> measure both lengths to compute the skip amount = |lenA - lenB|.`}]
+  if(type==='cmpA') return {
+    why:`<div class="ep-why-block">p1 (${p1Val}) ≤ p2 (${p2Val}) → p1 stays in place. Slide p1Prev to p1, advance p1 forward. The merged tail grows by one node from L1.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>p1 wins (or tie).</strong> p1Prev slides to ${p1Val}, p1 advances. No pointer rewiring needed.`}]
   };
-  if(type==='lenB') return {
-    why:`<div class="ep-why-block why-len">L1 has ${lenA} nodes. Now counting L2. lenB = ${lenB??'counting…'} nodes. Difference = |${lenA}-${lenB??'?'}| = ${lenB!=null?Math.abs(lenA-lenB):'?'}.</div>`,
-    inv:[{icon:'🔒',cls:'',text:`<strong>diff = ${diff??'?'}.</strong> The longer list's pointer skips this many nodes so both pointers are equidistant from any intersection.`}]
+  if(type==='cmpB') return {
+    why:`<div class="ep-why-block">p2 (${p2Val}) < p1 (${p1Val}) → splice p2 before p1. p1Prev.next = p2, save p2.next, p2.next = p1, p1Prev = p2, advance p2. p1 stays — it will be compared again next iteration.</div>`,
+    inv:[{icon:'🔑',cls:'inv-pur',text:`<strong>p2 inserted before p1.</strong> p1Prev now points to the newly inserted p2 node (val ${p2Val}). p1 (val ${p1Val}) has not moved.`}]
   };
-  if(type==='advance') return {
-    why:`<div class="ep-why-block why-len">Phase 2: advancing the longer list (${lenA>lenB?'L1':'L2'}) by ${diff} step${diff!==1?'s':''}. Now both pointers are the same distance from the intersection (or null).</div>`,
-    inv:[{icon:'🔒',cls:'',text:`<strong>After equalization:</strong> a is at L1[${aIdx}], b is at L2[${bIdx}]. Both are ${Math.max(lenA,lenB)-diff} steps from null.`}]
+  if(type==='tail') return {
+    why:`<div class="ep-why-block">One list is exhausted. The remaining tail is already sorted — attach it directly to p1Prev.next. O(1) work regardless of remaining length.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Tail attached.</strong> Remaining nodes need no individual comparison since both input lists were sorted.`}]
   };
-  if(type==='scan') return {
-    why:`<div class="ep-why-block why-scan">Phase 3: advancing both pointers together. Step ${scanStep}. a=[L1 idx ${aIdx}], b=[L2 idx ${bIdx}]. They're not equal yet — keep advancing.</div>`,
-    inv:[{icon:'🔒',cls:'',text:`<strong>Both move in lock-step.</strong> If there's an intersection, they will reach it simultaneously because they're equidistant from it.`}]
-  };
-  if(type==='found') return {
-    why:`<div class="ep-why-block why-found">a == b! Both pointers landed on the same node (value ${interVal}). This is the intersection node — the first shared node of the two lists. Return it.</div>`,
-    inv:[{icon:'✅',cls:'',text:`<strong>Intersection found at value ${interVal}.</strong> O(m+n) time, O(1) space.`}]
-  };
-  if(type==='none') return {
-    why:`<div class="ep-why-block why-none">a == b == null. Both pointers reached the end simultaneously without ever pointing to the same non-null node. The lists don't intersect. Return null.</div>`,
-    inv:[{icon:'🔑',cls:'inv-key',text:`<strong>No intersection.</strong> a==b==null is the termination condition — the while loop ends and we return a (null).`}]
+  if(type==='done') return {
+    why:`<div class="ep-why-block">Merge complete. All ${steps} comparisons done. The merged list is returned via l1 (which may have been updated to p2 if the first p2 node was smaller than l1.head).</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>Done.</strong> O(n+m) time, O(1) space — no new nodes created, only pointers rewired.`}]
   };
   return {why:'',inv:[]};
 }
 
 // ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
 const TYPE_LINES={
-  init:   {ids:['cl-sig','cl-sg2','cl-len','cl-len2','cl-la'],cls:'hl-len'},
-  lenA:   {ids:['cl-la2'],cls:'hl-len'},
-  lenB:   {ids:['cl-lb'],cls:'hl-len'},
-  advance:{ids:['cl-adv','cl-adv2','cl-adv3','cl-adv4'],cls:'hl-len'},
-  scan:   {ids:['cl-scan','cl-scan2','cl-scan3','cl-scan4','cl-scan5'],cls:'hl-scan'},
-  found:  {ids:['cl-ret'],cls:'hl-found'},
-  none:   {ids:['cl-ret'],cls:'hl-none'},
+  init: {ids:['cl-init','cl-prev','cl-while','cl-cmp'],cls:'hl-l1'},
+  cmpA: {ids:['cl-cmp','cl-l1','cl-l1b'],cls:'hl-l1'},
+  cmpB: {ids:['cl-cmp','cl-l2','cl-l2b','cl-l2c','cl-l2d','cl-l2e','cl-l2f'],cls:'hl-l2'},
+  tail: {ids:['cl-tail','cl-tail2','cl-tail3'],cls:'hl-tail'},
+  done: {ids:['cl-ret'],cls:'hl-done'},
 };
 function highlightCode(type){
   document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
@@ -468,309 +434,251 @@ function highlightCode(type){
 // ─── NARRATIVE ────────────────────────────────────────────────────────────────
 function getNarrative(st){
   if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
-  const {type,lenA,lenB,diff,scanStep,aIdx,bIdx,interVal,l1Full,l2Full} = st;
+  const {type,p1Val,p2Val,prevVal,steps,result,l1,l2,resultSoFar} = st;
   if(type==='init') return {color:'var(--accent3)',
-    text:`L1 = [${l1Full.map(n=>n.val).join(',')}] (${l1Full.length} nodes), L2 = [${l2Full.map(n=>n.val).join(',')}] (${l2Full.length} nodes). Phase 1: measure both lengths.`};
-  if(type==='lenA') return {color:'var(--accent2)',
-    text:`Walking L1 to count length. lenA = <strong>${lenA}</strong>. Now counting L2.`};
-  if(type==='lenB') return {color:'var(--accent2)',
-    text:`lenA=<strong>${lenA}</strong>, lenB=<strong>${lenB}</strong>. Difference = <strong>${diff}</strong>. ${diff>0?`Advance ${lenA>lenB?'L1':'L2'} by ${diff} node${diff!==1?'s':''} to equalize.`:'Both same length — skip equalization.'}`};
-  if(type==='advance') return {color:'var(--accent2)',
-    text:`Phase 2: skipped ${diff} node${diff!==1?'s':''} from ${lenA>lenB?'L1':'L2'}. Both pointers now equidistant from intersection (if any).`};
-  if(type==='scan') return {color:'var(--pur-dark)',
-    text:`Phase 3 step ${scanStep}: a=val <strong>${l1Full[aIdx]?.val??'null'}</strong>, b=val <strong>${l2Full[bIdx]?.val??'null'}</strong>. Not equal yet → advance both.`};
-  if(type==='found') return {color:'var(--accent4)',
-    text:`✅ <strong>a == b!</strong> Intersection found at node with value <strong>${interVal}</strong>. Return this node.`};
-  if(type==='none') return {color:'var(--accent)',
-    text:`❌ a == b == <strong>null</strong>. Both pointers reached end together — no intersection. Return null.`};
+    text:`L1=[${l1.join(',')}], L2=[${l2.join(',')}]. Compare heads, weave smaller into result. p1Prev tracks the merged tail. No new nodes — just pointer rewiring.`};
+  if(type==='cmpA') return {color:'var(--accent2)',
+    text:`p1=<strong>${p1Val}</strong> ≤ p2=<strong>${p2Val}</strong>. p1 is already in the right position. Slide p1Prev→${p1Val}, advance p1. Result tail grows from L1.`};
+  if(type==='cmpB') return {color:'var(--pur-dark)',
+    text:`p2=<strong>${p2Val}</strong> < p1=<strong>${p1Val}</strong>. Splice p2 before p1! Rewire: p1Prev.next→p2, p2.next→p1. p1Prev slides to p2 (${p2Val}). p1 stays.`};
+  if(type==='tail') return {color:'var(--accent3)',
+    text:`One list exhausted. Attach remaining tail directly. O(1) — no more comparisons needed.`};
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ Merged! Result = <strong>${result?.join(' → ')}</strong>. ${steps} comparison${steps!==1?'s':''} total.`};
   return {text:'',color:'var(--accent4)'};
 }
 
 // ─── COMPUTE STEPS ────────────────────────────────────────────────────────────
-function computeSteps(lists){
-  const {l1Full, l2Full, sharedNodes} = lists;
-  const n1=l1Full.length, n2=l2Full.length;
-  const hasInter=sharedNodes.length>0;
-  const interIdx1=hasInter?l1Full.indexOf(sharedNodes[0]):-1;
-  const interIdx2=hasInter?l2Full.indexOf(sharedNodes[0]):-1;
+function computeSteps(l1, l2){
   const steps=[];
+  const n1=l1.length, n2=l2.length;
+
+  // State: p1Idx, p2Idx, prevIdx (-1=null), resultOrder (indices into unified array)
+  // Unified: 0..n1-1 = L1, n1..n1+n2-1 = L2
+  // We track which list each node came from and its position
+
+  // resultOrder: array of {src:'l1'|'l2', idx} showing merged sequence
+  // We simulate the algorithm conceptually
+
+  let p1=0, p2=0, prevSrc=null, prevIdx=-1;
+  let resultOrder=[];
+  let cmpSteps=0;
+  let newHead=null; // will be set
 
   const snap=(type,desc,extra={})=>steps.push({
-    type,desc,l1Full,l2Full,n1,n2,hasInter,
+    type,desc,l1:[...l1],l2:[...l2],n1,n2,
+    p1,p2,prevSrc,prevIdx,
+    resultOrder:[...resultOrder],
+    cmpSteps,
+    p1Val:p1<n1?l1[p1]:null,
+    p2Val:p2<n2?l2[p2]:null,
+    prevVal:prevSrc==='l1'?l1[prevIdx]:prevSrc==='l2'?l2[prevIdx]:null,
     result:null,...extra,
-    explain:makeExplain(type,{n1,n2,...extra})
+    explain:makeExplain(type,{p1Val:p1<n1?l1[p1]:null,p2Val:p2<n2?l2[p2]:null,
+      prevVal:prevSrc==='l1'?l1[prevIdx]:prevSrc==='l2'?l2[prevIdx]:null,
+      steps:cmpSteps,...extra})
   });
 
-  snap('init',`📌 Start. L1=[${l1Full.map(n=>n.val)}] L2=[${l2Full.map(n=>n.val)}]`,
-    {lenA:n1,lenB:n2,diff:Math.abs(n1-n2),aIdx:0,bIdx:0,scanStep:0});
+  snap('init',`📌 Start. L1=[${l1}] L2=[${l2}]. p1=L1[0]=${l1[0]}, p2=L2[0]=${l2[0]}, p1Prev=null.`);
 
-  // Phase 1a: walk L1
-  snap('lenA',`Phase 1: counting L1 length = ${n1}`,
-    {lenA:n1,lenB:null,diff:null,aIdx:n1,bIdx:0,scanStep:0});
+  // Determine new head
+  newHead = l1[0]<=l2[0] ? {src:'l1',idx:0} : {src:'l2',idx:0};
 
-  // Phase 1b: walk L2
-  const diff=Math.abs(n1-n2);
-  snap('lenB',`Phase 1: lenA=${n1}, lenB=${n2}, diff=${diff}`,
-    {lenA:n1,lenB:n2,diff,aIdx:0,bIdx:0,scanStep:0});
-
-  // Phase 2: advance longer
-  let aIdx=0, bIdx=0;
-  if(n1>n2) aIdx=n1-n2;
-  if(n2>n1) bIdx=n2-n1;
-  snap('advance',`Phase 2: equalized — a=[${aIdx}], b=[${bIdx}]`,
-    {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep:0});
-
-  // Phase 3: scan together
-  let scanStep=0;
-  while(aIdx<n1 && bIdx<n2 && l1Full[aIdx]!==l2Full[bIdx]){
-    aIdx++; bIdx++; scanStep++;
-    snap('scan',`Phase 3 step ${scanStep}: a=[${aIdx}]=${l1Full[aIdx]?.val??'null'}, b=[${bIdx}]=${l2Full[bIdx]?.val??'null'}`,
-      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep});
+  while(p1<n1 && p2<n2){
+    cmpSteps++;
+    if(l1[p1]<=l2[p2]){
+      // Case A: p1 wins
+      resultOrder.push({src:'l1',idx:p1});
+      prevSrc='l1'; prevIdx=p1;
+      p1++;
+      snap('cmpA',`L1[${p1-1}]=${l1[p1-1]} ≤ L2[${p2}]=${l2[p2]} → p1 stays, slide forward`,
+        {winner:'l1',p1Val:l1[p1-1],p2Val:l2[p2],steps:cmpSteps});
+    } else {
+      // Case B: p2 wins — splice
+      resultOrder.push({src:'l2',idx:p2});
+      prevSrc='l2'; prevIdx=p2;
+      p2++;
+      snap('cmpB',`L2[${p2-1}]=${l2[p2-1]} < L1[${p1}]=${l1[p1]} → splice p2 before p1`,
+        {winner:'l2',p1Val:l1[p1],p2Val:l2[p2-1],steps:cmpSteps});
+    }
   }
 
-  // Result
-  if(aIdx<n1 && bIdx<n2 && l1Full[aIdx]===l2Full[bIdx]){
-    const interVal=l1Full[aIdx].val;
-    snap('found',`✅ Intersection at node val=${interVal}`,
-      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep,interVal,
-       result:{found:true,interVal,interNode:l1Full[aIdx]}});
-    steps[steps.length-1].result={found:true,interVal};
-  } else {
-    snap('none','❌ No intersection — return null',
-      {lenA:n1,lenB:n2,diff,aIdx,bIdx,scanStep,interVal:null,
-       result:{found:false}});
-    steps[steps.length-1].result={found:false};
+  // Tail attachment
+  const hasL1Tail=p1<n1, hasL2Tail=p2<n2;
+  if(hasL1Tail||hasL2Tail){
+    while(p1<n1){resultOrder.push({src:'l1',idx:p1});p1++;}
+    while(p2<n2){resultOrder.push({src:'l2',idx:p2});p2++;}
+    snap('tail',`Attach remaining tail`,{steps:cmpSteps});
   }
+
+  // Build result array
+  const resArr=resultOrder.map(r=>r.src==='l1'?l1[r.idx]:l2[r.idx]);
+
+  snap('done',`✅ Merged: ${resArr.join(' → ')}`,
+    {steps:cmpSteps,result:resArr,
+     resultOrder:[...resultOrder],
+     p1:n1,p2:n2,
+     p1Val:null,p2Val:null,
+     explain:makeExplain('done',{steps:cmpSteps})});
+  steps[steps.length-1].result=resArr;
   return steps;
 }
 
-// ─── CANVAS DRAWING ───────────────────────────────────────────────────────────
-const NW=46, NH=46, NARR=18, PAD=14;
+// ─── CANVAS ───────────────────────────────────────────────────────────────────
+const NR=20;
 
 function drawCanvas(st){
-  const canvas=document.getElementById('ycanvas');
+  const canvas=document.getElementById('mainCanvas');
   const ctx=canvas.getContext('2d');
-  const {l1Full,l2Full,type,aIdx,bIdx,interVal} = st;
-  const n1=l1Full.length, n2=l2Full.length;
-
-  // Find shared start index
-  let sharedStart1=-1;
-  for(let i=0;i<n1;i++) if(l1Full[i].mem==='shared'){sharedStart1=i;break;}
-  const sharedLen=sharedStart1>=0?n1-sharedStart1:0;
-  const unique1=sharedStart1>=0?sharedStart1:n1;
-  const unique2=l2Full.length-sharedLen;
-
-  // Layout: compute max columns needed
-  const cols=Math.max(unique1,unique2)+sharedLen+1; // +1 for null
-  const W=Math.max(cols*(NW+NARR)+PAD*2, 300);
-  const H=sharedLen>0?160:110;
-  canvas.width=W; canvas.height=H;
+  const {l1,l2,n1,n2,p1,p2,resultOrder,type,winner} = st;
+  const W=canvas.width, H=canvas.height;
   ctx.clearRect(0,0,W,H);
+  const isFinal=type==='done';
 
-  const ROW1=sharedLen>0?30:50, ROW2=sharedLen>0?110:50, ROW_SHARED=sharedLen>0?70:50;
-  const isFinal=!!st.result;
+  const total=n1+n2;
+  const spX=Math.min(52,(W-40)/Math.max(total,1));
 
-  function nodeX(colIdx){ return PAD + colIdx*(NW+NARR); }
+  // Row Y positions
+  const ROW_L1=45, ROW_L2=120, ROW_RES=195;
 
-  function drawNode(x, y, val, state, label){
-    // Node box
+  // X for L1[i], L2[j]
+  const l1X=i=>28+i*spX;
+  const l2X=j=>28+j*spX;
+
+  // Result row: use resultOrder
+  const resX=k=>28+k*spX;
+
+  function drawArrow(x1,y,x2,color){
+    if(x2<=x1) return;
     ctx.save();
-    const radius=7;
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.moveTo(x1+NR,y); ctx.lineTo(x2-NR-5,y); ctx.stroke();
     ctx.beginPath();
-    ctx.roundRect(x,y,NW,NH,radius);
-    if(state==='shared')    { ctx.fillStyle='rgba(255,209,102,.18)'; ctx.strokeStyle='#f5a623'; ctx.lineWidth=2.5; }
-    else if(state==='l1cur'){ ctx.fillStyle='rgba(33,150,243,.22)';  ctx.strokeStyle='#2196f3'; ctx.lineWidth=3; }
-    else if(state==='l2cur'){ ctx.fillStyle='rgba(192,84,252,.18)';  ctx.strokeStyle='#c084fc'; ctx.lineWidth=3; }
-    else if(state==='inter'){ ctx.fillStyle='rgba(255,209,102,.3)';  ctx.strokeStyle='#f5a623'; ctx.lineWidth=3;
-      // Glow
-      ctx.shadowColor='rgba(255,209,102,.6)'; ctx.shadowBlur=14; }
-    else if(state==='done') { ctx.fillStyle='rgba(6,214,160,.12)';   ctx.strokeStyle='rgba(6,214,160,.4)'; ctx.lineWidth=1.5; }
-    else                    { ctx.fillStyle='#fffdf7';               ctx.strokeStyle='#d4ccb8'; ctx.lineWidth=1.5; }
+    ctx.moveTo(x2-NR-5,y);
+    ctx.lineTo(x2-NR-12,y-5); ctx.lineTo(x2-NR-12,y+5);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawNode(x,y,val,state,labelAbove){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x,y,NR,0,Math.PI*2);
+    if(state==='l1cur')     {ctx.fillStyle='rgba(255,209,102,.28)';ctx.strokeStyle='#f5a623';ctx.lineWidth=3;ctx.shadowColor='rgba(255,209,102,.5)';ctx.shadowBlur=10;}
+    else if(state==='l2cur'){ctx.fillStyle='rgba(255,209,102,.28)';ctx.strokeStyle='#f5a623';ctx.lineWidth=3;ctx.shadowColor='rgba(255,209,102,.5)';ctx.shadowBlur=10;}
+    else if(state==='l1')   {ctx.fillStyle='rgba(33,150,243,.16)'; ctx.strokeStyle='var(--accent2)';ctx.strokeStyle='#2196f3';ctx.lineWidth=2;}
+    else if(state==='l2')   {ctx.fillStyle='rgba(192,84,252,.14)'; ctx.strokeStyle='#c084fc';ctx.lineWidth=2;}
+    else if(state==='done') {ctx.fillStyle='rgba(6,214,160,.18)';  ctx.strokeStyle='rgba(6,214,160,.5)';ctx.lineWidth=1.5;}
+    else if(state==='res')  {ctx.fillStyle='rgba(6,214,160,.22)';  ctx.strokeStyle='#06d6a0';ctx.lineWidth=2;}
+    else if(state==='prev') {ctx.fillStyle='rgba(230,57,70,.12)';  ctx.strokeStyle='rgba(230,57,70,.5)';ctx.lineWidth=2;}
+    else                    {ctx.fillStyle='rgba(200,195,180,.2)'; ctx.strokeStyle='#d4ccb8';ctx.lineWidth=1.5;}
     ctx.fill(); ctx.stroke();
     ctx.restore();
 
-    // Value
     ctx.save();
-    ctx.font='bold 16px Space Mono, monospace';
+    ctx.font='bold 12px Space Mono,monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillStyle=
-      state==='l1cur'?'#0d47a1':
-      state==='l2cur'?'#5b1a9a':
-      state==='shared'||state==='inter'?'#7a4800':
-      state==='done'?'#024d37':
-      '#1a1a2e';
-    ctx.fillText(String(val), x+NW/2, y+NH/2-4);
+    ctx.fillStyle=state==='l1cur'||state==='l2cur'?'#7a4800':
+      state==='l1'?'#0d47a1':state==='l2'?'#5b1a9a':
+      state==='done'||state==='res'?'#024d37':'#8a8070';
+    ctx.fillText(String(val),x,y);
     ctx.restore();
 
-    // Pointer label above
-    if(label){
+    if(labelAbove){
       ctx.save();
-      const lbY=y-18;
-      labels.push({text:label,x:x+NW/2,y:lbY,color:
-        label.includes('a')&&!label.includes('b')?'#2196f3':
-        label.includes('b')&&!label.includes('a')?'#c084fc':
-        '#f5a623'});
+      ctx.font='bold 8px Space Mono,monospace';
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillStyle=labelAbove.color||'#f5a623';
+      ctx.fillText(labelAbove.text,x,y-NR-2);
       ctx.restore();
     }
   }
 
-  function drawArrow(x1,y1,x2,y2,color){
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x1,y1);
-    ctx.lineTo(x2,y2);
-    ctx.strokeStyle=color||'#d4ccb8';
-    ctx.lineWidth=1.5;
-    ctx.stroke();
-    // Arrowhead
-    const ang=Math.atan2(y2-y1,x2-x1);
-    ctx.beginPath();
-    ctx.moveTo(x2,y2);
-    ctx.lineTo(x2-8*Math.cos(ang-.4),y2-8*Math.sin(ang-.4));
-    ctx.lineTo(x2-8*Math.cos(ang+.4),y2-8*Math.sin(ang+.4));
-    ctx.closePath();
-    ctx.fillStyle=color||'#d4ccb8';
-    ctx.fill();
-    ctx.restore();
-  }
-
-  function nullNode(x,y){
-    ctx.save();
-    ctx.font='10px Space Mono,monospace';
-    ctx.fillStyle='#8a8070';
-    ctx.textAlign='left'; ctx.textBaseline='middle';
-    ctx.fillText('null',x,y+NH/2);
-    ctx.restore();
-  }
-
-  const labels=[];
-
-  // Draw L1 unique prefix
-  for(let i=0;i<unique1;i++){
-    const node=l1Full[i];
-    const x=nodeX(i), y=ROW1;
-    const isACur=(type!=='lenA'&&type!=='init')&&i===aIdx;
-    const isDone=(type!=='lenA'&&type!=='init')&&i<aIdx;
-    const isInter=isFinal&&st.result?.found&&node.val===interVal;
-    const state=isInter?'inter':isACur?'l1cur':isDone?'done':'normal';
-    const label=isACur?(i===bIdx&&i<n2&&l1Full[i]===l2Full[i]?'a=b':'a'):null;
-    drawNode(x,y,node.val,state,label);
-    if(i<unique1-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#b0c4de');
-  }
-
-  // Draw L2 unique prefix
-  for(let i=0;i<unique2;i++){
-    const node=l2Full[i];
-    const x=nodeX(Math.max(0,unique1-unique2)+i), y=ROW2;
-    const isBCur=(type!=='lenA'&&type!=='lenB'&&type!=='init')&&i===bIdx;
-    const isDone=(type!=='lenA'&&type!=='lenB'&&type!=='init')&&i<bIdx;
-    const state=isBCur?'l2cur':isDone?'done':'normal';
-    const label=isBCur?'b':null;
-    drawNode(x,y,node.val,state,label);
-    if(i<unique2-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#d8b4fe');
-  }
-
-  // Convergence arrows (Y-shape) to shared
-  if(sharedLen>0){
-    const sharedX0=nodeX(Math.max(unique1,unique2));
-    // From L1 last unique → first shared
-    const l1LastX=nodeX(unique1-1)+NW;
-    drawArrow(l1LastX, ROW1+NH/2, sharedX0, ROW_SHARED+NH/2, '#f5a623');
-    // From L2 last unique → first shared
-    const l2LastX=nodeX(Math.max(0,unique1-unique2)+unique2-1)+NW;
-    drawArrow(l2LastX, ROW2+NH/2, sharedX0, ROW_SHARED+NH/2, '#f5a623');
-  } else if(unique1===0&&unique2===0){
-    // Both start at shared
-  }
-
-  // Draw shared tail
-  for(let i=0;i<sharedLen;i++){
-    const node=l1Full[unique1+i];
-    const x=nodeX(Math.max(unique1,unique2)+i), y=ROW_SHARED;
-    const col1=unique1+i, col2=unique2+i;
-    const isACur=col1===aIdx;
-    const isBCur=col2===bIdx;
-    const isInter=isFinal&&st.result?.found&&node.val===interVal&&i===0;
-    const state=isInter?'inter':'shared';
-    const label=isACur&&isBCur?'a=b':isACur?'a':isBCur?'b':null;
-    drawNode(x,y,node.val,state,label);
-    if(i<sharedLen-1) drawArrow(x+NW,y+NH/2,x+NW+NARR,y+NH/2,'#f5a623');
-  }
-
-  // Null at end
-  const endCol=Math.max(unique1,unique2)+sharedLen;
-  const endY=sharedLen>0?ROW_SHARED:ROW1;
-  const lastX=nodeX(endCol-1)+NW;
-  drawArrow(lastX,endY+NH/2,lastX+NARR-4,endY+NH/2,'#d4ccb8');
-  nullNode(lastX+NARR-4, endY);
-
-  // Draw labels on top
-  labels.forEach(lb=>{
+  // Row labels
+  function rowLabel(txt,y,color){
     ctx.save();
     ctx.font='bold 9px Space Mono,monospace';
-    ctx.textAlign='center'; ctx.textBaseline='bottom';
-    ctx.fillStyle=lb.color;
-    // Badge
-    const tw=ctx.measureText(lb.text).width+8;
-    ctx.fillStyle=lb.color+'22';
-    ctx.beginPath();
-    ctx.roundRect(lb.x-tw/2,lb.y-13,tw,13,3);
-    ctx.fill();
-    ctx.fillStyle=lb.color;
-    ctx.font='bold 9px Space Mono,monospace';
-    ctx.fillText(lb.text,lb.x,lb.y);
+    ctx.fillStyle=color||var_color;
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillStyle=color;
+    ctx.fillText(txt,22,y);
     ctx.restore();
-  });
+  }
+  ctx.save();
+  ctx.font='bold 9px Space Mono,monospace';
+  ctx.textBaseline='middle';
+  ctx.textAlign='right';
+  ctx.fillStyle='#2196f3'; ctx.fillText('L1',22,ROW_L1);
+  ctx.fillStyle='#c084fc'; ctx.fillText('L2',22,ROW_L2);
+  ctx.fillStyle='#06d6a0'; ctx.fillText('Res',22,ROW_RES);
+  ctx.restore();
 
-  // Outer border
-  const yo=document.getElementById('youter');
-  yo.className=`youter ${type==='found'?'yo-found':type==='none'?'yo-none':type==='scan'||type==='advance'?'yo-scan':''}`;
+  // Draw L1
+  for(let i=0;i<n1;i++){
+    const x=l1X(i);
+    const isCur=i===p1&&!isFinal;
+    const isDone=i<p1||(isFinal);
+    const isPrev=st.prevSrc==='l1'&&st.prevIdx===i&&!isFinal;
+    const state=isCur?'l1cur':isPrev?'prev':isDone?'done':'l1';
+    const lbl=isCur?{text:'p1',color:'#f5a623'}:isPrev?{text:'prev',color:'rgba(230,57,70,.7)'}:null;
+    drawNode(x,ROW_L1,l1[i],state,lbl);
+    if(i<n1-1) drawArrow(x,ROW_L1,l1X(i+1),isDone?'rgba(6,214,160,.3)':'rgba(33,150,243,.3)');
+  }
+  // null
+  if(n1>0){ctx.save();ctx.font='9px Space Mono,monospace';ctx.fillStyle='#c8bfaa';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('→null',l1X(n1-1)+NR+4,ROW_L1);ctx.restore();}
+
+  // Draw L2
+  for(let j=0;j<n2;j++){
+    const x=l2X(j);
+    const isCur=j===p2&&!isFinal;
+    const isDone=j<p2||(isFinal);
+    const isPrev=st.prevSrc==='l2'&&st.prevIdx===j&&!isFinal;
+    const state=isCur?'l2cur':isPrev?'prev':isDone?'done':'l2';
+    const lbl=isCur?{text:'p2',color:'#f5a623'}:isPrev?{text:'prev',color:'rgba(230,57,70,.7)'}:null;
+    drawNode(x,ROW_L2,l2[j],state,lbl);
+    if(j<n2-1) drawArrow(x,ROW_L2,l2X(j+1),isDone?'rgba(6,214,160,.3)':'rgba(192,84,252,.3)');
+  }
+  if(n2>0){ctx.save();ctx.font='9px Space Mono,monospace';ctx.fillStyle='#c8bfaa';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('→null',l2X(n2-1)+NR+4,ROW_L2);ctx.restore();}
+
+  // Draw Result so far
+  const resNodes=isFinal?resultOrder:resultOrder;
+  for(let k=0;k<resNodes.length;k++){
+    const {src,idx}=resNodes[k];
+    const val=src==='l1'?l1[idx]:l2[idx];
+    const x=resX(k);
+    const isLast=k===resNodes.length-1&&!isFinal;
+    drawNode(x,ROW_RES,val,isLast&&type!=='tail'?'prev':'res',null);
+    if(k<resNodes.length-1) drawArrow(x,ROW_RES,resX(k+1),'rgba(6,214,160,.5)');
+  }
+  if(isFinal&&resNodes.length>0){ctx.save();ctx.font='9px Space Mono,monospace';ctx.fillStyle='#06d6a0';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('→null',resX(resNodes.length-1)+NR+4,ROW_RES);ctx.restore();}
+
+  // Canvas border color
+  document.getElementById('canvasOuter').className=
+    `canvas-outer ${type==='cmpA'?'co-l1':type==='cmpB'?'co-l2':type==='tail'?'co-tail':isFinal?'co-done':''}`;
 }
 
 // ─── GLOBALS ──────────────────────────────────────────────────────────────────
 let steps=[], currentStep=0, playing=false, timer=null, speed=750;
-let lists=null;
 
-// ─── BUILD UI ─────────────────────────────────────────────────────────────────
 function buildUI(){
-  const l1Raw=document.getElementById('inL1').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
-  const l2Raw=document.getElementById('inL2').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
-  const interRaw=document.getElementById('inInter').value.trim();
+  const l1=document.getElementById('inL1').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  const l2=document.getElementById('inL2').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  if(!l1.length||!l2.length){alert('Please enter valid lists.');return;}
 
-  // Parse intersection: could be "1,4" (multiple shared nodes) or "1" or ""
-  let shared=[];
-  if(interRaw.length>0){
-    // Find where shared tail starts in each list by matching from right
-    // User inputs the full lists including shared: parse where the shared part begins
-    // Simple approach: the shared portion is the suffix of both lists that matches
-    // We'll let user specify shared VALUES as a comma list after the split point
-    shared=interRaw.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
-  }
+  // Resize canvas
+  const canvas=document.getElementById('mainCanvas');
+  const total=l1.length+l2.length;
+  const spX=Math.min(52,(600)/Math.max(total,1));
+  canvas.width=Math.max(400,Math.max(l1.length,l2.length)*spX+80);
+  canvas.height=240;
 
-  // Remove shared suffix from l1Raw and l2Raw if they end with shared
-  // (user might have typed the full list including shared tail)
-  function stripShared(arr,sh){
-    if(!sh.length) return arr;
-    const tail=arr.slice(arr.length-sh.length);
-    if(tail.join()===sh.join()) return arr.slice(0,arr.length-sh.length);
-    return arr;
-  }
-  const l1Unique=stripShared(l1Raw,shared);
-  const l2Unique=stripShared(l2Raw,shared);
-
-  if(!l1Raw.length||!l2Raw.length){alert('Please enter valid lists.');return;}
-
-  lists=buildLists(l1Unique,l2Unique,shared);
-  steps=computeSteps(lists);
+  steps=computeSteps(l1,l2);
   currentStep=0;
-
-  document.getElementById('cxL1').textContent=lists.l1Full.length;
-  document.getElementById('cxL2').textContent=lists.l2Full.length;
+  document.getElementById('cxSteps').textContent='—';
+  document.getElementById('cxHead').textContent='—';
   document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
-  document.getElementById('doneBanner').className='done-banner';
+  document.getElementById('doneBanner').classList.remove('show');
   document.getElementById('doneBar').className='done-bar';
-  document.getElementById('bestBox').style.border='1px solid #2a2a3e';
-  document.getElementById('bestBox').style.background='transparent';
+  document.getElementById('bestBox').className='best-box';
   document.getElementById('btnPrev').disabled=true;
   document.getElementById('btnNext').disabled=false;
   document.getElementById('btnPause').disabled=true;
@@ -794,56 +702,66 @@ function setVar(elId,cardId,val){
 function renderStep(idx){
   if(idx<0||idx>=steps.length) return;
   const st=steps[idx]; currentStep=idx;
-  const {type,lenA,lenB,diff,scanStep,aIdx,bIdx,interVal,l1Full,l2Full} = st;
+  const {type,p1Val,p2Val,prevVal,cmpSteps,l1,l2,result,resultOrder} = st;
   const isFinal=!!st.result;
 
-  // Canvas
   drawCanvas(st);
 
   // Phase badge
   const pb=document.getElementById('phaseBadge');
-  if(type==='init'){pb.className='phase-badge pb-len';pb.textContent='Initializing…';}
-  else if(type==='lenA'){pb.className='phase-badge pb-len';pb.textContent=`Phase 1: Counting L1 → lenA = ${lenA}`;}
-  else if(type==='lenB'){pb.className='phase-badge pb-len';pb.textContent=`Phase 1: lenA=${lenA} lenB=${lenB} diff=${diff}`;}
-  else if(type==='advance'){pb.className='phase-badge pb-len';pb.textContent=`Phase 2: Equalized — skip ${diff} from ${lenA>lenB?'L1':'L2'}`;}
-  else if(type==='scan'){pb.className='phase-badge pb-scan';pb.textContent=`Phase 3: Advancing both — step ${scanStep}`;}
-  else if(type==='found'){pb.className='phase-badge pb-found';pb.textContent=`✅ Intersection found! val = ${interVal}`;}
-  else{pb.className='phase-badge pb-none';pb.textContent='❌ No intersection — return null';}
+  const phases={
+    init:'pb-init',cmpA:'pb-l1',cmpB:'pb-l2',tail:'pb-tail',done:'pb-done'
+  };
+  pb.className=`phase-badge ${phases[type]||'pb-init'}`;
+  pb.textContent=
+    type==='init'?'Starting — p1=L1[0], p2=L2[0], p1Prev=null':
+    type==='cmpA'?`p1(${p1Val}) ≤ p2(${p2Val}) → p1 wins · advance p1`:
+    type==='cmpB'?`p2(${p2Val}) < p1(${p1Val}) → splice p2 before p1`:
+    type==='tail'?'One list done — attach remaining tail O(1)':
+    `✅ Merged! ${cmpSteps} comparison${cmpSteps!==1?'s':''}`;
 
-  // Pointer strip
-  const aVal=aIdx<l1Full.length?l1Full[aIdx].val:'null';
-  const bVal=bIdx<l2Full.length?l2Full[bIdx].val:'null';
-  const isEq=(type==='found')||(type==='none');
-  document.getElementById('paVal').textContent=`val = ${aVal}`;
-  document.getElementById('paSub').textContent=`L1 index ${aIdx}`;
-  document.getElementById('pbVal').textContent=`val = ${bVal}`;
-  document.getElementById('pbSub').textContent=`L2 index ${bIdx}`;
-  document.getElementById('pcA').className=`ptr-card pc-a`;
-  document.getElementById('pcB').className=`ptr-card pc-b`;
-  document.getElementById('pcEq').className=`ptr-card ${isEq?'pc-eq':''}`;
-  document.getElementById('pcEq').style.opacity=type==='scan'||isEq?'1':'.3';
-  document.getElementById('peqVal').textContent=isEq?(type==='found'?'YES ✓':'YES (null)'):type==='scan'?'NO':'—';
-  document.getElementById('peqSub').textContent=isEq?(type==='found'?'intersection!':'no intersection'):'comparing…';
+  // Comparison panel
+  const co=document.getElementById('cmpOuter');
+  const ct=document.getElementById('cmpTitle');
+  const cr=document.getElementById('cmpRow');
+  if(type==='cmpA'||type==='cmpB'){
+    const winL1=type==='cmpA';
+    co.className=`cmp-outer ${winL1?'co-l1':'co-l2'}`;
+    ct.textContent=`Comparing p1=${p1Val} vs p2=${p2Val}`;
+    cr.innerHTML=`
+      <div class="cmp-box cb-l1 ${winL1?'cmp-box cb-win':''}">
+        <div class="cmp-val">${p1Val}</div>
+        <div class="cmp-lbl">p1 (L1)</div>
+      </div>
+      <div class="cmp-op">${p1Val<=p2Val?'≤':'>'}</div>
+      <div class="cmp-box cb-l2 ${!winL1?'cmp-box cb-win':''}">
+        <div class="cmp-val">${p2Val}</div>
+        <div class="cmp-lbl">p2 (L2)</div>
+      </div>
+      <div class="cmp-verdict ${winL1?'cv-l1':'cv-l2'}">${winL1?'L1 wins →':'L2 wins →'}</div>`;
+  } else {
+    co.className='cmp-outer';
+    ct.textContent=type==='done'?'All comparisons complete':type==='tail'?'Attach remaining tail':'Comparison panel';
+    cr.innerHTML='';
+  }
 
   // Step panel
   const sp=document.getElementById('stepPanel');
-  const mkBox=(lbl,val,cls)=>
-    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
-  sp.className=`step-panel ${type==='found'?'sp-found':type==='none'?'sp-none':type==='scan'||type==='advance'?'sp-scan':'sp-len'}`;
+  sp.className=`step-panel ${type==='cmpA'?'sp-l1':type==='cmpB'?'sp-l2':type==='tail'?'sp-tail':isFinal?'sp-done':''}`;
   document.getElementById('spTitle').textContent=st.desc.replace(/<[^>]+>/g,'');
+  const mkBox=(lbl,v,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${v}</div></div>`;
   const spb=document.getElementById('spBody');
-  if(type==='lenA'||type==='lenB'){
-    spb.innerHTML=mkBox('lenA',lenA??'—','spbox sb-blue')+mkBox('lenB',lenB??'—','spbox sb-pur')+(diff!=null?mkBox('diff',diff,'spbox sb-yel'):'');
-  } else if(type==='advance'){
-    spb.innerHTML=mkBox('lenA',lenA,'spbox sb-blue')+mkBox('lenB',lenB,'spbox sb-pur')+mkBox('diff',diff,'spbox sb-yel')+mkBox('skip',`${lenA>lenB?'L1':'L2'}×${diff}`,'spbox sb-yel');
-  } else if(type==='scan'){
-    spb.innerHTML=mkBox('a val',aVal,'spbox sb-blue')+mkBox('b val',bVal,'spbox sb-pur')+mkBox('a==b','NO','spbox sb-red')+mkBox('step',scanStep,'spbox sb-yel');
-  } else if(type==='found'){
-    spb.innerHTML=mkBox('a==b','YES ✓','spbox sb-yel')+mkBox('val',interVal,'spbox sb-yel');
-  } else if(type==='none'){
-    spb.innerHTML=mkBox('a==b','null','spbox sb-red')+mkBox('result','null','spbox sb-red');
+  if(type==='cmpA'||type==='cmpB'){
+    spb.innerHTML=
+      mkBox('p1',p1Val??'null','spbox sb-blue')+
+      mkBox('p2',p2Val??'null','spbox sb-pur')+
+      mkBox('winner',type==='cmpA'?`p1(${p1Val})`:`p2(${p2Val})`,'spbox sb-yel')+
+      mkBox('comparisons',cmpSteps,'spbox sb-grn');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('comparisons',cmpSteps,'spbox sb-grn')+mkBox('new head',result?.[0],'spbox sb-grn');
   } else {
-    spb.innerHTML=mkBox('L1',l1Full.length,'spbox sb-blue')+mkBox('L2',l2Full.length,'spbox sb-pur');
+    spb.innerHTML=mkBox('L1 len',l1.length,'spbox sb-blue')+mkBox('L2 len',l2.length,'spbox sb-pur');
   }
 
   // Narrative
@@ -851,28 +769,23 @@ function renderStep(idx){
   document.getElementById('narrativeText').innerHTML=narr.text;
   document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
 
-  // 3-tab
   updateExplain(st);
   highlightCode(type);
 
-  // Right vars
-  setVar('vLenA','vcLenA',lenA??'—');
-  setVar('vLenB','vcLenB',lenB??'—');
-  setVar('vDiff','vcDiff',diff!=null?diff:'—');
-  setVar('vStep','vcStep',scanStep>0?scanStep:'—');
+  setVar('vP1','vcP1',p1Val??'null');
+  setVar('vP2','vcP2',p2Val??'null');
+  setVar('vPrev','vcPrev',prevVal??'null');
+  setVar('vSteps','vcSteps',cmpSteps??0);
 
-  // Done
   if(isFinal){
-    const found=st.result.found;
-    document.getElementById('doneBanner').className=`done-banner show ${found?'db-found':'db-none'}`;
-    document.getElementById('doneBanner').textContent=found?`★ Intersection at val = ${st.result.interVal}`:'★ No intersection — returns null';
-    document.getElementById('doneBar').className=`done-bar show ${found?'db-found':'db-none'}`;
-    document.getElementById('doneBar').textContent=found?`★ val = ${st.result.interVal}`:'★ null';
-    document.getElementById('bestBox').className=`best-box ${found?'bb-found':'bb-none'}`;
-    document.getElementById('bestLabel').className=`best-label ${found?'bl-found':'bl-none'}`;
-    document.getElementById('bestLabel').textContent=found?'Intersection Node':'No Intersection';
-    document.getElementById('bestVal').textContent=found?`val = ${st.result.interVal}`:'null';
-    document.getElementById('bestMeta').textContent=found?`L1[${aIdx}] == L2[${bIdx}]`:`a == b == null`;
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ ${result?.join(' → ')}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=result?.join(' → ')||'—';
+    document.getElementById('bestMeta').textContent=`${cmpSteps} comparisons · O(n+m) · O(1)`;
+    document.getElementById('cxSteps').textContent=cmpSteps;
+    document.getElementById('cxHead').textContent=result?.[0]??'—';
   }
 
   document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
@@ -926,9 +839,9 @@ document.addEventListener('keydown',e=>{
   else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
   else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
 });
-window.addEventListener('resize',()=>{ if(steps.length) renderStep(currentStep); });
-
+window.addEventListener('resize',()=>{if(steps.length)renderStep(currentStep);});
 buildUI();
 </script>
 </body>
 </html>
+

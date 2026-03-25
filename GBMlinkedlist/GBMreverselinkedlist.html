@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reverse Linked List — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a5a00;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:280px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:var(--accent4);color:#3a2800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* ══ PHASE BADGE ══ */
+.phase-badge{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:4px 12px;border-radius:5px;margin-bottom:12px;display:inline-block;transition:all .3s;}
+.pb-init {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+.pb-rev  {background:rgba(255,209,102,.15);border:1.5px solid var(--accent4);color:#7a5a00;}
+.pb-done {background:rgba(6,214,160,.15);border:1.5px solid var(--accent3);color:#024d37;animation:phb .4s ease;}
+@keyframes phb{from{transform:scale(1.07);}to{transform:none;}}
+
+/* ══ LEGEND ══ */
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ CANVAS ══ */
+.canvas-section{margin-bottom:14px;}
+.canvas-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:6px;transition:border-color .3s;overflow:hidden;}
+.canvas-outer.co-rev {border-color:var(--accent4);}
+.canvas-outer.co-done{border-color:var(--accent3);}
+#mainCanvas{display:block;margin:0 auto;}
+
+/* ══ POINTER STRIP ══ */
+.ptr-strip{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.ptr-card{flex:1;min-width:90px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;transition:all .3s;}
+.ptr-card.pc-prev{border-color:var(--pur);background:rgba(192,84,252,.05);}
+.ptr-card.pc-curr{border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.ptr-card.pc-next{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.ptr-card.pc-done{border-color:var(--accent3);background:rgba(6,214,160,.07);}
+.ptr-name{font-family:'Space Mono',monospace;font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.ptr-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.ptr-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* ══ ACTION PANEL ══ */
+.action-section{margin-bottom:14px;}
+.action-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;transition:border-color .3s;}
+.action-outer.ao-rev {border-color:var(--accent4);}
+.action-outer.ao-done{border-color:var(--accent3);}
+.action-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.action-steps{display:flex;flex-direction:column;gap:5px;}
+.astep{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;font-family:'Space Mono',monospace;font-size:.67rem;border:1.5px solid var(--border);background:var(--surface);transition:all .25s;}
+.astep.as-cur {background:rgba(255,209,102,.12);border-color:var(--accent4);color:#7a4800;font-weight:700;}
+.astep.as-done{background:rgba(6,214,160,.07);border-color:rgba(6,214,160,.3);color:#028a5b;}
+.astep.as-wait{opacity:.45;color:var(--muted);}
+.as-num{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;flex-shrink:0;}
+.as-num.an-cur {background:var(--accent4);color:#3a2800;}
+.as-num.an-done{background:var(--accent3);color:#012a1e;}
+.as-num.an-wait{background:var(--border);color:var(--muted);}
+
+/* ══ BEFORE/AFTER ══ */
+.ba-section{margin-bottom:14px;}
+.ba-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;}
+.ba-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.ba-label{font-family:'Space Mono',monospace;font-size:.58rem;font-weight:700;width:52px;flex-shrink:0;}
+.ba-before{color:var(--muted);}
+.ba-after {color:var(--accent3);}
+.ba-list{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-rev {border-color:var(--accent4);}
+.step-panel.sp-done{border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:6px 10px;text-align:center;}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spbox.sb-yel {border-color:var(--accent4);border-width:2px;background:rgba(255,209,102,.06);}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);background:rgba(6,214,160,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*18+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-save {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-flip {background:rgba(255,209,102,.16);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-adv  {background:rgba(192,84,252,.14);border-left-color:var(--pur);color:#e2e8f0;}
+.code-line.hl-done {background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(6,214,160,.06);border:1px solid rgba(6,214,160,.2);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Reverse Linked List</h1>
+    <div class="sub">In-Place Reversal · Three Pointers · O(n) · O(1)</div>
+  </div>
+  <div class="family-badge">Linked List · In-Place</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>List values  (comma-separated)</label>
+      <input type="text" id="inVals" value="0,1,2,3,4,5">
+      <div class="hint">Singly linked list — will be reversed in place</div>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="750">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <div id="phaseBadge" class="phase-badge pb-init">Press RUN to begin</div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.15);border-color:#c084fc;"></div> prev</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.22);border-color:#f5a623;"></div> curr (being reversed)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.18);border-color:#2196f3;"></div> next (saved)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.18);border-color:#06d6a0;"></div> already reversed ✓</div>
+    <div class="legend-item"><div class="ldot" style="background:var(--surface);border-color:#d4ccb8;"></div> not yet touched</div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-section">
+    <div class="section-label">Live list — arrows flip direction one at a time · pointers shown above</div>
+    <div class="canvas-outer" id="canvasOuter">
+      <canvas id="mainCanvas" width="640" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- POINTER STRIP -->
+  <div class="ptr-strip">
+    <div class="ptr-card" id="pcPrev">
+      <div class="ptr-name">prev</div>
+      <div class="ptr-val" id="ppVal">null</div>
+      <div class="ptr-sub" id="ppSub">left boundary</div>
+    </div>
+    <div class="ptr-card" id="pcCurr">
+      <div class="ptr-name">curr</div>
+      <div class="ptr-val" id="pcVal">—</div>
+      <div class="ptr-sub" id="pcSub">being reversed</div>
+    </div>
+    <div class="ptr-card" id="pcNext">
+      <div class="ptr-name">next</div>
+      <div class="ptr-val" id="pnVal">—</div>
+      <div class="ptr-sub" id="pnSub">saved ahead</div>
+    </div>
+    <div class="ptr-card" id="pcNewHead" style="opacity:.3">
+      <div class="ptr-name">new head</div>
+      <div class="ptr-val" id="phVal">—</div>
+      <div class="ptr-sub">when done</div>
+    </div>
+  </div>
+
+  <!-- 4-STEP ACTION PANEL -->
+  <div class="action-section">
+    <div class="section-label">4 micro-steps per iteration — happening right now</div>
+    <div class="action-outer" id="actionOuter">
+      <div class="action-title" id="actionTitle">Iteration detail</div>
+      <div class="action-steps" id="actionSteps"></div>
+    </div>
+  </div>
+
+  <!-- BEFORE / AFTER -->
+  <div class="ba-section">
+    <div class="ba-outer">
+      <div class="ba-row">
+        <div class="ba-label ba-before">Before:</div>
+        <div class="ba-list" id="baBeforeList">—</div>
+      </div>
+      <div class="ba-row">
+        <div class="ba-label ba-after">After:</div>
+        <div class="ba-list" id="baAfterList">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-rev" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to watch the three-pointer reversal.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" style="color:var(--accent2)">O(n)</div>
+      <div class="cx-sub">single pass</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" style="color:#028a5b">O(1)</div>
+      <div class="cx-sub">3 pointers</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Iteration</div>
+      <div class="cx-val" id="cxIter" style="color:#7a5a00">—</div>
+      <div class="cx-sub">of n-1</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">New Head</div>
+      <div class="cx-val" id="cxHead" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub">value</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — Reverse Linked List</div>
+    <pre class="code-block">
+<span class="code-line" id="cl-sig">LinkedList* <span class="cf">reverseLinkedList</span>(</span>
+<span class="code-line" id="cl-sg2">    LinkedList* head){</span>
+<span class="code-line" id="cl-init">  LinkedList *prev=<span class="cn">nullptr</span>;</span>
+<span class="code-line" id="cl-cur">  LinkedList *curr=head;</span>
+<span class="code-line" id="cl-while">  <span class="ck">while</span>(curr!=<span class="cn">nullptr</span>){</span>
+<span class="code-line" id="cl-save">   <span class="cc">// ① save next</span></span>
+<span class="code-line" id="cl-save2">   LinkedList* nxt=curr->next;</span>
+<span class="code-line" id="cl-flip">   <span class="cc">// ② flip arrow</span></span>
+<span class="code-line" id="cl-flip2">   curr->next=prev;</span>
+<span class="code-line" id="cl-adv">   <span class="cc">// ③ advance prev</span></span>
+<span class="code-line" id="cl-adv2">   prev=curr;</span>
+<span class="code-line" id="cl-adv3">   <span class="cc">// ④ advance curr</span></span>
+<span class="code-line" id="cl-adv4">   curr=nxt;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> prev; <span class="cc">// new head</span></span>
+<span class="code-line" id="cl-ret2">}</span></pre>
+  </div>
+
+  <div style="flex-shrink:0;padding:13px 13px 10px;border-bottom:1px solid #2a2a3e;">
+    <div style="font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#ff6b6b;margin-bottom:8px;">⚡ Why the 4-step order matters</div>
+    <pre style="font-family:'Space Mono',monospace;font-size:.62rem;line-height:1.85;background:#02020a;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;overflow-x:auto;color:#9ca3af;">
+<span style="color:#374151;font-style:italic">// The 4 steps MUST happen in this exact order:
+//
+// ① nxt = curr->next    SAVE next first!
+//    Without this, step ② destroys the
+//    reference to the rest of the list.
+//
+// ② curr->next = prev   FLIP the arrow
+//    curr now points backward to prev.
+//    The rest of the list is saved in nxt.
+//
+// ③ prev = curr         SLIDE prev forward
+//    prev is the "reversed tail" — it
+//    becomes the new head when we finish.
+//
+// ④ curr = nxt          SLIDE curr forward
+//    Move to the next unprocessed node.
+//
+// When curr == nullptr:
+//    prev is the new head of the reversed list.</span></pre>
+    <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);color:#4fc3f7;padding:2px 8px;border-radius:3px;">① save nxt first</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(255,209,102,.12);border:1px solid rgba(255,209,102,.3);color:#ffd166;padding:2px 8px;border-radius:3px;">② flip arrow</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(192,84,252,.12);border:1px solid rgba(192,84,252,.3);color:#c084fc;padding:2px 8px;border-radius:3px;">③ slide prev</div>
+      <div style="font-family:'Space Mono',monospace;font-size:.52rem;background:rgba(6,214,160,.10);border:1px solid rgba(6,214,160,.3);color:var(--accent3);padding:2px 8px;border-radius:3px;">④ slide curr</div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcPrev"><div class="var-name">prev (val)</div><div class="var-value" id="vPrev" style="color:var(--pur)">null</div></div>
+      <div class="var-card" id="vcCurr"><div class="var-name">curr (val)</div><div class="var-value" id="vCurr" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcNext"><div class="var-name">next (val)</div><div class="var-value" id="vNext" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcIter"><div class="var-name">iteration</div><div class="var-value" id="vIter" style="color:var(--accent3)">0</div></div>
+    </div>
+    <div class="best-box" id="bestBox">
+      <div class="best-label">New Head</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet reversed</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ LIST REVERSED</div>
+</div>
+</div>
+
+<script>
+// ─── EXPLAIN ──────────────────────────────────────────────────────────────────
+function makeExplain(type, subStep, args){
+  const {prevIdx,currIdx,nextIdx,iter,n,vals,microStep} = args||{};
+  const pv=prevIdx>=0?vals[prevIdx]:'null';
+  const cv=currIdx>=0&&currIdx<n?vals[currIdx]:'null';
+  const nv=nextIdx>=0&&nextIdx<n?vals[nextIdx]:'null';
+
+  if(type==='init') return {
+    why:`<div class="ep-why-block">To reverse a singly linked list in-place, we need exactly three pointers: <strong>prev</strong> (reversed tail, starts null), <strong>curr</strong> (node being processed, starts at head), and <strong>next</strong> (temporary save of curr.next before we overwrite it). Each iteration processes one node.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> at the start of each iteration, all nodes left of curr are already reversed and form a valid list ending at prev. All nodes from curr onward are still in original order.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why save next first?</strong> Step ② overwrites curr.next. If we don't save it first, we permanently lose the reference to the rest of the unreversed list.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>When curr == null:</strong> all nodes are reversed. prev is now pointing at the last original node, which is the new head. Return prev.`},
+    ]
+  };
+  if(subStep===0) return {
+    why:`<div class="ep-why-block">Step ①: <strong>nxt = curr.next = ${nv}</strong>. Saving curr's next pointer before we overwrite it in step ②. Without this save, we'd lose the rest of the list.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>nxt = ${nv}.</strong> Curr.next is about to be overwritten — this is our only chance to save it.`}]
+  };
+  if(subStep===1) return {
+    why:`<div class="ep-why-block">Step ②: <strong>curr.next = prev (${pv})</strong>. The arrow on node ${cv} now points BACKWARD to prev. This is the actual reversal! The forward connection to ${nv} is preserved in nxt.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>Arrow flipped.</strong> Node ${cv} now points to ${pv}. The reversed prefix [... ← ${pv} ← ${cv}] grows by one.`}]
+  };
+  if(subStep===2) return {
+    why:`<div class="ep-why-block">Step ③: <strong>prev = curr (${cv})</strong>. Sliding prev one step forward. Prev always points to the rightmost node of the reversed portion — it will become the new head when we finish.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>prev slides to ${cv}.</strong> The reversed tail advances.`}]
+  };
+  if(subStep===3) return {
+    why:`<div class="ep-why-block">Step ④: <strong>curr = nxt (${nv})</strong>. Sliding curr to the next unprocessed node. The loop continues until curr == null.</div>`,
+    inv:[{icon:'🔒',cls:'',text:`<strong>curr slides to ${nv??'null'}.</strong> ${nv==null?'curr is now null → loop ends, return prev as new head.':'Next iteration begins with this node.'}`}]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block">curr == null — all nodes reversed! prev points to the original tail node (val ${pv}), which is now the new head. Return prev.</div>`,
+    inv:[{icon:'✅',cls:'',text:`<strong>New head = val ${pv}.</strong> All ${n} nodes reversed in O(n) time, O(1) space.`}]
+  };
+  return {why:'',inv:[]};
+}
+
+// ─── CODE HIGHLIGHT ───────────────────────────────────────────────────────────
+function highlightCode(subStep, isDone){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  if(isDone){
+    ['cl-ret','cl-ret2'].forEach(id=>document.getElementById(id)?.classList.add('hl-done'));
+    return;
+  }
+  if(subStep===0) ['cl-save','cl-save2'].forEach(id=>document.getElementById(id)?.classList.add('hl-save'));
+  if(subStep===1) ['cl-flip','cl-flip2'].forEach(id=>document.getElementById(id)?.classList.add('hl-flip'));
+  if(subStep===2) ['cl-adv','cl-adv2'].forEach(id=>document.getElementById(id)?.classList.add('hl-adv'));
+  if(subStep===3) ['cl-adv3','cl-adv4'].forEach(id=>document.getElementById(id)?.classList.add('hl-adv'));
+}
+
+// ─── NARRATIVE ────────────────────────────────────────────────────────────────
+function getNarrative(st){
+  if(!st) return {text:'Press RUN.',color:'var(--accent4)'};
+  const {type,subStep,prevIdx,currIdx,nextIdx,iter,vals,n} = st;
+  const pv=prevIdx>=0?vals[prevIdx]:'null';
+  const cv=currIdx>=0&&currIdx<n?vals[currIdx]:'?';
+  const nv=nextIdx>=0&&nextIdx<n?vals[nextIdx]:'null';
+  if(type==='init') return {color:'var(--accent3)',
+    text:`List = [${vals.join(' → ')}]. n=${n}. prev=null, curr=head (val ${vals[0]}). Starting iterative reversal — 4 micro-steps per node.`};
+  const labels=['① Save nxt','② Flip arrow','③ Slide prev','④ Slide curr'];
+  const descs=[
+    `Saving curr.next = <strong>${nv}</strong> before we overwrite it. Iteration ${iter}.`,
+    `Flipping arrow: node <strong>${cv}</strong>.next ← prev (<strong>${pv}</strong>). Arrow reversed! ←`,
+    `Sliding prev → node <strong>${cv}</strong>. Reversed prefix grows.`,
+    `Sliding curr → <strong>${nv??'null'}</strong>. ${nv==null?'curr is null → loop ends next check!':'Move to next unprocessed node.'}`
+  ];
+  if(type==='done') return {color:'var(--accent3)',
+    text:`✅ curr == null. All ${n} nodes reversed. prev = <strong>${pv}</strong> is the new head. Returning prev.`};
+  return {color:['var(--accent2)','var(--accent4)','var(--pur-dark)','var(--pur)'][subStep],
+    text:`<strong>${labels[subStep]}:</strong> ${descs[subStep]}`};
+}
+
+// ─── COMPUTE STEPS ────────────────────────────────────────────────────────────
+// Each full iteration = 4 sub-steps: save, flip, slide prev, slide curr
+// We record the state AFTER each micro-step so the user sees each change
+function computeSteps(vals){
+  const n=vals.length;
+  const steps=[];
+
+  // Arrows: at each step, arrows[i] = index that node i points to (-1 = null)
+  // Initially: 0→1→2→…→(n-1)→null
+  const initArrows=vals.map((_,i)=>i<n-1?i+1:-1);
+
+  const snap=(type,subStep,prevIdx,currIdx,nextIdx,iter,arrows,extra={})=>steps.push({
+    type,subStep,prevIdx,currIdx,nextIdx,iter,vals:[...vals],n,
+    arrows:[...arrows],result:null,...extra,
+    explain:makeExplain(type,subStep,{prevIdx,currIdx,nextIdx,iter,n,vals})
+  });
+
+  snap('init',-1,-1,0,1,0,initArrows);
+
+  let prevIdx=-1, currIdx=0, iter=0;
+  const arrows=[...initArrows];
+
+  while(currIdx<n){
+    const nextIdx=currIdx<n-1?currIdx+1:-1;
+    iter++;
+
+    // Sub-step 0: save nxt (visual: highlight nxt node)
+    snap('iter',0,prevIdx,currIdx,nextIdx,iter,[...arrows]);
+
+    // Sub-step 1: flip arrow curr→prev
+    arrows[currIdx]=prevIdx; // curr.next = prev
+    snap('iter',1,prevIdx,currIdx,nextIdx,iter,[...arrows]);
+
+    // Sub-step 2: advance prev
+    const newPrev=currIdx;
+    snap('iter',2,newPrev,currIdx,nextIdx,iter,[...arrows]);
+
+    // Sub-step 3: advance curr
+    const newCurr=nextIdx;
+    snap('iter',3,newPrev,newCurr,newCurr>=0&&newCurr<n-1?newCurr+1:-1,iter,[...arrows]);
+
+    prevIdx=newPrev;
+    currIdx=newCurr>=0?newCurr:n; // n means null
+  }
+
+  // Done
+  snap('done',-1,prevIdx,n,n,iter,[...arrows],
+    {result:{newHead:prevIdx,newHeadVal:vals[prevIdx]}});
+  steps[steps.length-1].result={newHead:prevIdx,newHeadVal:vals[prevIdx]};
+  return steps;
+}
+
+// ─── CANVAS ───────────────────────────────────────────────────────────────────
+const NR=22;
+
+function drawCanvas(st){
+  const canvas=document.getElementById('mainCanvas');
+  const ctx=canvas.getContext('2d');
+  const {vals,n,arrows,prevIdx,currIdx,nextIdx,subStep,type} = st;
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const isFinal=type==='done';
+  const spacingX=Math.min(72,(W-2*NR-20)/(n-1));
+  const totalW=(n-1)*spacingX+2*NR;
+  const startX=(W-totalW)/2+NR;
+  const midY=H/2+10;
+
+  // Compute x positions
+  const xPos=vals.map((_,i)=>startX+i*spacingX);
+
+  // Determine node states
+  function nodeState(i){
+    if(isFinal) return 'done';
+    if(i===currIdx&&!isFinal) return 'curr';
+    if(i===prevIdx&&prevIdx>=0) return 'prev';
+    if(i===nextIdx&&nextIdx>=0&&nextIdx<n) return 'next';
+    if(i<currIdx) return 'reversed'; // already done
+    return 'normal';
+  }
+
+  // ── Draw arrows ──────────────────────────────────────────────────────────────
+  function drawArrow(fromIdx,toIdx,color,above=false,curved=false){
+    if(fromIdx<0||fromIdx>=n) return;
+    const x1=xPos[fromIdx], y1=midY;
+    if(toIdx<0){ // null
+      ctx.save();
+      ctx.strokeStyle=color; ctx.lineWidth=1.8;
+      ctx.setLineDash([4,3]);
+      ctx.beginPath(); ctx.moveTo(x1+NR,y1); ctx.lineTo(x1+NR+22,y1); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font='9px Space Mono,monospace'; ctx.fillStyle=color;
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText('null',x1+NR+24,y1);
+      ctx.restore();
+      return;
+    }
+    const x2=xPos[toIdx], y2=midY;
+    const goLeft=x2<x1;
+
+    ctx.save();
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2;
+
+    if(curved){
+      // curved arc above or below
+      const cy=goLeft?y1-38:y1+38;
+      const mx=(x1+x2)/2;
+      ctx.beginPath();
+      ctx.moveTo(x1+(goLeft?-NR:NR),y1);
+      ctx.quadraticCurveTo(mx,cy,x2+(goLeft?NR:-NR),y2);
+      ctx.stroke();
+      const ang=Math.atan2(y2-cy,x2+(goLeft?NR:-NR)-(mx));
+      const ex=x2+(goLeft?NR:-NR), ey=y2;
+      ctx.beginPath();
+      ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-9*Math.cos(ang-.4),ey-9*Math.sin(ang-.4));
+      ctx.lineTo(ex-9*Math.cos(ang+.4),ey-9*Math.sin(ang+.4));
+      ctx.closePath(); ctx.fill();
+    } else {
+      const sx=goLeft?x1-NR:x1+NR, ex=goLeft?x2+NR+5:x2-NR-5, ey=y2;
+      ctx.beginPath(); ctx.moveTo(sx,y1); ctx.lineTo(ex,ey); ctx.stroke();
+      const ang=Math.atan2(ey-y1,ex-sx);
+      ctx.beginPath();
+      ctx.moveTo(ex,ey);
+      ctx.lineTo(ex-9*Math.cos(ang-.4),ey-9*Math.sin(ang-.4));
+      ctx.lineTo(ex-9*Math.cos(ang+.4),ey-9*Math.sin(ang+.4));
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Draw all arrows
+  for(let i=0;i<n;i++){
+    const to=arrows[i];
+    const st_i=nodeState(i);
+    const isReversed=to<i&&to>=0;
+    const isCurrNode=i===currIdx;
+    const color=
+      isFinal?'rgba(6,214,160,.5)':
+      isReversed?'rgba(230,57,70,.55)': // reversed arrows in red
+      st_i==='curr'&&subStep>=1?'rgba(230,57,70,.7)':
+      '#c8bfaa';
+    const useCurved=isReversed&&!isFinal;
+    drawArrow(i,to,color,false,useCurved);
+  }
+
+  // Draw nodes
+  for(let i=0;i<n;i++){
+    const x=xPos[i], y=midY;
+    const state=nodeState(i);
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x,y,NR,0,Math.PI*2);
+
+    if(state==='done'||state==='reversed'){
+      ctx.fillStyle='rgba(6,214,160,.18)'; ctx.strokeStyle='rgba(6,214,160,.5)'; ctx.lineWidth=2;
+    } else if(state==='curr'){
+      ctx.fillStyle='rgba(255,209,102,.28)'; ctx.strokeStyle='#f5a623'; ctx.lineWidth=3;
+      ctx.shadowColor='rgba(255,209,102,.5)'; ctx.shadowBlur=10;
+    } else if(state==='prev'){
+      ctx.fillStyle='rgba(192,84,252,.18)'; ctx.strokeStyle='#c084fc'; ctx.lineWidth=2.5;
+    } else if(state==='next'){
+      ctx.fillStyle='rgba(33,150,243,.18)'; ctx.strokeStyle='#2196f3'; ctx.lineWidth=2.5;
+    } else {
+      ctx.fillStyle='#fffdf7'; ctx.strokeStyle='#d4ccb8'; ctx.lineWidth=1.5;
+    }
+    ctx.fill(); ctx.stroke(); ctx.restore();
+
+    // Value
+    ctx.save();
+    ctx.font='bold 13px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=
+      state==='done'||state==='reversed'?'#024d37':
+      state==='curr'?'#7a4800':
+      state==='prev'?'#5b1a9a':
+      state==='next'?'#0d47a1':
+      '#8a8070';
+    ctx.fillText(String(vals[i]),x,y);
+    ctx.restore();
+
+    // Pointer labels above
+    const labels=[];
+    if(!isFinal){
+      if(i===prevIdx&&prevIdx>=0) labels.push({t:'prev',c:'#c084fc'});
+      if(i===currIdx&&currIdx<n)  labels.push({t:'curr',c:'#f5a623'});
+      if(i===nextIdx&&nextIdx>=0&&nextIdx<n&&nextIdx!==currIdx) labels.push({t:'next',c:'#2196f3'});
+    } else {
+      if(i===prevIdx) labels.push({t:'new head',c:'#06d6a0'});
+    }
+
+    labels.forEach((lb,li)=>{
+      ctx.save();
+      ctx.font='bold 9px Space Mono,monospace';
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      const lx=x+(li-0.5*Math.max(0,labels.length-1))*18;
+      const ly=y-NR-4;
+      ctx.fillStyle=lb.c;
+      ctx.shadowColor=lb.c; ctx.shadowBlur=3;
+      ctx.fillText(lb.t,lx,ly);
+      ctx.restore();
+    });
+
+    // Index below
+    ctx.save();
+    ctx.font='9px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillStyle='rgba(138,128,112,.5)';
+    ctx.fillText(`[${i}]`,x,y+NR+2);
+    ctx.restore();
+  }
+
+  // "← reversed" label on left side
+  if(prevIdx>0&&!isFinal){
+    ctx.save();
+    ctx.font='9px Space Mono,monospace';
+    ctx.fillStyle='rgba(230,57,70,.6)';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('← reversed',xPos[0]-NR-2,midY-NR-14);
+    ctx.restore();
+  }
+  if(!isFinal&&currIdx<n&&currIdx>=0){
+    ctx.save();
+    ctx.font='9px Space Mono,monospace';
+    ctx.fillStyle='rgba(200,195,180,.5)';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('original →',xPos[currIdx>=0?currIdx:0]+NR+4,midY-NR-14);
+    ctx.restore();
+  }
+
+  document.getElementById('canvasOuter').className=
+    `canvas-outer ${isFinal?'co-done':'co-rev'}`;
+}
+
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let initVals=[];
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildUI(){
+  initVals=document.getElementById('inVals').value.split(',').map(s=>parseInt(s.trim())).filter(v=>!isNaN(v));
+  if(initVals.length<1){alert('Please enter at least one value.');return;}
+
+  const canvas=document.getElementById('mainCanvas');
+  const n=initVals.length;
+  const spacingX=Math.min(72,580/Math.max(n-1,1));
+  canvas.width=Math.max(340,n*spacingX+60);
+  canvas.height=220;
+
+  steps=computeSteps(initVals);
+  currentStep=0;
+
+  document.getElementById('baBeforeList').textContent=initVals.join(' → ');
+  document.getElementById('baAfterList').textContent='—';
+  document.getElementById('cxIter').textContent='—';
+  document.getElementById('cxHead').textContent='—';
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  renderStep(0);
+}
+
+// ─── ACTION STEPS PANEL ───────────────────────────────────────────────────────
+const MICRO_LABELS=[
+  {num:'①',txt:'nxt = curr.next',code:'save next pointer'},
+  {num:'②',txt:'curr.next = prev',code:'flip the arrow ←'},
+  {num:'③',txt:'prev = curr',code:'slide prev forward'},
+  {num:'④',txt:'curr = nxt',code:'slide curr forward'},
+];
+function renderActionPanel(st){
+  const{type,subStep,iter,prevIdx,currIdx,nextIdx,vals,n}=st;
+  const ao=document.getElementById('actionOuter');
+  const at=document.getElementById('actionTitle');
+  const as=document.getElementById('actionSteps');
+  if(type==='init'||type==='done'){
+    ao.className=`action-outer ${type==='done'?'ao-done':''}`;
+    at.textContent=type==='done'?'All nodes reversed — return prev as new head':'Initializing prev=null, curr=head';
+    as.innerHTML='';
+    return;
+  }
+  ao.className='action-outer ao-rev';
+  at.textContent=`Iteration ${iter} — node val=${currIdx<n?vals[currIdx]:'?'}`;
+  as.innerHTML=MICRO_LABELS.map((m,i)=>{
+    const state=i===subStep?'cur':i<subStep?'done':'wait';
+    return `<div class="astep as-${state}">
+      <div class="as-num an-${state}">${m.num}</div>
+      <span style="flex:1">${m.txt}</span>
+      <span style="font-size:.55rem;color:${state==='cur'?'#7a4800':state==='done'?'#028a5b':'var(--muted)'};">${m.code}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── VAR FLASH ────────────────────────────────────────────────────────────────
+let prevVarVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVarVals[elId]!==undefined&&prevVarVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVarVals[elId]=s;
+}
+
+// ─── RENDER STEP ──────────────────────────────────────────────────────────────
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+  const{type,subStep,prevIdx,currIdx,nextIdx,iter,vals,n}=st;
+  const isFinal=type==='done';
+  const pv=prevIdx>=0&&prevIdx<n?vals[prevIdx]:'null';
+  const cv=currIdx>=0&&currIdx<n?vals[currIdx]:'null';
+  const nv=nextIdx>=0&&nextIdx<n?vals[nextIdx]:'null';
+
+  drawCanvas(st);
+  renderActionPanel(st);
+
+  // Phase badge
+  const pb=document.getElementById('phaseBadge');
+  if(type==='init'){pb.className='phase-badge pb-init';pb.textContent='Initializing — prev=null, curr=head';}
+  else if(isFinal){pb.className='phase-badge pb-done';pb.textContent=`✅ Reversed! New head = val ${pv}`;}
+  else{
+    const labels=['① Saving next','② Flipping arrow ←','③ Sliding prev','④ Sliding curr'];
+    pb.className='phase-badge pb-rev';pb.textContent=`Iteration ${iter} — ${labels[subStep]}`;
+  }
+
+  // Pointer strip
+  document.getElementById('pcPrev').className=`ptr-card ${prevIdx>=0?'pc-prev':''}`;
+  document.getElementById('pcCurr').className=`ptr-card ${currIdx<n?'pc-curr':''}`;
+  document.getElementById('pcNext').className=`ptr-card ${nextIdx>=0&&nextIdx<n?'pc-next':''}`;
+  document.getElementById('pcNewHead').className=`ptr-card ${isFinal?'pc-done':''}`;
+  document.getElementById('pcNewHead').style.opacity=isFinal?'1':'.3';
+  document.getElementById('ppVal').textContent=prevIdx>=0?`val=${pv}`:'null';
+  document.getElementById('ppSub').textContent=prevIdx>=0?`[${prevIdx}]`:'no prev yet';
+  document.getElementById('pcVal').textContent=currIdx<n?`val=${cv}`:'null (done)';
+  document.getElementById('pcSub').textContent=currIdx<n?`[${currIdx}]`:'loop ended';
+  document.getElementById('pnVal').textContent=nextIdx>=0&&nextIdx<n?`val=${nv}`:'null';
+  document.getElementById('pnSub').textContent=nextIdx>=0&&nextIdx<n?`[${nextIdx}]`:'tail';
+  document.getElementById('phVal').textContent=isFinal?`val=${pv}`:'—';
+
+  // Step panel
+  const sp=document.getElementById('stepPanel');
+  sp.className=`step-panel ${isFinal?'sp-done':'sp-rev'}`;
+  document.getElementById('spTitle').textContent=isFinal?`Done! New head = val ${pv}`:`Iter ${iter} · Step ${subStep>=0?subStep+1:'-'}`;
+  const mkBox=(lbl,v,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${v}</div></div>`;
+  const spb=document.getElementById('spBody');
+  if(!isFinal&&type!=='init'){
+    spb.innerHTML=
+      mkBox('prev',pv,'spbox sb-pur')+
+      mkBox('curr',cv,'spbox sb-yel')+
+      mkBox('next',nv,'spbox sb-blue')+
+      mkBox('iter',iter,'spbox sb-grn');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('new head',pv,'spbox sb-grn')+mkBox('steps',iter,'spbox sb-grn');
+  } else {
+    spb.innerHTML=mkBox('n',n,'spbox sb-blue')+mkBox('head',vals[0],'spbox sb-yel');
+  }
+
+  // Narrative
+  const narr=getNarrative(st);
+  document.getElementById('narrativeText').innerHTML=narr.text;
+  document.querySelector('.narrative-bar').style.borderLeftColor=narr.color;
+
+  // 3-tab
+  updateExplain(st);
+  highlightCode(subStep,isFinal);
+
+  // Right vars
+  setVar('vPrev','vcPrev',prevIdx>=0?pv:'null');
+  setVar('vCurr','vcCurr',currIdx<n?cv:'null');
+  setVar('vNext','vcNext',nextIdx>=0&&nextIdx<n?nv:'null');
+  setVar('vIter','vcIter',iter??0);
+
+  // Before/After
+  if(isFinal){
+    // Build reversed array by following arrows from prevIdx
+    const rev=[];
+    let ci=prevIdx;
+    const visited=new Set();
+    while(ci>=0&&ci<n&&!visited.has(ci)){
+      visited.add(ci);
+      rev.push(vals[ci]);
+      ci=st.arrows[ci];
+    }
+    document.getElementById('baAfterList').textContent=rev.join(' → ')+' → null';
+    document.getElementById('cxIter').textContent=iter;
+    document.getElementById('cxHead').textContent=pv;
+  }
+
+  // Done
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ Reversed! New head = val ${pv}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=`val = ${pv}  [idx ${prevIdx}]`;
+    document.getElementById('bestMeta').textContent=`${n} nodes · ${iter} iterations · O(n) O(1)`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st?.explain) return;
+  document.getElementById('paneWhat').innerHTML=st.desc||st.explain.why||'—';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+window.addEventListener('resize',()=>{if(steps.length)renderStep(currentStep);});
+buildUI();
+</script>
+</body>
+</html>
