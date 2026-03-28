@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LRU Cache — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a4800;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+/* ── OP BUILDER ── */
+.op-builder{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
+.ob-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.ob-config{display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-family:'Space Mono',monospace;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--bg);border:1.5px solid var(--border);border-radius:4px;padding:5px 9px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input.sm{width:80px;} .field input:focus{border-color:var(--accent4);}
+.op-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.op-btn{padding:6px 11px;border:1.5px solid var(--border);background:var(--surface);border-radius:6px;font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;cursor:pointer;color:var(--ink);transition:all .15s;}
+.op-btn:hover{border-color:var(--accent4);background:rgba(255,209,102,.08);}
+.op-btn.selected{border-color:var(--accent4);background:rgba(255,209,102,.15);color:#7a4800;}
+.op-inputs{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;}
+.btn{padding:7px 14px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#7a4800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:4px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:5px 9px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.65rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+.op-queue-list{display:flex;flex-direction:column;gap:3px;max-height:72px;overflow-y:auto;margin-bottom:6px;}
+.oq-row{display:flex;align-items:center;gap:6px;padding:3px 8px;background:rgba(255,209,102,.06);border:1px solid rgba(255,209,102,.2);border-radius:5px;font-family:'Space Mono',monospace;font-size:.6rem;}
+.oqr-num{color:var(--muted);}
+.oqr-op {font-weight:700;color:#7a4800;}
+.oqr-args{color:var(--muted);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: LRU CACHE DLL STRIP ══ */
+.cache-section{margin-bottom:14px;}
+.cache-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;overflow-x:auto;transition:border-color .3s;min-height:120px;}
+.cache-outer.co-insert{border-color:var(--accent3);}
+.cache-outer.co-get   {border-color:var(--accent2);}
+.cache-outer.co-evict {border-color:var(--accent);}
+.cache-outer.co-recent{border-color:var(--pur);}
+.cache-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.ch-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ch-usage{font-family:'Space Mono',monospace;font-size:.8rem;font-weight:700;}
+/* Capacity bar */
+.cap-bar-wrap{height:6px;background:#e8e2d4;border-radius:3px;overflow:hidden;margin-bottom:10px;}
+.cap-bar{height:100%;background:var(--accent3);border-radius:3px;transition:width .4s;}
+.cap-bar.cb-full{background:var(--accent);}
+/* MRU/LRU labels */
+.mru-lru-row{display:flex;justify-content:space-between;margin-bottom:6px;}
+.mru-lbl,.lru-lbl{font-family:'Space Mono',monospace;font-size:.52rem;font-weight:700;padding:2px 7px;border-radius:4px;}
+.mru-lbl{background:rgba(6,214,160,.15);color:#024d37;border:1px solid var(--accent3);}
+.lru-lbl{background:rgba(230,57,70,.1);color:#b71c1c;border:1px solid var(--accent);}
+/* Node strip */
+.cache-strip{display:flex;align-items:center;gap:0;flex-wrap:nowrap;}
+.cache-node-wrap{display:flex;align-items:center;flex-shrink:0;}
+.cache-node{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:62px;height:62px;border-radius:10px;border:2px solid var(--border);
+  font-family:'Space Mono',monospace;font-weight:700;
+  background:var(--surface);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;gap:2px;
+}
+.cn-key{font-size:.65rem;color:var(--muted);}
+.cn-val{font-size:.9rem;color:var(--ink);}
+/* Node states */
+.cns-mru    {background:rgba(6,214,160,.15);border-color:var(--accent3);box-shadow:0 0 12px rgba(6,214,160,.25);}
+.cns-mru .cn-key{color:#028a5b;}
+.cns-active {background:rgba(255,209,102,.22);border-color:var(--accent4);transform:scale(1.1) translateY(-4px);box-shadow:0 8px 18px rgba(255,209,102,.3);}
+.cns-active .cn-key{color:#7a4800;} .cns-active .cn-val{color:#7a4800;}
+.cns-lru    {background:rgba(230,57,70,.08);border-color:rgba(230,57,70,.3);}
+.cns-lru .cn-key{color:var(--accent);}
+.cns-evicted{background:rgba(230,57,70,.15);border-color:var(--accent);transform:scale(.85);opacity:.45;}
+.cns-normal {background:var(--surface);border-color:var(--border);}
+/* Arrows */
+.cn-arrow{width:22px;height:2px;background:var(--border);position:relative;flex-shrink:0;}
+.cn-arrow::after{content:'►';position:absolute;right:-3px;top:50%;transform:translateY(-50%);font-size:.55rem;color:var(--border);}
+.cna-new .cn-arrow{background:var(--accent3);}
+.cna-new .cn-arrow::after{color:var(--accent3);}
+/* Empty state */
+.cache-empty{font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);padding:16px 0;}
+/* Sentinel */
+.cache-sentinel{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);padding:4px 8px;border:1.5px dashed var(--border);border-radius:5px;flex-shrink:0;align-self:center;}
+
+/* ══ UNIQUE VISUAL 2: OPERATION RESULT PANEL ══ */
+.op-panel-section{margin-bottom:14px;}
+.op-panel-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.op-panel-outer.opo-insert{border-color:var(--accent3);}
+.op-panel-outer.opo-get   {border-color:var(--accent2);}
+.op-panel-outer.opo-recent{border-color:var(--pur);}
+.op-ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.oph-op{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:5px;}
+.oph-op.oho-insert{background:rgba(6,214,160,.12);border:1.5px solid var(--accent3);color:#024d37;}
+.oph-op.oho-get   {background:rgba(33,150,243,.1); border:1.5px solid var(--accent2);color:#0d47a1;}
+.oph-op.oho-recent{background:rgba(192,84,252,.1); border:1.5px solid var(--pur);   color:var(--pur-dark);}
+.oph-op.oho-evict {background:rgba(230,57,70,.1);  border:1.5px solid var(--accent); color:#b71c1c;}
+/* What happened summary */
+.op-summary{padding:8px 12px;border-radius:8px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;text-align:center;transition:all .3s;}
+.os-insert{background:rgba(6,214,160,.12);border:1.5px solid var(--accent3);color:#024d37;}
+.os-get   {background:rgba(33,150,243,.1); border:1.5px solid var(--accent2);color:#0d47a1;}
+.os-miss  {background:rgba(230,57,70,.08); border:1.5px solid var(--accent); color:#b71c1c;}
+.os-recent{background:rgba(192,84,252,.1); border:1.5px solid var(--pur);   color:var(--pur-dark);}
+.os-evict {background:rgba(230,57,70,.15); border:1.5px solid var(--accent); color:#b71c1c;}
+.os-init  {background:rgba(0,0,0,.04);     border:1.5px solid var(--border);color:var(--muted);}
+
+/* ══ UNIQUE VISUAL 3: HASHMAP TABLE ══ */
+.hashmap-section{margin-bottom:14px;}
+.hashmap-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.hashmap-outer.hmo-active{border-color:var(--accent4);}
+.hm-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.hm-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.hm-count{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent4);}
+.hm-table{display:grid;grid-template-columns:auto auto auto;gap:4px 8px;align-items:center;}
+.hmt-header{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);padding:3px 0;border-bottom:1px solid var(--border);}
+.hmt-key  {font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;color:var(--ink);}
+.hmt-val  {font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);}
+.hmt-pos  {font-family:'Space Mono',monospace;font-size:.62rem;}
+.hmt-row-active .hmt-key{color:#7a4800;font-weight:700;}
+.hmt-row-active .hmt-val{color:#7a4800;}
+.hmt-row-active .hmt-pos{color:var(--accent4);}
+.hmt-row-evict .hmt-key{color:var(--accent);text-decoration:line-through;opacity:.5;}
+.hmt-row-mru .hmt-key{color:#024d37;}
+.hmt-row-mru .hmt-pos{color:var(--accent3);}
+
+/* OP LOG */
+.op-log-section{margin-bottom:14px;}
+.op-log-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+.ol-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;}
+.ol-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.ol-count{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent4);}
+.ol-rows{display:flex;flex-direction:column;gap:3px;max-height:90px;overflow-y:auto;}
+.ol-rows::-webkit-scrollbar{width:3px;}.ol-rows::-webkit-scrollbar-thumb{background:var(--border);}
+.ol-row{display:flex;gap:8px;padding:3px 8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.6rem;border:1px solid var(--border);}
+.olr-current{background:rgba(255,209,102,.1);border-color:var(--accent4);font-weight:700;}
+.olr-done   {background:rgba(0,0,0,.02);color:var(--muted);}
+.ol-op-name{font-weight:700;}
+.ol-insert{color:#024d37;} .ol-get{color:#0d47a1;} .ol-recent{color:var(--pur-dark);}
+.ol-result{margin-left:auto;font-size:.55rem;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-insert{border-color:var(--accent3);}
+.step-panel.sp-get   {border-color:var(--accent2);}
+.step-panel.sp-recent{border-color:var(--pur);}
+.step-panel.sp-evict {border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-insert{background:rgba(6,214,160,.14); border-left-color:var(--accent3);color:#e2e8f0;}
+.code-line.hl-get   {background:rgba(33,150,243,.14);border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-evict {background:rgba(230,57,70,.14); border-left-color:var(--accent); color:#e2e8f0;}
+.code-line.hl-recent{background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:6px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.cache-repr{font-family:'Space Mono',monospace;font-size:.62rem;color:#9ca3af;padding:7px 9px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:5px;line-height:1.7;word-break:break-all;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>LRU Cache</h1>
+    <div class="sub">HashMap + DoublyLinkedList · O(1) All Ops</div>
+  </div>
+  <div class="family-badge">Data Structures · Cache</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+
+  <!-- OP BUILDER -->
+  <div class="op-builder">
+    <div class="ob-title">Build your operation sequence</div>
+    <div class="ob-config">
+      <div class="field"><label>Max Size</label><input type="number" id="iMaxSize" value="3" min="1" class="sm"></div>
+      <button class="btn btn-secondary" style="font-size:.62rem;padding:5px 10px" id="btnLoadSample">⚡ Sample</button>
+      <button class="btn btn-secondary" style="font-size:.62rem;padding:5px 10px" id="btnClearOps">✕ Clear</button>
+    </div>
+    <div class="op-row">
+      <button class="op-btn" data-op="insertKeyValuePair">insertKeyValuePair</button>
+      <button class="op-btn" data-op="getValueFromKey">getValueFromKey</button>
+      <button class="op-btn" data-op="getMostRecentKey">getMostRecentKey</button>
+    </div>
+    <div class="op-inputs" id="opInputs" style="display:none">
+      <div class="field" id="fKey"><label>Key</label><input type="text" id="iKey" placeholder="e.g. a" class="sm"></div>
+      <div class="field" id="fVal" style="display:none"><label>Value</label><input type="number" id="iVal" placeholder="e.g. 1" class="sm"></div>
+      <button class="btn btn-primary" id="btnAddOp" style="align-self:flex-end">+ Add</button>
+    </div>
+    <div class="op-queue-list" id="opQueueList"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1400">0.5×</button>
+          <button class="speed-btn active" data-ms="750">1×</button>
+          <button class="speed-btn" data-ms="340">2×</button>
+          <button class="speed-btn" data-ms="130">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" disabled>▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset">↺ RESET</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.15);border-color:#06d6a0;border-radius:3px"></div> MRU (most recent)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.08);border-color:#e63946;border-radius:3px"></div> LRU (will evict next)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.22);border-color:#ffd166;border-radius:3px"></div> currently active node</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.15);border-color:#e63946;border-radius:3px;opacity:.5"></div> evicted</div>
+  </div>
+
+  <!-- VISUAL 1: LRU CACHE STRIP -->
+  <div class="cache-section">
+    <div class="section-label">Cache — MRU on left, LRU on right (will evict next)</div>
+    <div class="cache-outer" id="cacheOuter">
+      <div class="cache-header">
+        <div class="ch-label" id="chLabel">size=<span id="chSize">0</span> / maxSize=<span id="chMax">—</span></div>
+        <div class="ch-usage" id="chUsage">—</div>
+      </div>
+      <div class="cap-bar-wrap"><div class="cap-bar" id="capBar" style="width:0%"></div></div>
+      <div class="mru-lru-row">
+        <span class="mru-lbl">◀ MRU (head)</span>
+        <span class="lru-lbl">(tail) LRU ▶</span>
+      </div>
+      <div class="cache-strip" id="cacheStrip"><div class="cache-empty">empty cache — add operations and press RUN</div></div>
+    </div>
+  </div>
+
+  <!-- VISUAL 2: OPERATION RESULT PANEL -->
+  <div class="op-panel-section">
+    <div class="section-label">Operation detail</div>
+    <div class="op-panel-outer" id="opPanelOuter">
+      <div class="op-ph">
+        <div class="oph-op oho-insert" id="ophOp">—</div>
+        <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);" id="ophArgs">—</div>
+      </div>
+      <div class="op-summary os-init" id="opSummary">add operations and press RUN</div>
+    </div>
+  </div>
+
+  <!-- VISUAL 3: HASHMAP TABLE -->
+  <div class="hashmap-section">
+    <div class="section-label">HashMap — key → (value, position in DLL)</div>
+    <div class="hashmap-outer" id="hashmapOuter">
+      <div class="hm-header">
+        <div class="hm-title">unordered_map&lt;key, DLL::Node*&gt;</div>
+        <div class="hm-count" id="hmCount">0 entries</div>
+      </div>
+      <div class="hm-table" id="hmTable">
+        <div class="hmt-header">Key</div>
+        <div class="hmt-header">Value</div>
+        <div class="hmt-header">Position</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OP LOG -->
+  <div class="op-log-section">
+    <div class="section-label">Operation log</div>
+    <div class="op-log-outer">
+      <div class="ol-header">
+        <div class="ol-title">sequence</div>
+        <div class="ol-count" id="olCount">0 ops</div>
+      </div>
+      <div class="ol-rows" id="olRows"></div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-insert" id="stepPanel">
+    <div class="sp-title" id="spTitle">Add operations and press RUN</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Build operations, press RUN.</div>
+  </div>
+
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">insert</div><div class="cx-val" style="color:var(--pur-dark)">O(1)</div><div class="cx-sub">hashmap + DLL</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">get</div><div class="cx-val" style="color:var(--accent2)">O(1)</div><div class="cx-sub">hashmap lookup</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">size</div><div class="cx-val" id="cxSize" style="color:#7a5a00">0</div><div class="cx-sub">cached items</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">MRU key</div><div class="cx-val" id="cxMRU" style="color:#028a5b">—</div><div class="cx-sub">most recent</div>
+    </div>
+  </div>
+
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Add operations and press RUN.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — LRU Cache</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Style</button>
+    </div>
+    <div id="code-clean">
+      <pre class="code-block">
+<span class="code-line" id="cl-ins"><span class="ck">void</span> <span class="cf">insert</span>(<span class="ck">string</span> k, <span class="ck">int</span> v){</span>
+<span class="code-line">  <span class="ck">if</span>(map.count(k)) remove(map[k]);</span>
+<span class="code-line">  <span class="ck">else if</span>(map.size()==max) {</span>
+<span class="code-line" id="cl-evict">    map.erase(tail->prev->key); <span class="cc">// evict</span></span>
+<span class="code-line">    remove(tail->prev);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  Node* n=<span class="ck">new</span> Node(k,v);</span>
+<span class="code-line" id="cl-ins2">  insertFront(n); map[k]=n; <span class="cc">// MRU</span></span>
+<span class="code-line">}</span>
+<span class="code-line" id="cl-get"><span class="ck">int</span> <span class="cf">get</span>(<span class="ck">string</span> k){</span>
+<span class="code-line">  <span class="ck">if</span>(!map.count(k)) <span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line">  Node* n=map[k]; <span class="ck">int</span> v=n->val;</span>
+<span class="code-line" id="cl-get2">  remove(n); insertFront(n); <span class="cc">// promote</span></span>
+<span class="code-line">  <span class="ck">return</span> v;</span>
+<span class="code-line">}</span>
+<span class="code-line" id="cl-recent"><span class="ck">string</span> <span class="cf">recent</span>(){</span>
+<span class="code-line">  <span class="ck">return</span> head->next->key;</span>
+<span class="code-line">}</span>
+</pre>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CF / COMPACT STYLE</div>
+      <pre class="code-block">
+<span class="code-line"><span class="ck">#include</span> <span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">struct</span> LRU{</span>
+<span class="code-line">  <span class="ck">int</span> cap;</span>
+<span class="code-line">  list&lt;pair&lt;<span class="ck">string</span>,<span class="ck">int</span>&gt;&gt; L; <span class="cc">// MRU front</span></span>
+<span class="code-line">  unordered_map&lt;<span class="ck">string</span>,</span>
+<span class="code-line">    list&lt;pair&lt;<span class="ck">string</span>,<span class="ck">int</span>&gt;&gt;::iterator&gt; M;</span>
+<span class="code-line">  LRU(<span class="ck">int</span> c):cap(c){}</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">put</span>(<span class="ck">string</span> k,<span class="ck">int</span> v){</span>
+<span class="code-line">    <span class="ck">if</span>(M.count(k)) L.erase(M[k]);</span>
+<span class="code-line">    <span class="ck">else if</span>(L.size()==cap)</span>
+<span class="code-line">      {M.erase(L.back().first);L.pop_back();}</span>
+<span class="code-line">    L.push_front({k,v}); M[k]=L.begin();</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">int</span> <span class="cf">get</span>(<span class="ck">string</span> k){</span>
+<span class="code-line">    <span class="ck">if</span>(!M.count(k))<span class="ck">return</span> <span class="cn">-1</span>;</span>
+<span class="code-line">    <span class="ck">auto</span> it=M[k];<span class="ck">int</span> v=it->second;</span>
+<span class="code-line">    L.erase(it);L.push_front({k,v});M[k]=L.begin();</span>
+<span class="code-line">    <span class="ck">return</span> v;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">string</span> <span class="cf">recent</span>(){<span class="ck">return</span> L.front().first;}</span>
+<span class="code-line">};</span>
+</pre>
+    </div>
+  </div>
+  <div class="vars-panel">
+    <div class="state-title">Live State</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcSize"><div class="var-name">size</div><div class="var-value" id="vSize" style="color:var(--accent4)">0</div></div>
+      <div class="var-card" id="vcMax"><div class="var-name">maxSize</div><div class="var-value" id="vMax" style="color:var(--pur)">—</div></div>
+      <div class="var-card" id="vcMRU"><div class="var-name">MRU key</div><div class="var-value" id="vMRU" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcLRU"><div class="var-name">LRU key</div><div class="var-value" id="vLRU" style="color:var(--accent)">—</div></div>
+      <div class="var-card" id="vcOp" style="grid-column:1/3"><div class="var-name">last op</div><div class="var-value" id="vOp" style="color:var(--accent4);font-size:.72rem">—</div></div>
+    </div>
+    <div class="var-name" style="margin-bottom:4px;font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;letter-spacing:2px;text-transform:uppercase;">Cache order (MRU → LRU)</div>
+    <div class="cache-repr" id="cacheRepr">empty</div>
+  </div>
+</div>
+</div>
+
+<script>
+// ─── LRU CACHE ENGINE ──────────────────────────────────────────────────────
+class LRUCache {
+  constructor(maxSize) {
+    this.maxSize = maxSize;
+    this.cache = new Map(); // key → {key, val, prev, next}
+    // Dummy head (MRU side) and tail (LRU side)
+    this.head = { key: 'HEAD', val: null, prev: null, next: null };
+    this.tail = { key: 'TAIL', val: null, prev: null, next: null };
+    this.head.next = this.tail;
+    this.tail.prev = this.head;
+  }
+
+  _remove(node) {
+    node.prev.next = node.next;
+    node.next.prev = node.prev;
+  }
+
+  _insertFront(node) {
+    node.next = this.head.next;
+    node.prev = this.head;
+    this.head.next.prev = node;
+    this.head.next = node;
+  }
+
+  insertKeyValuePair(key, val) {
+    let evicted = null;
+    if (this.cache.has(key)) {
+      this._remove(this.cache.get(key));
+    } else if (this.cache.size === this.maxSize) {
+      const lruNode = this.tail.prev;
+      evicted = { key: lruNode.key, val: lruNode.val };
+      this._remove(lruNode);
+      this.cache.delete(lruNode.key);
+    }
+    const node = { key, val, prev: null, next: null };
+    this._insertFront(node);
+    this.cache.set(key, node);
+    return evicted;
+  }
+
+  getValueFromKey(key) {
+    if (!this.cache.has(key)) return null;
+    const node = this.cache.get(key);
+    this._remove(node);
+    this._insertFront(node);
+    return node.val;
+  }
+
+  getMostRecentKey() {
+    return this.head.next === this.tail ? null : this.head.next.key;
+  }
+
+  toArray() {
+    const arr = [];
+    let cur = this.head.next;
+    while (cur !== this.tail) { arr.push({ key: cur.key, val: cur.val }); cur = cur.next; }
+    return arr;
+  }
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+let opQueue = [];
+let steps = [];
+let currentStep = 0;
+let playing = false;
+let timer = null;
+let speed = 750;
+let selectedOp = null;
+
+// ─── OP BUTTON HANDLING ───────────────────────────────────────────────────
+document.querySelectorAll('.op-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedOp = btn.dataset.op;
+    const inputs = document.getElementById('opInputs');
+    const fKey = document.getElementById('fKey');
+    const fVal = document.getElementById('fVal');
+    inputs.style.display = 'flex';
+    if (selectedOp === 'getMostRecentKey') {
+      fKey.style.display = 'none';
+      fVal.style.display = 'none';
+    } else if (selectedOp === 'getValueFromKey') {
+      fKey.style.display = 'flex';
+      fVal.style.display = 'none';
+    } else {
+      fKey.style.display = 'flex';
+      fVal.style.display = 'flex';
+    }
+  });
+});
+
+document.getElementById('btnAddOp').addEventListener('click', () => {
+  if (!selectedOp) return;
+  const op = { op: selectedOp };
+  if (selectedOp !== 'getMostRecentKey') {
+    op.key = document.getElementById('iKey').value.trim();
+    if (!op.key) return;
+  }
+  if (selectedOp === 'insertKeyValuePair') {
+    op.val = parseInt(document.getElementById('iVal').value);
+    if (isNaN(op.val)) return;
+  }
+  opQueue.push(op);
+  renderOpQueue();
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('iKey').value = '';
+  document.getElementById('iVal').value = '';
+});
+
+function renderOpQueue() {
+  const el = document.getElementById('opQueueList');
+  el.innerHTML = '';
+  opQueue.forEach((op, i) => {
+    const row = document.createElement('div');
+    row.className = 'oq-row';
+    const argStr = op.op === 'insertKeyValuePair' ? `("${op.key}", ${op.val})` :
+      op.op === 'getValueFromKey' ? `("${op.key}")` : '()';
+    row.innerHTML = `<span class="oqr-num">${i + 1}.</span><span class="oqr-op">${op.op}</span><span class="oqr-args">${argStr}</span>
+      <button onclick="removeOp(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--accent);font-size:.65rem">✕</button>`;
+    el.appendChild(row);
+  });
+}
+window.removeOp = (i) => { opQueue.splice(i, 1); renderOpQueue(); if (!opQueue.length) document.getElementById('btnRun').disabled = true; };
+
+document.getElementById('btnLoadSample').addEventListener('click', () => {
+  opQueue = [
+    { op: 'insertKeyValuePair', key: 'b', val: 2 },
+    { op: 'insertKeyValuePair', key: 'a', val: 1 },
+    { op: 'insertKeyValuePair', key: 'c', val: 3 },
+    { op: 'getMostRecentKey' },
+    { op: 'getValueFromKey', key: 'a' },
+    { op: 'getMostRecentKey' },
+    { op: 'insertKeyValuePair', key: 'd', val: 4 },
+    { op: 'getValueFromKey', key: 'b' },
+    { op: 'insertKeyValuePair', key: 'a', val: 5 },
+    { op: 'getValueFromKey', key: 'a' },
+  ];
+  renderOpQueue();
+  document.getElementById('btnRun').disabled = false;
+});
+
+document.getElementById('btnClearOps').addEventListener('click', () => {
+  opQueue = []; renderOpQueue(); document.getElementById('btnRun').disabled = true;
+});
+
+// ─── EXPLAIN ────────────────────────────────────────────────────────────
+function makeExplain(op, args) {
+  const { key, val, result, evicted, cacheArr, maxSize } = args || {};
+  const why = {
+    insertKeyValuePair: `<div class="ep-why-block">Insert: check if key exists → if yes, remove it from DLL first (update-in-place). If cache full, evict LRU (tail.prev). Then insert new node at head (MRU). Update hashmap. O(1) all pointer ops.</div>`,
+    getValueFromKey:    `<div class="ep-why-block">Get: if key not in hashmap → miss, return null. Else: fetch node, remove from DLL, re-insert at head (promote to MRU). Return value. O(1).</div>`,
+    getMostRecentKey:   `<div class="ep-why-block">MostRecent: head.next in the DLL is always the MRU node (just inserted/accessed). O(1) pointer dereference.</div>`,
+  };
+  return {
+    why: why[op] || '—',
+    inv: [
+      { icon: '🔒', cls: '', text: `<strong>DLL Invariant:</strong> head.next = MRU node, tail.prev = LRU node. Any access/insert promotes the node to head.` },
+      { icon: '🗺️', cls: 'inv-warn', text: `<strong>HashMap Invariant:</strong> map[key] = pointer to DLL node. Gives O(1) lookup without traversing the DLL.` },
+      { icon: '🔑', cls: 'inv-pur', text: `<strong>Why both?</strong> DLL alone = O(n) lookup. HashMap alone = no ordering. Together = O(1) ordered cache.` },
+    ]
+  };
+}
+
+// ─── CODE HIGHLIGHT ─────────────────────────────────────────────────────
+function highlightCode(op, evicted) {
+  document.querySelectorAll('#code-clean .code-line').forEach(e => e.className = 'code-line');
+  if (op === 'insertKeyValuePair') {
+    document.getElementById('cl-ins')?.classList.add('hl-insert');
+    document.getElementById('cl-ins2')?.classList.add('hl-insert');
+    if (evicted) document.getElementById('cl-evict')?.classList.add('hl-evict');
+  } else if (op === 'getValueFromKey') {
+    document.getElementById('cl-get')?.classList.add('hl-get');
+    document.getElementById('cl-get2')?.classList.add('hl-get');
+  } else if (op === 'getMostRecentKey') {
+    document.getElementById('cl-recent')?.classList.add('hl-recent');
+  }
+}
+let activeCodeTab = 'clean';
+function switchCodeTab(tab) {
+  activeCodeTab = tab;
+  document.getElementById('code-clean').style.display = tab === 'clean' ? 'block' : 'none';
+  document.getElementById('code-cf').style.display = tab === 'cf' ? 'block' : 'none';
+  document.getElementById('ctab-clean').classList.toggle('active', tab === 'clean');
+  document.getElementById('ctab-cf').classList.toggle('active', tab === 'cf');
+}
+
+// ─── COMPUTE STEPS ──────────────────────────────────────────────────────
+function computeSteps(ops, maxSize) {
+  const steps = [];
+  const lru = new LRUCache(maxSize);
+  const opLog = [];
+
+  steps.push({
+    type: 'init', op: null, desc: `📐 LRU Cache(maxSize=${maxSize}). Empty cache. HashMap + DLL ready.`,
+    cacheArr: [], maxSize, opLog: [], opIdx: -1,
+    mruKey: null, lruKey: null, activeKey: null, evicted: null, result: null,
+    explain: makeExplain('insertKeyValuePair', { maxSize })
+  });
+
+  ops.forEach((opObj, opIdx) => {
+    const { op, key, val } = opObj;
+    let evicted = null, result = null, desc = '';
+    const logEntry = { op, args: op === 'insertKeyValuePair' ? `("${key}", ${val})` : op === 'getValueFromKey' ? `("${key}")` : '()', result: null };
+
+    if (op === 'insertKeyValuePair') {
+      const isUpdate = lru.cache.has(key);
+      evicted = lru.insertKeyValuePair(key, val);
+      desc = evicted ?
+        `📥 insert("${key}", ${val}): cache full → evict LRU key "${evicted.key}". Insert "${key}" at MRU.` :
+        isUpdate ?
+        `📥 insert("${key}", ${val}): key exists → update value and promote to MRU.` :
+        `📥 insert("${key}", ${val}): new key. Insert at MRU position.`;
+      logEntry.result = evicted ? `evicted "${evicted.key}"` : 'ok';
+    } else if (op === 'getValueFromKey') {
+      const hit = lru.cache.has(key);
+      result = lru.getValueFromKey(key);
+      desc = hit ?
+        `🔍 get("${key}"): found! val=${result}. Promoted to MRU.` :
+        `🔍 get("${key}"): MISS. Key not in cache → return null.`;
+      logEntry.result = result !== null ? String(result) : 'null';
+    } else if (op === 'getMostRecentKey') {
+      result = lru.getMostRecentKey();
+      desc = `⭐ getMostRecentKey(): "${result}" (head of DLL).`;
+      logEntry.result = `"${result}"`;
+    }
+
+    opLog.push(logEntry);
+    const arr = lru.toArray();
+
+    steps.push({
+      type: op, op, opIdx, desc,
+      cacheArr: arr, maxSize,
+      opLog: opLog.map(x => ({ ...x })),
+      mruKey: arr.length ? arr[0].key : null,
+      lruKey: arr.length ? arr[arr.length - 1].key : null,
+      activeKey: key || null,
+      evicted, result,
+      explain: makeExplain(op, { key, val, result, evicted, cacheArr: arr, maxSize })
+    });
+  });
+
+  return steps;
+}
+
+// ─── RENDERING ─────────────────────────────────────────────────────────
+let prevVars = {};
+function setVar(elId, cardId, val) {
+  const el = document.getElementById(elId), card = document.getElementById(cardId);
+  if (!el || !card) return;
+  const s = String(val); el.textContent = s;
+  if (prevVars[elId] !== undefined && prevVars[elId] !== s) {
+    card.classList.remove('changed'); void card.offsetWidth; card.classList.add('changed');
+    setTimeout(() => card.classList.remove('changed'), 500);
+  }
+  prevVars[elId] = s;
+}
+
+function renderStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
+  const st = steps[idx]; currentStep = idx;
+  const { cacheArr, maxSize, mruKey, lruKey, activeKey, evicted, result, op } = st;
+  const isFinal = idx === steps.length - 1;
+
+  // ── Cache strip ──
+  const co = document.getElementById('cacheOuter');
+  const opTypeClass = op === 'insertKeyValuePair' ? 'co-insert' : op === 'getValueFromKey' ? 'co-get' : op === 'getMostRecentKey' ? 'co-recent' : '';
+  co.className = `cache-outer ${evicted ? 'co-evict' : opTypeClass}`;
+
+  document.getElementById('chSize').textContent = cacheArr.length;
+  document.getElementById('chMax').textContent = maxSize;
+  document.getElementById('chUsage').textContent = cacheArr.length ? `${cacheArr.length}/${maxSize} slots used` : 'empty';
+  const capPct = maxSize > 0 ? (cacheArr.length / maxSize * 100) : 0;
+  const capBar = document.getElementById('capBar');
+  capBar.style.width = capPct + '%';
+  capBar.className = `cap-bar ${capPct >= 100 ? 'cb-full' : ''}`;
+
+  const strip = document.getElementById('cacheStrip');
+  if (!cacheArr.length) {
+    strip.innerHTML = '<div class="cache-empty">cache is empty</div>';
+  } else {
+    strip.innerHTML = '';
+    cacheArr.forEach((item, i) => {
+      const wrap = document.createElement('div'); wrap.className = 'cache-node-wrap';
+      const node = document.createElement('div');
+      const isMRU = i === 0;
+      const isLRU = i === cacheArr.length - 1;
+      const isActive = item.key === activeKey;
+      const isEvicting = evicted && item.key === evicted.key; // shouldn't show in arr, but handle
+      node.className = `cache-node ${isActive ? 'cns-active' : isMRU ? 'cns-mru' : isLRU && cacheArr.length >= maxSize ? 'cns-lru' : 'cns-normal'}`;
+      node.innerHTML = `<div class="cn-key">"${item.key}"</div><div class="cn-val">${item.val}</div>`;
+      wrap.appendChild(node);
+      if (i < cacheArr.length - 1) {
+        const arrowWrap = document.createElement('div');
+        arrowWrap.className = `cache-node-wrap ${isActive || i === 0 ? 'cna-new' : ''}`;
+        const arrow = document.createElement('div'); arrow.className = 'cn-arrow';
+        arrowWrap.appendChild(arrow);
+        wrap.appendChild(arrowWrap);
+      }
+      strip.appendChild(wrap);
+    });
+    // Evicted ghost node
+    if (evicted) {
+      const ghost = document.createElement('div');
+      ghost.style.cssText = 'display:flex;align-items:center;gap:6px;margin-left:12px;';
+      ghost.innerHTML = `<span style="font-family:'Space Mono',monospace;font-size:.55rem;color:var(--accent)">✂ evicted:</span>
+        <div class="cache-node cns-evicted"><div class="cn-key">"${evicted.key}"</div><div class="cn-val">${evicted.val}</div></div>`;
+      strip.appendChild(ghost);
+    }
+  }
+
+  // ── Op detail panel ──
+  const opo = document.getElementById('opPanelOuter');
+  const ophOp = document.getElementById('ophOp');
+  const opSum = document.getElementById('opSummary');
+  if (!op) {
+    opo.className = 'op-panel-outer';
+    ophOp.textContent = '—'; ophOp.className = 'oph-op';
+    document.getElementById('ophArgs').textContent = '—';
+    opSum.className = 'op-summary os-init'; opSum.textContent = 'add operations and press RUN';
+  } else {
+    const opClass = op === 'insertKeyValuePair' ? 'opo-insert' : op === 'getValueFromKey' ? 'opo-get' : 'opo-recent';
+    opo.className = `op-panel-outer ${opClass}`;
+    const btnClass = op === 'insertKeyValuePair' ? 'oho-insert' : op === 'getValueFromKey' ? 'oho-get' : 'oho-recent';
+    ophOp.className = `oph-op ${btnClass}`; ophOp.textContent = op;
+    document.getElementById('ophArgs').textContent = op === 'insertKeyValuePair' ? `("${activeKey}", ${st.cacheArr.find(x => x.key === activeKey)?.val ?? ''})` :
+      op === 'getValueFromKey' ? `("${activeKey}")` : '()';
+
+    if (evicted) { opSum.className = 'op-summary os-evict'; opSum.textContent = `✂ Evicted LRU key "${evicted.key}" (val=${evicted.val}). Inserted "${activeKey}".`; }
+    else if (op === 'insertKeyValuePair') { opSum.className = 'op-summary os-insert'; opSum.textContent = `✓ Inserted "${activeKey}" → MRU position.`; }
+    else if (op === 'getValueFromKey' && result !== null) { opSum.className = 'op-summary os-get'; opSum.textContent = `✓ get("${activeKey}") = ${result}. Promoted to MRU.`; }
+    else if (op === 'getValueFromKey') { opSum.className = 'op-summary os-miss'; opSum.textContent = `✗ get("${activeKey}") = null. Key not in cache.`; }
+    else if (op === 'getMostRecentKey') { opSum.className = 'op-summary os-recent'; opSum.textContent = `⭐ getMostRecentKey() = "${result}".`; }
+  }
+
+  // ── HashMap table ──
+  document.getElementById('hashmapOuter').className = `hashmap-outer ${op ? 'hmo-active' : ''}`;
+  document.getElementById('hmCount').textContent = `${cacheArr.length} entr${cacheArr.length !== 1 ? 'ies' : 'y'}`;
+  const hmTable = document.getElementById('hmTable');
+  hmTable.innerHTML = `<div class="hmt-header">Key</div><div class="hmt-header">Value</div><div class="hmt-header">Position</div>`;
+  cacheArr.forEach((item, i) => {
+    const isMRU = i === 0, isLRU = i === cacheArr.length - 1, isAct = item.key === activeKey;
+    const rowClass = isAct ? 'hmt-row-active' : isMRU ? 'hmt-row-mru' : '';
+    const kd = document.createElement('div'); kd.className = `hmt-key ${rowClass}`; kd.textContent = `"${item.key}"`;
+    const vd = document.createElement('div'); vd.className = `hmt-val ${rowClass}`; vd.textContent = item.val;
+    const pd = document.createElement('div'); pd.className = `hmt-pos ${rowClass}`;
+    pd.textContent = isMRU ? '← MRU [0]' : isLRU ? `LRU [${i}] →` : `[${i}]`;
+    hmTable.appendChild(kd); hmTable.appendChild(vd); hmTable.appendChild(pd);
+  });
+  if (evicted) {
+    const kd = document.createElement('div'); kd.className = 'hmt-key hmt-row-evict'; kd.textContent = `"${evicted.key}"`;
+    const vd = document.createElement('div'); vd.className = 'hmt-val hmt-row-evict'; vd.textContent = evicted.val;
+    const pd = document.createElement('div'); pd.className = 'hmt-pos hmt-row-evict'; pd.textContent = '✂ evicted';
+    hmTable.appendChild(kd); hmTable.appendChild(vd); hmTable.appendChild(pd);
+  }
+
+  // ── Op log ──
+  const olRows = document.getElementById('olRows');
+  olRows.innerHTML = '';
+  document.getElementById('olCount').textContent = `${(st.opLog || []).length} op${(st.opLog || []).length !== 1 ? 's' : ''}`;
+  (st.opLog || []).forEach((log, i) => {
+    const isCurrent = i === st.opIdx;
+    const row = document.createElement('div');
+    row.className = `ol-row ${isCurrent ? 'olr-current' : 'olr-done'}`;
+    const cls = log.op === 'insertKeyValuePair' ? 'ol-insert' : log.op === 'getValueFromKey' ? 'ol-get' : 'ol-recent';
+    row.innerHTML = `<span class="ol-op-name ${cls}">${i + 1}. ${log.op}</span><span>${log.args}</span>${log.result ? `<span class="ol-result" style="color:var(--accent3)">${log.result}</span>` : ''}`;
+    olRows.appendChild(row);
+    if (isCurrent) setTimeout(() => row.scrollIntoView({ block: 'nearest' }), 0);
+  });
+
+  // ── Narrative ──
+  const nb = document.querySelector('.narrative-bar');
+  if (nb) nb.style.borderLeftColor = {
+    insertKeyValuePair: evicted ? 'var(--accent)' : 'var(--accent3)',
+    getValueFromKey: result !== null ? 'var(--accent2)' : 'var(--accent)',
+    getMostRecentKey: 'var(--pur)',
+  }[op] || 'var(--accent4)';
+  document.getElementById('narrativeText').innerHTML = st.desc || 'Initialize.';
+
+  // ── Step panel ──
+  const sp = document.getElementById('stepPanel');
+  const spClass = evicted ? 'sp-evict' : op === 'insertKeyValuePair' ? 'sp-insert' : op === 'getValueFromKey' ? 'sp-get' : op === 'getMostRecentKey' ? 'sp-recent' : 'sp-insert';
+  sp.className = `step-panel ${spClass}`;
+  document.getElementById('spTitle').textContent = (st.desc || '').replace(/<[^>]+>/g, '');
+  const mkBox = (lbl, val, sub, cls) =>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+  const spb = document.getElementById('spBody');
+  spb.innerHTML = mkBox('size', cacheArr.length, `/${maxSize}`, cacheArr.length >= maxSize ? 'spbox sb-red' : 'spbox sb-grn') +
+    mkBox('MRU', mruKey ?? '—', 'head', 'spbox sb-grn') +
+    mkBox('LRU', lruKey ?? '—', 'tail', 'spbox sb-red') +
+    (result !== null && result !== undefined ? mkBox('result', result, '', 'spbox sb-blue') : '');
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(op, evicted);
+
+  // ── Right vars ──
+  setVar('vSize', 'vcSize', cacheArr.length);
+  setVar('vMax',  'vcMax',  maxSize);
+  setVar('vMRU',  'vcMRU',  mruKey ?? '—');
+  setVar('vLRU',  'vcLRU',  lruKey ?? '—');
+  setVar('vOp',   'vcOp',   op || '—');
+  document.getElementById('cacheRepr').textContent = cacheArr.length ? cacheArr.map(x => `"${x.key}":${x.val}`).join(' → ') : 'empty';
+  document.getElementById('cxSize').textContent = cacheArr.length;
+  document.getElementById('cxMRU').textContent = mruKey ?? '—';
+
+  // Progress
+  document.getElementById('progressFill').style.width = ((idx + 1) / steps.length * 100) + '%';
+  const counter = document.getElementById('stepCounter');
+  if (counter) counter.textContent = `Step ${idx + 1}`;
+  const total = document.getElementById('stepTotal');
+  if (total) total.textContent = `/ ${steps.length}`;
+  document.getElementById('btnPrev').disabled = idx === 0;
+  document.getElementById('btnNext').disabled = idx === steps.length - 1;
+
+  if (idx === steps.length - 1 && steps.length > 1) {
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent = `★ Done! Cache: ${cacheArr.map(x => `"${x.key}"`).join(' → ') || 'empty'}`;
+  }
+}
+
+// ─── TABS ───────────────────────────────────────────────────────────────
+let activeTab = 'what';
+function switchTab(tab) {
+  activeTab = tab;
+  ['what', 'why', 'inv'].forEach(t => {
+    const c = t[0].toUpperCase() + t.slice(1);
+    document.getElementById('tab' + c).classList.toggle('active', t === tab);
+    document.getElementById('pane' + c).classList.toggle('active', t === tab);
+  });
+  if (steps.length) updateExplain(steps[currentStep]);
+}
+function updateExplain(st) {
+  if (!st || !st.explain) return;
+  document.getElementById('paneWhat').innerHTML = st.desc || '';
+  document.getElementById('paneWhy').innerHTML = st.explain.why || '';
+  document.getElementById('invBlock').innerHTML = (st.explain.inv || []).map(r =>
+    `<div class="inv-row ${r.cls || ''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ───────────────────────────────────────────────────────────
+function play() {
+  if (currentStep >= steps.length - 1) { stopPlay(); return; }
+  playing = true;
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnPause').textContent = '⏸ Pause';
+  document.getElementById('btnRun').disabled = true;
+  tick();
+}
+function tick() { if (!playing) return; if (currentStep >= steps.length - 1) { stopPlay(); return; } renderStep(currentStep + 1); timer = setTimeout(tick, speed); }
+function stopPlay() { playing = false; clearTimeout(timer); document.getElementById('btnPause').textContent = '▶ Resume'; document.getElementById('btnRun').disabled = false; }
+
+document.getElementById('btnRun').addEventListener('click', () => {
+  const maxSize = Math.max(1, parseInt(document.getElementById('iMaxSize').value) || 3);
+  steps = computeSteps(opQueue, maxSize);
+  currentStep = 0;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('stepTotal').textContent = `/ ${steps.length}`;
+  renderStep(0);
+  setTimeout(play, 200);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  stopPlay();
+  steps = []; currentStep = 0;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('btnNext').disabled = true;
+  document.getElementById('btnPause').disabled = true;
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('cacheStrip').innerHTML = '<div class="cache-empty">empty cache — add operations and press RUN</div>';
+  document.getElementById('cacheRepr').textContent = 'empty';
+  document.getElementById('narrativeText').textContent = 'Build operations, press RUN.';
+  document.getElementById('hmTable').innerHTML = `<div class="hmt-header">Key</div><div class="hmt-header">Value</div><div class="hmt-header">Position</div>`;
+  document.getElementById('olRows').innerHTML = '';
+  document.getElementById('opSummary').className = 'op-summary os-init';
+  document.getElementById('opSummary').textContent = 'add operations and press RUN';
+  ['vSize', 'vMax', 'vMRU', 'vLRU', 'vOp'].forEach((id, i) => document.getElementById(id).textContent = ['0', '—', '—', '—', '—'][i]);
+  ['cxSize', 'cxMRU'].forEach((id, i) => document.getElementById(id).textContent = ['0', '—'][i]);
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => { stopPlay(); renderStep(currentStep - 1); });
+document.getElementById('btnNext').addEventListener('click', () => { stopPlay(); renderStep(currentStep + 1); });
+document.getElementById('btnPause').addEventListener('click', () => playing ? stopPlay() : play());
+document.querySelectorAll('.speed-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.speed-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); speed = parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight') { stopPlay(); renderStep(currentStep + 1); e.preventDefault(); }
+  else if (e.key === 'ArrowLeft') { stopPlay(); renderStep(currentStep - 1); e.preventDefault(); }
+  else if (e.key === ' ') { e.preventDefault(); playing ? stopPlay() : play(); }
+});
+</script>
+</body>
+</html>

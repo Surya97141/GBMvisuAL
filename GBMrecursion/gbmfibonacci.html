@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nth Fibonacci — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.2rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(255,209,102,.2);border:1px solid var(--accent4);color:#7a4800;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+.controls{display:flex;gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input,.field select{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;transition:border-color .2s;}
+.field input{width:120px;} .field select{width:180px;}
+.field input:focus,.field select:focus{border-color:var(--accent4);}
+.field .hint{font-size:.62rem;color:var(--muted);margin-top:2px;}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#7a4800;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:5px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+
+/* LEGEND */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ UNIQUE VISUAL 1: FIBONACCI SEQUENCE STRIP ══
+   All F(0)..F(n) shown as cards in a row.
+   Current cell computing pulses gold.
+   Cells being read light up blue.
+   Completed cells turn green with their value. */
+.seq-section{margin-bottom:14px;}
+.seq-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;transition:border-color .3s;overflow-x:auto;}
+.seq-outer.so-compute{border-color:var(--accent4);}
+.seq-outer.so-read   {border-color:var(--accent2);}
+.seq-outer.so-done   {border-color:var(--accent3);}
+.seq-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.sh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.sh-result{font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;}
+.fib-row{display:flex;gap:6px;flex-wrap:nowrap;}
+.fib-card{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:50px;flex-shrink:0;padding:8px 6px;border-radius:8px;border:2px solid var(--border);
+  background:var(--surface);transition:all .3s cubic-bezier(.34,1.56,.64,1);
+}
+.fc-idx {font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);}
+.fc-val {font-family:'Space Mono',monospace;font-size:.95rem;font-weight:700;color:var(--muted);}
+.fc-label{font-family:'Space Mono',monospace;font-size:.48rem;color:var(--muted);margin-top:1px;}
+/* states */
+.fc-done   {background:rgba(6,214,160,.12);   border-color:#06d6a0;}
+.fc-done .fc-val{color:#024d37;}
+.fc-current{background:rgba(255,209,102,.25);  border-color:#ffd166;transform:scale(1.1) translateY(-4px);box-shadow:0 6px 16px rgba(255,209,102,.3);}
+.fc-current .fc-val{color:#7a4800;}
+.fc-reading{background:rgba(33,150,243,.12);   border-color:#2196f3;}
+.fc-reading .fc-val{color:#0d47a1;}
+.fc-base   {background:rgba(192,84,252,.12);   border-color:#c084fc;}
+.fc-base .fc-val{color:#5b1a9a;}
+.fc-pending{background:rgba(0,0,0,.02);        border-color:var(--border);border-style:dashed;}
+.fc-pending .fc-val{color:#ccc;}
+
+/* ══ UNIQUE VISUAL 2: CALL STACK / MEMO TABLE ══
+   Iterative: shows prev/curr/next rolling window
+   Recursive: shows call stack depth + redundant calls counter
+   Memoized: shows memo table filling up */
+.compute-section{margin-bottom:14px;}
+.compute-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.compute-outer.co-active{border-color:var(--accent4);}
+.compute-outer.co-done  {border-color:var(--accent3);}
+/* Rolling window (iterative) */
+.window-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.win-card{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:58px;padding:8px 10px;border-radius:8px;border:2px solid var(--border);transition:all .3s cubic-bezier(.34,1.56,.64,1);}
+.wc-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;}
+.wc-val{font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;}
+.wc-sub{font-family:'Space Mono',monospace;font-size:.5rem;color:var(--muted);}
+.wc-prev {border-color:var(--accent2);background:rgba(33,150,243,.08);}  .wc-prev .wc-val{color:#0d47a1;}
+.wc-curr {border-color:var(--accent4);background:rgba(255,209,102,.12);transform:translateY(-3px);} .wc-curr .wc-val{color:#7a4800;}
+.wc-next {border-color:var(--accent3);background:rgba(6,214,160,.08);}   .wc-next .wc-val{color:#024d37;}
+.wc-done {border-color:var(--accent3);background:rgba(6,214,160,.14);}   .wc-done .wc-val{color:#024d37;}
+.win-arrow{font-family:'Space Mono',monospace;font-size:1.1rem;color:var(--border);}
+/* Call stack (recursive) */
+.call-stack-viz{display:flex;flex-direction:column;gap:4px;}
+.cs-frame{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:6px;border:1.5px solid var(--border);font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;transition:all .3s;}
+.csf-active{border-color:var(--accent4);background:rgba(255,209,102,.1);color:#7a4800;}
+.csf-done  {border-color:var(--accent3);background:rgba(6,214,160,.07);color:#024d37;}
+.csf-label{flex:1;}
+.csf-ret{font-size:.62rem;color:var(--accent3);}
+/* Memo table */
+.memo-grid{display:flex;flex-wrap:wrap;gap:5px;}
+.memo-cell{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px;padding:5px 6px;border-radius:6px;border:1.5px solid var(--border);font-family:'Space Mono',monospace;transition:all .3s;}
+.mc-idx{font-size:.48rem;color:var(--muted);}
+.mc-val{font-size:.82rem;font-weight:700;}
+.memo-cell.mm-hit  {border-color:var(--accent3);background:rgba(6,214,160,.1);}  .memo-cell.mm-hit .mc-val{color:#024d37;}
+.memo-cell.mm-fill {border-color:var(--accent4);background:rgba(255,209,102,.15);transform:scale(1.05);}  .memo-cell.mm-fill .mc-val{color:#7a4800;}
+.memo-cell.mm-empty{border-color:var(--border);background:rgba(0,0,0,.02);border-style:dashed;}  .memo-cell.mm-empty .mc-val{color:#ccc;}
+
+/* ══ UNIQUE VISUAL 3: APPROACH COMPARISON ══
+   Shows all three approaches side by side with
+   complexity and calls counter */
+.compare-section{margin-bottom:14px;}
+.compare-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;}
+.compare-row{display:flex;gap:8px;}
+.cmp-card{flex:1;border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;text-align:center;transition:all .3s;}
+.cmp-card.cmp-active{border-width:2px;}
+.cmp-card.cmp-iter{border-color:var(--accent3);}.cmp-card.cmp-active.cmp-iter{background:rgba(6,214,160,.06);}
+.cmp-card.cmp-memo{border-color:var(--pur);}.cmp-card.cmp-active.cmp-memo{background:rgba(192,84,252,.06);}
+.cmp-card.cmp-rec {border-color:var(--accent);}.cmp-card.cmp-active.cmp-rec{background:rgba(230,57,70,.04);}
+.cmp-name{font-family:'Space Mono',monospace;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.cmp-time{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;margin-bottom:2px;}
+.cmp-space{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);}
+.cmp-calls{font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;margin-top:4px;}
+
+/* STEP PANEL */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-base   {border-color:var(--pur);}
+.step-panel.sp-compute{border-color:var(--accent4);}
+.step-panel.sp-read   {border-color:var(--accent2);}
+.step-panel.sp-done   {border-color:var(--accent3);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.spbox{flex:1;min-width:70px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;color:var(--ink);}
+.spb-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+
+/* NARRATIVE */
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent4);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+/* COMPLEXITY */
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+/* 3-TAB */
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.explain-panel.ep-base   {border-color:var(--pur);}
+.explain-panel.ep-compute{border-color:var(--accent4);}
+.explain-panel.ep-done   {border-color:var(--accent3);}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent4);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.06);}
+.ep-why-block.why-base   {border-left-color:var(--pur);background:rgba(192,84,252,.07);}
+.ep-why-block.why-compute{border-left-color:var(--accent4);background:rgba(255,209,102,.07);}
+.ep-why-block.why-done   {border-left-color:var(--accent3);background:rgba(6,214,160,.06);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent4);color:#3a2800;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*4+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-base   {background:rgba(192,84,252,.14);border-left-color:var(--pur);    color:#e2e8f0;}
+.code-line.hl-compute{background:rgba(255,209,102,.14);border-left-color:var(--accent4);color:#e2e8f0;}
+.code-line.hl-read   {background:rgba(33,150,243,.14); border-left-color:var(--accent2);color:#e2e8f0;}
+.code-line.hl-done   {background:rgba(6,214,160,.18);  border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;color:var(--bg);word-break:break-all;}
+
+.fib-seq-right{margin-bottom:12px;overflow-x:auto;}
+.fsr-title{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+.fsr-chips{display:flex;gap:3px;flex-wrap:wrap;}
+.fsr-chip{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:4px;border:1px solid #2a2a3e;background:#0d0d18;color:#4a5568;transition:all .22s;}
+.fsr-chip.fsc-done   {border-color:#06d6a0;background:rgba(6,214,160,.15);color:#06d6a0;}
+.fsr-chip.fsc-current{border-color:#ffd166;background:rgba(255,209,102,.2);color:#ffd166;}
+.fsr-chip.fsc-reading{border-color:#2196f3;background:rgba(33,150,243,.15);color:#4fc3f7;}
+
+.best-box{margin:0 0 12px;padding:11px;border-radius:5px;opacity:.4;transition:opacity .4s;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.3);}
+.best-box.show{opacity:1;}
+.best-label{font-family:'Space Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent4);margin-bottom:5px;}
+.best-val{font-family:'Space Mono',monospace;font-size:1.6rem;font-weight:700;color:var(--bg);}
+.best-meta{font-size:.62rem;color:#6b6b8a;margin-top:3px;}
+.done-bar{display:none;margin:0 13px 10px;background:var(--accent4);color:#3a2800;text-align:center;padding:8px;border-radius:4px;font-family:'Space Mono',monospace;font-size:.67rem;font-weight:800;letter-spacing:2px;}
+.done-bar.show{display:block;animation:fadeUp .4s ease;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Nth Fibonacci</h1>
+    <div class="sub">Iterative · Memoized · Recursive · Three Approaches</div>
+  </div>
+  <div class="family-badge">DP · Recursion</div>
+</div>
+
+<div class="main">
+<!-- LEFT -->
+<div class="viz-panel">
+  <div class="controls">
+    <div class="field">
+      <label>N (1-indexed)</label>
+      <input type="number" id="inN" value="6" min="1" max="15">
+      <div class="hint">F(1)=0, F(2)=1, F(3)=1…</div>
+    </div>
+    <div class="field">
+      <label>Approach</label>
+      <select id="inMode">
+        <option value="iterative">Iterative — O(n) time, O(1) space</option>
+        <option value="memo">Memoized — O(n) time, O(n) space</option>
+        <option value="recursive">Naive Recursive — O(2ⁿ) time</option>
+      </select>
+    </div>
+    <div class="speed-wrap">
+      <label>Speed</label>
+      <div class="speed-btns">
+        <button class="speed-btn" data-ms="1400">0.5×</button>
+        <button class="speed-btn active" data-ms="700">1×</button>
+        <button class="speed-btn" data-ms="320">2×</button>
+        <button class="speed-btn" data-ms="120">4×</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+    <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.12);border-color:#c084fc;border-radius:3px"></div> base case</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.25);border-color:#ffd166;border-radius:3px"></div> computing</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.12);border-color:#2196f3;border-radius:3px"></div> reading (lookup)</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.12);border-color:#06d6a0;border-radius:3px"></div> done ✓</div>
+  </div>
+
+  <!-- UNIQUE VISUAL 1: FIBONACCI SEQUENCE STRIP -->
+  <div class="seq-section">
+    <div class="section-label">Fibonacci sequence  F(0)…F(n)</div>
+    <div class="seq-outer" id="seqOuter">
+      <div class="seq-header">
+        <div class="sh-title">each cell = one Fibonacci number</div>
+        <div class="sh-result" id="shResult">—</div>
+      </div>
+      <div class="fib-row" id="fibRow"></div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 2: APPROACH-SPECIFIC PANEL -->
+  <div class="compute-section">
+    <div class="section-label" id="computeLabel">Computation details</div>
+    <div class="compute-outer" id="computeOuter">
+      <div id="computeInner">
+        <span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">Press RUN…</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNIQUE VISUAL 3: APPROACH COMPARISON -->
+  <div class="compare-section">
+    <div class="section-label">Approach comparison</div>
+    <div class="compare-outer">
+      <div class="compare-row">
+        <div class="cmp-card cmp-iter" id="cmpIter">
+          <div class="cmp-name" style="color:var(--accent3)">Iterative</div>
+          <div class="cmp-time" style="color:var(--accent3)">O(n) time</div>
+          <div class="cmp-space">O(1) space</div>
+          <div class="cmp-calls" id="cmpIterCalls" style="color:var(--accent3)">— steps</div>
+        </div>
+        <div class="cmp-card cmp-memo" id="cmpMemo">
+          <div class="cmp-name" style="color:var(--pur-dark)">Memoized</div>
+          <div class="cmp-time" style="color:var(--pur-dark)">O(n) time</div>
+          <div class="cmp-space">O(n) space</div>
+          <div class="cmp-calls" id="cmpMemoCalls" style="color:var(--pur-dark)">— calls</div>
+        </div>
+        <div class="cmp-card cmp-rec" id="cmpRec">
+          <div class="cmp-name" style="color:var(--accent)">Recursive</div>
+          <div class="cmp-time" style="color:var(--accent)">O(2ⁿ) time</div>
+          <div class="cmp-space">O(n) space</div>
+          <div class="cmp-calls" id="cmpRecCalls" style="color:var(--accent)">— calls</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-compute" id="stepPanel">
+    <div class="sp-title" id="spTitle">Press RUN to begin</div>
+    <div class="sp-body" id="spBody"><span style="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted)">step details here</span></div>
+  </div>
+
+  <!-- NARRATIVE -->
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Press RUN to start.</div>
+  </div>
+
+  <!-- COMPLEXITY -->
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Time</div><div class="cx-val" id="cxTime" style="color:var(--pur-dark)">—</div>
+      <div class="cx-sub" id="cxTimeSub">—</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">Space</div><div class="cx-val" id="cxSpace" style="color:var(--accent2)">—</div>
+      <div class="cx-sub" id="cxSpaceSub">—</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Steps / Calls</div>
+      <div class="cx-val" id="cxCalls" style="color:#7a5a00">—</div>
+      <div class="cx-sub">total</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">F(n)</div>
+      <div class="cx-val" id="cxAnswer" style="color:#028a5b">—</div>
+      <div class="cx-sub">answer</div>
+    </div>
+  </div>
+
+  <!-- 3-TAB -->
+  <div class="explain-panel ep-compute" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-label"><span id="stepCounter">Step 0</span><span id="stepTotal"></span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+    <span><kbd class="kbd">R</kbd> reset</span>
+  </div>
+</div>
+
+<!-- RIGHT -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title" id="codePanelTitle">C++ — Iterative</div>
+    <pre class="code-block" id="codeBlock">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">getNthFib</span>(<span class="ck">int</span> n) {</span>
+<span class="code-line" id="cl-base1">  <span class="ck">if</span> (n==<span class="cn">1</span>) <span class="ck">return</span> <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-base2">  <span class="ck">if</span> (n==<span class="cn">2</span>) <span class="ck">return</span> <span class="cn">1</span>;</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> prev=<span class="cn">0</span>, curr=<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">3</span>; i&lt;=n; i++) {</span>
+<span class="code-line" id="cl-next">    <span class="ck">int</span> next = prev + curr;</span>
+<span class="code-line" id="cl-shift1">    prev = curr;</span>
+<span class="code-line" id="cl-shift2">    curr = next;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> curr;</span>
+<span class="code-line" id="cl-close">}</span>
+</pre>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live Variables</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcI">    <div class="var-name">i / call</div>  <div class="var-value" id="vI"    style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcPrev"> <div class="var-name">prev / a</div>  <div class="var-value" id="vPrev" style="color:var(--accent2)">—</div></div>
+      <div class="var-card" id="vcCurr"> <div class="var-name">curr / b</div>  <div class="var-value" id="vCurr" style="color:var(--accent4)">—</div></div>
+      <div class="var-card" id="vcNext"> <div class="var-name">next / ret</div><div class="var-value" id="vNext" style="color:var(--accent3)">—</div></div>
+      <div class="var-card" id="vcCalls" style="grid-column:1/3">
+        <div class="var-name">total steps / calls</div>
+        <div class="var-value" id="vCalls" style="color:var(--accent3)">0</div>
+      </div>
+    </div>
+
+    <div class="fib-seq-right">
+      <div class="fsr-title">F(0)…F(n) computed</div>
+      <div class="fsr-chips" id="fsrChips"></div>
+    </div>
+
+    <div class="best-box" id="bestBox">
+      <div class="best-label">F(n) Answer</div>
+      <div class="best-val" id="bestVal">—</div>
+      <div class="best-meta" id="bestMeta">not yet complete</div>
+    </div>
+  </div>
+  <div class="done-bar" id="doneBar">★ FIBONACCI COMPLETE</div>
+</div>
+</div>
+
+<script>
+// ─── FIB VALUES ────────────────────────────────────────────────────────────
+function fibVal(n){if(n<=0)return 0;if(n===1)return 0;if(n===2)return 1;let a=0,b=1;for(let i=3;i<=n;i++){let t=a+b;a=b;b=t;}return b;}
+
+// ─── EXPLAIN ───────────────────────────────────────────────────────────────
+function makeExplain(type,mode,args){
+  const{n,i,prev,curr,next,calls,memo}=args||{};
+  const modeLabel={iterative:'Iterative',memo:'Memoized',recursive:'Naive Recursive'}[mode]||mode;
+
+  if(type==='base') return {
+    why:`<div class="ep-why-block why-base">Base cases: F(1)=0 and F(2)=1 by definition. These are the seeds of the entire Fibonacci sequence — every other value is derived from them. The ${modeLabel} approach handles these identically.</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>F(1)=0, F(2)=1.</strong> All other F(k) = F(k-1)+F(k-2). The sequence is 0,1,1,2,3,5,8,13,21…`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>1-indexed convention here:</strong> getNthFib(1)=F0=0, getNthFib(2)=F1=1, getNthFib(n)=F(n-1) in 0-indexed terms.`},
+    ]
+  };
+  if(type==='compute'&&mode==='iterative') return {
+    why:`<div class="ep-why-block why-compute">Step i=${i}: next = prev(${prev}) + curr(${curr}) = ${next}. Then slide: prev←curr, curr←next. Only two variables needed — prev and curr form a rolling window over the last two Fibonacci numbers. Space is O(1).</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Loop invariant:</strong> Before iteration i, prev=F(i-2) and curr=F(i-1). After: prev=F(i-1), curr=F(i). At i=n, curr=F(n).`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Why no array?</strong> We only ever need the last two values. Storing all F(0..n) wastes O(n) space unnecessarily.`},
+    ]
+  };
+  if(type==='compute'&&mode==='memo') return {
+    why:`<div class="ep-why-block why-compute">Computing F(${i}): look up memo[${i}]. ${memo&&memo[i]!==undefined?`✓ Cache HIT — return ${memo[i]} immediately. No recomputation.`:`Cache MISS — compute F(${i-1})+F(${i-2}) recursively, store result.`}</div>`,
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Memoization invariant:</strong> memo[k] is set exactly once, the first time F(k) is needed. All subsequent calls return immediately.`},
+      {icon:'📐',cls:'inv-warn',text:`<strong>O(n) calls instead of O(2ⁿ):</strong> Without memo, F(n) calls F(n-1) and F(n-2), which both call F(n-3)… exponential. With memo, each F(k) computed once.`},
+    ]
+  };
+  if(type==='compute'&&mode==='recursive') return {
+    why:`<div class="ep-why-block why-compute">Call F(${i}): must call F(${i-1}) and F(${i-2}) separately. Both subtrees are explored fully. Total calls = O(2ⁿ). Call #${calls} so far.</div>`,
+    inv:[
+      {icon:'⚠️',cls:'inv-warn',text:`<strong>Exponential blowup:</strong> F(n) is called with MANY duplicate arguments. F(3) alone is computed ${Math.max(1,fibVal(n)-1)} times for n=${n}.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>This is why memoization helps:</strong> cache the result of each F(k) on first computation → O(n) instead of O(2ⁿ).`},
+    ]
+  };
+  if(type==='done') return {
+    why:`<div class="ep-why-block why-done">${modeLabel} complete. F(${n}) = ${fibVal(n)}. ${mode==='iterative'?`Used ${n-2} loop iterations, O(1) space.`:mode==='memo'?`Made ${calls} recursive calls (each unique k called once), O(n) space for memo table.`:`Made ${calls} recursive calls total — compare to iterative's ${n-2} steps!`}</div>`,
+    inv:[
+      {icon:'✅',cls:'',text:`<strong>F(${n}) = ${fibVal(n)}.</strong> ${mode==='iterative'?'O(n) time, O(1) space — optimal.':mode==='memo'?'O(n) time, O(n) space — same time as iterative but uses extra memory.':'O(2ⁿ) time — exponential. Only good for tiny n.'}`},
+    ]
+  };
+  return{why:'',inv:[]};
+}
+
+// ─── CODE SNIPPETS per mode ────────────────────────────────────────────────
+const CODE={
+  iterative:`<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">getNthFib</span>(<span class="ck">int</span> n) {</span>
+<span class="code-line" id="cl-base1">  <span class="ck">if</span> (n==<span class="cn">1</span>) <span class="ck">return</span> <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-base2">  <span class="ck">if</span> (n==<span class="cn">2</span>) <span class="ck">return</span> <span class="cn">1</span>;</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> prev=<span class="cn">0</span>, curr=<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-loop">  <span class="ck">for</span> (<span class="ck">int</span> i=<span class="cn">3</span>; i&lt;=n; i++) {</span>
+<span class="code-line" id="cl-next">    <span class="ck">int</span> next = prev + curr;</span>
+<span class="code-line" id="cl-shift1">    prev = curr;</span>
+<span class="code-line" id="cl-shift2">    curr = next;</span>
+<span class="code-line" id="cl-end">  }</span>
+<span class="code-line" id="cl-ret">  <span class="ck">return</span> curr;</span>
+<span class="code-line" id="cl-close">}</span>`,
+  memo:`<span class="code-line" id="cl-sig">unordered_map&lt;<span class="ck">int</span>,<span class="ck">int</span>&gt; memo;</span>
+<span class="code-line" id="cl-fn"><span class="ck">int</span> <span class="cf">getNthFib</span>(<span class="ck">int</span> n) {</span>
+<span class="code-line" id="cl-base1">  <span class="ck">if</span> (n==<span class="cn">1</span>) <span class="ck">return</span> <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-base2">  <span class="ck">if</span> (n==<span class="cn">2</span>) <span class="ck">return</span> <span class="cn">1</span>;</span>
+<span class="code-line" id="cl-check">  <span class="ck">if</span> (memo.count(n)) <span class="ck">return</span> memo[n];</span>
+<span class="code-line" id="cl-rec">  <span class="ck">return</span> memo[n] =</span>
+<span class="code-line" id="cl-rec2">    <span class="cf">getNthFib</span>(n-<span class="cn">1</span>) + <span class="cf">getNthFib</span>(n-<span class="cn">2</span>);</span>
+<span class="code-line" id="cl-close">}</span>`,
+  recursive:`<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">getNthFib</span>(<span class="ck">int</span> n) {</span>
+<span class="code-line" id="cl-base1">  <span class="ck">if</span> (n==<span class="cn">1</span>) <span class="ck">return</span> <span class="cn">0</span>;</span>
+<span class="code-line" id="cl-base2">  <span class="ck">if</span> (n==<span class="cn">2</span>) <span class="ck">return</span> <span class="cn">1</span>;</span>
+<span class="code-line" id="cl-rec">  <span class="ck">return</span> <span class="cf">getNthFib</span>(n-<span class="cn">1</span>)</span>
+<span class="code-line" id="cl-rec2">       + <span class="cf">getNthFib</span>(n-<span class="cn">2</span>);</span>
+<span class="code-line" id="cl-close">}</span>`
+};
+
+const TYPE_LINES={
+  iterative:{
+    base:   {ids:['cl-base1','cl-base2'],cls:'hl-base'},
+    compute:{ids:['cl-next','cl-shift1','cl-shift2'],cls:'hl-compute'},
+    read:   {ids:['cl-loop'],cls:'hl-read'},
+    done:   {ids:['cl-ret'],cls:'hl-done'},
+  },
+  memo:{
+    base:   {ids:['cl-base1','cl-base2'],cls:'hl-base'},
+    compute:{ids:['cl-rec','cl-rec2'],cls:'hl-compute'},
+    read:   {ids:['cl-check'],cls:'hl-read'},
+    done:   {ids:['cl-rec'],cls:'hl-done'},
+  },
+  recursive:{
+    base:   {ids:['cl-base1','cl-base2'],cls:'hl-base'},
+    compute:{ids:['cl-rec','cl-rec2'],cls:'hl-compute'},
+    done:   {ids:['cl-base1','cl-base2'],cls:'hl-done'},
+  }
+};
+function highlightCode(type,mode){
+  document.querySelectorAll('.code-line').forEach(e=>e.className='code-line');
+  const tl=TYPE_LINES[mode];if(!tl)return;
+  const e=tl[type];if(!e)return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  const first=document.getElementById(e.ids[0]);
+  if(first)first.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ─── computeSteps ──────────────────────────────────────────────────────────
+function computeSteps(n, mode){
+  const steps=[];
+  const fibArr=new Array(n+1).fill(null); // 1-indexed, fibArr[i]=F(i)
+  fibArr[1]=0; if(n>=2)fibArr[2]=1;
+
+  const snap=(type,desc,extra={})=>{
+    steps.push({type,desc,mode,n,fibArr:[...fibArr],result:null,...extra,
+      explain:makeExplain(type,mode,{n,...extra})});
+  };
+
+  if(mode==='iterative'){
+    snap('base',`📐 <strong>Base cases.</strong> F(1)=0, F(2)=1. Set prev=0, curr=1.`,
+      {i:2,prev:0,curr:1,next:null,calls:0});
+    if(n<=2){
+      snap('done',`✅ <strong>F(${n}) = ${fibVal(n)}</strong>. Base case answer.`,
+        {i:n,prev:n===1?null:0,curr:fibVal(n),next:null,calls:0,result:{answer:fibVal(n)}});
+      steps[steps.length-1].result={answer:fibVal(n)};
+      return steps;
+    }
+    let prev=0,curr=1,calls=0;
+    for(let i=3;i<=n;i++){
+      calls++;
+      snap('read',`🔄 Loop i=${i}: reading prev=${prev}, curr=${curr}.`,
+        {i,prev,curr,next:null,calls});
+      const next=prev+curr;
+      fibArr[i]=next;
+      snap('compute',`➕ F(${i}) = ${prev} + ${curr} = <strong>${next}</strong>. Slide window.`,
+        {i,prev,curr,next,calls});
+      prev=curr; curr=next;
+    }
+    snap('done',`✅ <strong>F(${n}) = ${curr}</strong>. Loop complete in ${calls} iterations.`,
+      {i:n,prev,curr,next:null,calls,result:{answer:curr}});
+    steps[steps.length-1].result={answer:curr};
+
+  } else if(mode==='memo'){
+    const memo={};
+    let calls=0;
+    snap('base',`📐 <strong>Memoized recursion.</strong> F(1)=0, F(2)=1 (base). memo={} initially.`,
+      {i:n,prev:null,curr:null,next:null,calls:0,memo:{}});
+
+    function rec(k){
+      calls++;
+      if(k===1){
+        memo[1]=0; fibArr[1]=0;
+        snap('base',`📍 F(1) = 0 (base case). Store memo[1]=0.`,
+          {i:1,prev:null,curr:0,next:null,calls,memo:{...memo}});
+        return 0;
+      }
+      if(k===2){
+        memo[2]=1; fibArr[2]=1;
+        snap('base',`📍 F(2) = 1 (base case). Store memo[2]=1.`,
+          {i:2,prev:null,curr:1,next:null,calls,memo:{...memo}});
+        return 1;
+      }
+      if(memo[k]!==undefined){
+        snap('read',`⚡ F(${k}): memo HIT! Return ${memo[k]} instantly.`,
+          {i:k,prev:null,curr:memo[k],next:null,calls,memo:{...memo}});
+        return memo[k];
+      }
+      snap('compute',`🔢 F(${k}): cache MISS. Recurse F(${k-1}) + F(${k-2}).`,
+        {i:k,prev:null,curr:null,next:null,calls,memo:{...memo}});
+      const a=rec(k-1), b=rec(k-2);
+      const val=a+b;
+      memo[k]=val; fibArr[k]=val;
+      snap('compute',`✅ F(${k}) = F(${k-1})+F(${k-2}) = ${a}+${b} = <strong>${val}</strong>. Cached.`,
+        {i:k,prev:a,curr:b,next:val,calls,memo:{...memo}});
+      return val;
+    }
+    const ans=rec(n);
+    snap('done',`🎉 <strong>F(${n}) = ${ans}</strong>. Made ${calls} calls total.`,
+      {i:n,prev:null,curr:ans,next:null,calls,memo:{...memo},result:{answer:ans}});
+    steps[steps.length-1].result={answer:ans};
+
+  } else { // recursive
+    let calls=0;
+    snap('base',`📐 <strong>Naive recursion.</strong> F(1)=0, F(2)=1. No memoization — exponential calls!`,
+      {i:n,prev:null,curr:null,next:null,calls:0,memo:{}});
+
+    function rec2(k){
+      calls++;
+      if(k===1){
+        snap('base',`📍 F(1)=0 (base). Call #${calls}.`,{i:1,prev:null,curr:0,next:null,calls,memo:{}});
+        return 0;
+      }
+      if(k===2){
+        snap('base',`📍 F(2)=1 (base). Call #${calls}.`,{i:2,prev:null,curr:1,next:null,calls,memo:{}});
+        return 1;
+      }
+      snap('compute',`🔢 F(${k}): call F(${k-1})+F(${k-2}). Call #${calls}.`,
+        {i:k,prev:null,curr:null,next:null,calls,memo:{}});
+      const a=rec2(k-1), b=rec2(k-2);
+      const val=a+b;
+      if(fibArr[k]===null||fibArr[k]===undefined)fibArr[k]=val;
+      snap('compute',`↩ F(${k}) = ${a}+${b} = <strong>${val}</strong>. Return up.`,
+        {i:k,prev:a,curr:b,next:val,calls,memo:{}});
+      return val;
+    }
+    const ans2=rec2(n);
+    snap('done',`🎉 <strong>F(${n}) = ${ans2}</strong>. Made <strong>${calls} calls</strong>! Compare: iterative uses ${n-2} steps.`,
+      {i:n,prev:null,curr:ans2,next:null,calls,memo:{},result:{answer:ans2}});
+    steps[steps.length-1].result={answer:ans2};
+  }
+  return steps;
+}
+
+// ─── GLOBALS ───────────────────────────────────────────────────────────────
+let steps=[], currentStep=0, playing=false, timer=null, speed=700;
+let nVal=6, modeVal='iterative';
+
+// ─── BUILD UI ──────────────────────────────────────────────────────────────
+function buildUI(){
+  nVal=Math.max(1,Math.min(15,parseInt(document.getElementById('inN').value)||6));
+  modeVal=document.getElementById('inMode').value;
+  document.getElementById('inN').value=nVal;
+
+  // Set code
+  document.getElementById('codeBlock').innerHTML=CODE[modeVal];
+  document.getElementById('codePanelTitle').textContent=
+    `C++ — ${{iterative:'Iterative',memo:'Memoized',recursive:'Naive Recursive'}[modeVal]}`;
+
+  steps=computeSteps(nVal,modeVal);
+  currentStep=0;
+
+  // Complexity cards
+  const cx={
+    iterative:['O(n)','n iterations','O(1)','2 variables'],
+    memo:      ['O(n)','n unique calls','O(n)','memo table'],
+    recursive: ['O(2ⁿ)','exponential','O(n)','call stack'],
+  }[modeVal];
+  document.getElementById('cxTime').textContent=cx[0];
+  document.getElementById('cxTimeSub').textContent=cx[1];
+  document.getElementById('cxSpace').textContent=cx[2];
+  document.getElementById('cxSpaceSub').textContent=cx[3];
+  document.getElementById('cxAnswer').textContent=fibVal(nVal);
+
+  // Comparison calls
+  const iterSteps=Math.max(0,nVal-2);
+  const memoCallsEst=nVal<=2?1:2*nVal-3;
+  const recCallsEst=nVal<=2?1:Math.pow(2,nVal)-1;
+  document.getElementById('cmpIterCalls').textContent=`${iterSteps} steps`;
+  document.getElementById('cmpMemoCalls').textContent=`~${memoCallsEst} calls`;
+  document.getElementById('cmpRecCalls').textContent=nVal<=12?`~${recCallsEst} calls`:`~2^${nVal} calls`;
+  // Highlight active
+  ['cmpIter','cmpMemo','cmpRec'].forEach(id=>document.getElementById(id).classList.remove('cmp-active'));
+  document.getElementById({iterative:'cmpIter',memo:'cmpMemo',recursive:'cmpRec'}[modeVal]).classList.add('cmp-active');
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').className='done-bar';
+  document.getElementById('bestBox').className='best-box';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  // Build fib row
+  buildFibRow(nVal);
+  renderStep(0);
+}
+
+function buildFibRow(n){
+  const fr=document.getElementById('fibRow');
+  fr.innerHTML='';
+  for(let i=1;i<=n;i++){
+    const card=document.createElement('div');
+    card.className='fib-card fc-pending';card.id=`fc-${i}`;
+    card.innerHTML=`<div class="fc-idx">F(${i})</div>`
+      +`<div class="fc-val" id="fv-${i}">?</div>`
+      +`<div class="fc-label">${i<=2?'base':''}</div>`;
+    fr.appendChild(card);
+  }
+}
+
+// ─── RENDER ────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx]; currentStep=idx;
+  const isFinal=!!st.result;
+  const n=st.n;
+
+  // ── Fib row ──
+  const so=document.getElementById('seqOuter');
+  so.className='seq-outer '+(isFinal?'so-done':st.type==='read'?'so-read':'so-compute');
+  for(let i=1;i<=n;i++){
+    const card=document.getElementById(`fc-${i}`);
+    const valEl=document.getElementById(`fv-${i}`);
+    if(!card||!valEl)continue;
+    const v=st.fibArr[i];
+    valEl.textContent=v!=null?v:'?';
+    const isCur=st.i===i&&!isFinal;
+    const isRead=(st.type==='read'||st.type==='compute')&&(i===st.i-1||i===st.i-2)&&!isFinal;
+    if(isFinal){card.className='fib-card fc-done';}
+    else if(i<=2&&v!=null){card.className='fib-card fc-base';}
+    else if(isCur&&st.type==='compute'){card.className='fib-card fc-current';}
+    else if(isRead){card.className='fib-card fc-reading';}
+    else if(v!=null){card.className='fib-card fc-done';}
+    else{card.className='fib-card fc-pending';}
+  }
+  document.getElementById('shResult').textContent=isFinal?`F(${n}) = ${st.result.answer}`:`computing…`;
+  document.getElementById('shResult').style.color=isFinal?'var(--accent3)':'var(--muted)';
+
+  // ── Compute panel ──
+  const co=document.getElementById('computeOuter');
+  const ci=document.getElementById('computeInner');
+  co.className='compute-outer '+(isFinal?'co-done':'co-active');
+
+  if(modeVal==='iterative'){
+    document.getElementById('computeLabel').textContent='Rolling window — prev & curr';
+    const prev=st.prev!=null?st.prev:'—';
+    const curr=st.curr!=null?st.curr:'—';
+    const next=st.next!=null?st.next:'—';
+    ci.innerHTML=`<div class="window-row">
+      <div class="win-card wc-prev"><div class="wc-lbl">prev</div><div class="wc-val">${prev}</div><div class="wc-sub">F(i-2)</div></div>
+      <div class="win-arrow">+</div>
+      <div class="win-card wc-curr"><div class="wc-lbl">curr</div><div class="wc-val">${curr}</div><div class="wc-sub">F(i-1)</div></div>
+      <div class="win-arrow">=</div>
+      <div class="win-card ${isFinal?'wc-done':'wc-next'}"><div class="wc-lbl">next</div><div class="wc-val">${next==='—'&&isFinal?curr:next}</div><div class="wc-sub">F(i)</div></div>
+    </div>`;
+  } else if(modeVal==='memo'){
+    document.getElementById('computeLabel').textContent='Memo table — cache hits save O(2ⁿ)';
+    const m=st.memo||{};
+    ci.innerHTML='<div class="memo-grid" id="memoGrid"></div>';
+    const mg=document.getElementById('memoGrid');
+    for(let k=1;k<=n;k++){
+      const cell=document.createElement('div');
+      const isHit=m[k]!==undefined&&st.i===k&&st.type==='read';
+      const isFill=m[k]!==undefined&&st.i===k&&st.type==='compute';
+      cell.className=`memo-cell ${m[k]!==undefined?isHit?'mm-hit':isFill?'mm-fill':'mm-hit':'mm-empty'}`;
+      cell.innerHTML=`<div class="mc-idx">F(${k})</div><div class="mc-val">${m[k]!==undefined?m[k]:'—'}</div>`;
+      mg.appendChild(cell);
+    }
+  } else {
+    document.getElementById('computeLabel').textContent=`Recursive call stack — call #${st.calls||0}`;
+    const callCount=st.calls||0;
+    const maxShow=6;
+    let html='<div class="call-stack-viz">';
+    for(let k=Math.max(2,n-maxShow+1);k<=n;k++){
+      const isDone=st.fibArr[k]!=null;
+      const isCurFrame=st.i===k&&!isFinal;
+      html+=`<div class="cs-frame ${isCurFrame?'csf-active':isDone?'csf-done':''}">
+        <div class="csf-label">F(${k})</div>
+        ${isDone?`<div class="csf-ret">= ${st.fibArr[k]}</div>`:''}
+      </div>`;
+    }
+    html+=`</div><div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--accent);margin-top:8px;">Total calls so far: ${callCount}</div>`;
+    ci.innerHTML=html;
+  }
+
+  // ── Step panel ──
+  const sp=document.getElementById('stepPanel');
+  const spt=document.getElementById('spTitle');
+  const spb=document.getElementById('spBody');
+  const mkBox=(lbl,val,sub,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div><div class="spb-sub">${sub}</div></div>`;
+
+  sp.className=`step-panel sp-${st.type==='done'?'done':st.type==='base'?'base':st.type==='read'?'read':'compute'}`;
+  spt.textContent=st.desc?.replace(/<[^>]+>/g,'')||'';
+
+  if(st.type==='compute'&&modeVal==='iterative'&&st.next!=null){
+    spb.innerHTML=mkBox('prev',st.prev,'F(i-2)','spbox sb-blue')+
+      mkBox('+','+','','spbox')+
+      mkBox('curr',st.curr,'F(i-1)','spbox sb-yel')+
+      mkBox('=',st.next,'F(i)','spbox sb-grn')+
+      mkBox('step',st.calls,'iterations','spbox sb-pur');
+  } else if(isFinal){
+    spb.innerHTML=mkBox('F(n)',st.result.answer,'answer','spbox sb-grn')+
+      mkBox('n',n,'input','spbox sb-blue')+
+      mkBox('calls/steps',st.calls,'total','spbox sb-yel');
+  } else {
+    spb.innerHTML=mkBox('i/k',st.i??'—','current','spbox sb-yel')+
+      mkBox('calls',st.calls??0,'so far','spbox sb-blue');
+  }
+
+  // ── Narrative ──
+  const narr={
+    base:   `Base case: F(1)=0, F(2)=1. Seeds of the sequence.`,
+    read:   `Reading existing values. ${modeVal==='iterative'?`Loop i=${st.i}: prev=${st.prev}, curr=${st.curr}.`:`Cache HIT for F(${st.i})=${st.curr} — return immediately!`}`,
+    compute:`Computing F(${st.i})${st.next!=null?` = ${st.prev}+${st.curr} = ${st.next}`:' — recursing into sub-problems'}.`,
+    done:   `✅ Done! F(${n}) = ${isFinal?st.result.answer:'—'}. ${modeVal==='recursive'?`Made ${st.calls} calls. Iterative would use ${Math.max(0,n-2)} steps!`:''}`,
+  }[st.type]||'';
+  const nb=document.getElementById('narrativeBar');
+  if(nb)nb.style.borderLeftColor={base:'var(--pur)',read:'var(--accent2)',compute:'var(--accent4)',done:'var(--accent3)'}[st.type]||'var(--accent4)';
+  const nt=document.getElementById('narrativeText');
+  if(nt)nt.innerHTML=narr;
+
+  // ── 3-tab ──
+  updateExplain(st);
+  highlightCode(st.type,modeVal);
+
+  // ── Right vars ──
+  setVar('vI',    'vcI',    st.i!=null?st.i:'—');
+  setVar('vPrev', 'vcPrev', st.prev!=null?st.prev:'—');
+  setVar('vCurr', 'vcCurr', st.curr!=null?st.curr:'—');
+  setVar('vNext', 'vcNext', st.next!=null?st.next:'—');
+  setVar('vCalls','vcCalls',st.calls!=null?st.calls:0);
+  document.getElementById('cxCalls').textContent=st.calls!=null?st.calls:'—';
+
+  // ── Right fib chips ──
+  const fc=document.getElementById('fsrChips');
+  fc.innerHTML='';
+  for(let i=1;i<=n;i++){
+    const v=st.fibArr[i];
+    const isCur=st.i===i&&!isFinal;
+    const chip=document.createElement('div');
+    chip.className=`fsr-chip ${v!=null?isCur?'fsc-current':'fsc-done':''}`;
+    chip.textContent=`F${i}=${v!=null?v:'?'}`;
+    fc.appendChild(chip);
+  }
+
+  // ── Done ──
+  if(isFinal){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ F(${n}) = ${st.result.answer}`;
+    document.getElementById('doneBar').className='done-bar show';
+    document.getElementById('bestBox').className='best-box show';
+    document.getElementById('bestVal').textContent=String(st.result.answer);
+    document.getElementById('bestMeta').textContent=
+      `n=${n} · ${modeVal} · ${st.calls} ${modeVal==='iterative'?'iterations':'calls'}`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────
+let activeTab='what';
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+  if(steps.length)updateExplain(steps[currentStep]);
+}
+function updateExplain(st){
+  if(!st||!st.explain)return;
+  const ep=document.getElementById('explainPanel');
+  const cls={base:'ep-base',compute:'ep-compute',read:'ep-compute',done:'ep-done'};
+  ep.className='explain-panel '+(cls[st.type]||'ep-compute');
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain.why||'';
+  document.getElementById('invBlock').innerHTML=(st.explain.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){if(!playing)return;if(currentStep>=steps.length-1){stopPlay();return;}renderStep(currentStep+1);timer=setTimeout(tick,speed);}
+function stopPlay(){playing=false;clearTimeout(timer);document.getElementById('btnPause').textContent='▶ Resume';document.getElementById('btnRun').disabled=false;}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+  else if(e.key==='r'||e.key==='R'){stopPlay();buildUI();}
+});
+buildUI();
+</script>
+</body>
+</html>

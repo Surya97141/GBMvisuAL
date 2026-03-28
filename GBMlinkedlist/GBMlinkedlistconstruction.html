@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linked List Construction — Live Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f0e8;--ink:#1a1a2e;--surface:#fffdf7;--border:#d4ccb8;
+  --accent:#e63946;--accent2:#2196f3;--accent3:#06d6a0;--accent4:#ffd166;
+  --muted:#8a8070;--pur:#c084fc;--pur-dark:#7a3fc0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.5;}
+
+.header{background:var(--ink);color:var(--bg);padding:22px 36px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent3);}
+.header h1{font-family:'Space Mono',monospace;font-size:clamp(.9rem,2.5vw,1.15rem);font-weight:700;letter-spacing:-1px;}
+.header .sub{font-size:.78rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+.family-badge{margin-left:auto;background:rgba(6,214,160,.2);border:1px solid var(--accent3);color:#024d37;font-family:'Space Mono',monospace;font-size:.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;white-space:nowrap;font-weight:700;}
+
+.main{display:grid;grid-template-columns:1fr 380px;height:calc(100vh - 76px);overflow:hidden;}
+.viz-panel{padding:20px 28px;border-right:1px solid var(--border);overflow-y:auto;}
+
+/* ── OPERATION BUILDER ── */
+.op-builder{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;}
+.ob-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.op-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.op-btn{padding:7px 13px;border:1.5px solid var(--border);background:var(--surface);border-radius:6px;font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;cursor:pointer;color:var(--ink);transition:all .15s;white-space:nowrap;}
+.op-btn:hover{border-color:var(--accent3);background:rgba(6,214,160,.06);}
+.op-btn.selected{border-color:var(--accent3);background:rgba(6,214,160,.12);color:#024d37;}
+.op-inputs{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-family:'Space Mono',monospace;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.field input{background:var(--bg);border:1.5px solid var(--border);border-radius:4px;padding:5px 9px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--ink);outline:none;width:90px;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent3);}
+.btn{padding:8px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--ink);color:var(--bg);}.btn-primary:hover{background:#028a5b;}
+.btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}.btn-secondary:hover{border-color:var(--ink);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.speed-wrap{display:flex;flex-direction:column;gap:4px;}
+.speed-wrap label{font-family:'Space Mono',monospace;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.speed-btns{display:flex;gap:4px;}
+.speed-btn{padding:5px 9px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:.65rem;cursor:pointer;color:var(--ink);}
+.speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+.section-label{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);}
+.ldot{width:12px;height:12px;border-radius:3px;border:2px solid;flex-shrink:0;}
+
+/* ══ DOUBLY-LINKED LIST STRIP ══ */
+.dlist-section{margin-bottom:14px;}
+.dlist-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;transition:border-color .3s;min-height:120px;}
+.dlist-outer.dlo-op  {border-color:var(--accent3);}
+.dlist-outer.dlo-remove{border-color:var(--accent);}
+.dlist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.dlh-label{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.dlh-status{font-family:'Space Mono',monospace;font-size:.78rem;font-weight:700;color:var(--ink);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.nodes-strip{display:flex;align-items:center;flex-wrap:nowrap;gap:0;}
+.dnode-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.dnode-badges{height:22px;display:flex;justify-content:center;gap:3px;align-items:flex-end;margin-bottom:2px;}
+.dnode-badge{font-family:'Space Mono',monospace;font-size:.48rem;font-weight:700;padding:1px 5px;border-radius:3px;}
+.ddb-head{background:rgba(33,150,243,.2);color:#0d47a1;border:1px solid var(--accent2);}
+.ddb-tail{background:rgba(192,84,252,.2);color:#5b1a9a;border:1px solid var(--pur);}
+.ddb-target{background:rgba(255,209,102,.25);color:#7a4800;border:1px solid var(--accent4);}
+.ddb-result{background:rgba(6,214,160,.2);color:#024d37;border:1px solid var(--accent3);}
+.dnode-box{
+  width:52px;height:52px;border-radius:9px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.88rem;font-weight:700;
+  background:var(--surface);color:var(--muted);
+  transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;
+}
+.dnode-arrows{display:flex;flex-direction:column;align-items:center;justify-content:center;width:30px;gap:3px;flex-shrink:0;}
+.dna-fwd,.dna-bwd{display:flex;align-items:center;gap:0;font-size:.55rem;color:var(--border);}
+.dna-line{flex:1;height:1.5px;background:currentColor;}
+.null-sentinel{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);padding:4px 7px;border:1.5px dashed var(--border);border-radius:5px;flex-shrink:0;align-self:center;}
+.standalone-label{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:5px;margin-top:8px;}
+
+.dns-normal  {background:var(--surface);border-color:var(--border);color:var(--muted);}
+.dns-head    {background:rgba(33,150,243,.12);border-color:var(--accent2);color:#0d47a1;}
+.dns-tail    {background:rgba(192,84,252,.1); border-color:var(--pur);   color:#5b1a9a;}
+.dns-headtail{background:rgba(6,214,160,.15); border-color:var(--accent3);color:#024d37;}
+.dns-target  {background:rgba(255,209,102,.22);border-color:var(--accent4);color:#7a4800;transform:scale(1.1) translateY(-4px);box-shadow:0 6px 14px rgba(255,209,102,.3);}
+.dns-affected{background:rgba(6,214,160,.12); border-color:var(--accent3);color:#024d37;box-shadow:0 0 8px rgba(6,214,160,.2);}
+.dns-removed {background:rgba(230,57,70,.1);  border-color:var(--accent); color:#b71c1c;opacity:.5;transform:scale(.88);}
+.dns-standalone{background:rgba(255,209,102,.08);border-color:rgba(255,209,102,.4);color:#7a4800;}
+.dna-green .dna-line{background:var(--accent3);} .dna-green{color:var(--accent3);}
+
+/* ══ OPERATION DETAIL PANEL ══ */
+.op-detail-section{margin-bottom:14px;}
+.op-detail-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.op-detail-outer.odo-active{border-color:var(--accent3);}
+.op-detail-outer.odo-remove{border-color:var(--accent);}
+.odh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.odh-op{font-family:'Space Mono',monospace;font-size:.75rem;font-weight:700;padding:3px 10px;border-radius:5px;border:1.5px solid var(--accent3);background:rgba(6,214,160,.1);color:#024d37;}
+.odh-op.odh-remove{border-color:var(--accent);background:rgba(230,57,70,.08);color:#b71c1c;}
+.ptr-table{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;align-items:center;}
+.pt-header{font-family:'Space Mono',monospace;font-size:.52rem;text-transform:uppercase;color:var(--muted);padding:3px 0;border-bottom:1px solid var(--border);}
+.pt-node  {font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;color:var(--ink);}
+.pt-before{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);}
+.pt-after {font-family:'Space Mono',monospace;font-size:.65rem;font-weight:700;color:var(--accent3);}
+.pt-after.pta-remove{color:var(--accent);}
+.op-result{margin-top:8px;padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;text-align:center;transition:all .3s;}
+.or-ok    {background:rgba(6,214,160,.12);border:1.5px solid var(--accent3);color:#024d37;}
+.or-remove{background:rgba(230,57,70,.08);border:1.5px solid var(--accent);color:#b71c1c;}
+.or-search{background:rgba(33,150,243,.1); border:1.5px solid var(--accent2);color:#0d47a1;}
+.or-init  {background:rgba(0,0,0,.04);border:1.5px solid var(--border);color:var(--muted);}
+
+/* ══ OPERATION LOG ══ */
+.op-log-section{margin-bottom:14px;}
+.op-log-outer{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;transition:border-color .3s;}
+.op-log-outer.olo-active{border-color:var(--accent3);}
+.olh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.olh-title{font-family:'Space Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);}
+.olh-count{font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;color:var(--accent3);}
+.op-log-list{display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto;}
+.op-log-list::-webkit-scrollbar{width:3px;}.op-log-list::-webkit-scrollbar-thumb{background:var(--border);}
+.op-log-row{display:flex;gap:8px;align-items:center;padding:4px 8px;border-radius:5px;font-family:'Space Mono',monospace;font-size:.62rem;transition:all .2s;}
+.olr-current{background:rgba(6,214,160,.1);border:1px solid var(--accent3);font-weight:700;}
+.olr-done{background:rgba(0,0,0,.02);border:1px solid var(--border);color:var(--muted);opacity:.75;}
+.ol-num{color:var(--muted);min-width:20px;}
+.ol-name{font-weight:700;}
+.ol-name.oln-set   {color:var(--accent2);}
+.ol-name.oln-insert{color:var(--accent3);}
+.ol-name.oln-remove{color:var(--accent);}
+.ol-name.oln-search{color:var(--pur-dark);}
+.ol-args{color:var(--muted);}
+.ol-result{margin-left:auto;font-size:.55rem;}
+
+/* STEP / NARRATIVE */
+.step-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:14px;transition:border-color .3s;}
+.step-panel.sp-op    {border-color:var(--accent3);}
+.step-panel.sp-remove{border-color:var(--accent);}
+.sp-title{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.sp-body{display:flex;gap:8px;flex-wrap:wrap;}
+.spbox{flex:1;min-width:65px;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;text-align:center;}
+.spbox.sb-blue{border-color:var(--accent2);background:rgba(33,150,243,.05);}
+.spbox.sb-grn {border-color:var(--accent3);border-width:2px;background:rgba(6,214,160,.06);}
+.spbox.sb-yel {border-color:var(--accent4);background:rgba(255,209,102,.06);}
+.spbox.sb-red {border-color:var(--accent);background:rgba(230,57,70,.04);}
+.spbox.sb-pur {border-color:var(--pur);background:rgba(192,84,252,.05);}
+.spb-lbl{font-family:'Space Mono',monospace;font-size:.52rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.spb-val{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--ink);}
+
+.narrative-bar{background:var(--ink);color:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:14px;
+  font-family:'DM Sans',sans-serif;font-size:.88rem;line-height:1.6;border-left:4px solid var(--accent3);
+  min-height:52px;transition:border-color .3s;}
+.nb-label{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+#narrativeText{color:#e2e8f0;}
+
+.cx-strip{display:flex;gap:8px;margin-bottom:14px;}
+.cx-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center;}
+.cx-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.cx-val{font-family:'Space Mono',monospace;font-size:.9rem;font-weight:700;}
+.cx-sub{font-size:.6rem;color:var(--muted);margin-top:1px;}
+
+.explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden;transition:border-color .3s;}
+.ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.57rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all .15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.ep-tab.active{color:var(--ink);border-bottom-color:var(--accent3);}
+.ep-tab.active.t-why{color:var(--pur-dark);border-bottom-color:var(--pur);}
+.ep-tab.active.t-inv{color:#028a5b;border-bottom-color:var(--accent3);}
+.ep-body{padding:12px 16px;min-height:72px;}
+.ep-pane{display:none;font-size:.82rem;line-height:1.72;color:var(--ink);}
+.ep-pane.active{display:block;animation:epFade .2s ease;}
+@keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.ep-pane strong{font-weight:700;}
+.ep-why-block{border-left:3px solid var(--pur);border-radius:0 6px 6px 0;padding:8px 12px;font-size:.8rem;line-height:1.72;background:rgba(192,84,252,.05);}
+.ep-inv-block{display:flex;flex-direction:column;gap:6px;}
+.inv-row{display:flex;align-items:flex-start;gap:8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.18);border-radius:6px;padding:7px 10px;}
+.inv-icon{font-size:.9rem;flex-shrink:0;}
+.inv-text{font-size:.77rem;line-height:1.6;color:var(--ink);}
+.inv-text strong{color:#028a5b;}
+.inv-row.inv-warn{background:rgba(255,209,102,.07);border-color:rgba(255,209,102,.25);}
+.inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+.inv-row.inv-pur{background:rgba(192,84,252,.05);border-color:rgba(192,84,252,.2);}
+.inv-row.inv-pur .inv-text strong{color:var(--pur-dark);}
+
+.progress-wrap{margin-bottom:10px;}
+.progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:4px;}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent3);border-radius:2px;transition:width .3s;}
+.done-banner{display:none;background:var(--accent3);color:#012a1e;text-align:center;padding:10px;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;}
+.done-banner.show{display:block;animation:fadeUp .4s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.playback{display:flex;gap:8px;margin-bottom:8px;}
+.kbd-hint{font-family:'Space Mono',monospace;font-size:.58rem;color:var(--muted);display:flex;gap:10px;}
+.kbd{background:var(--surface);border:1.5px solid var(--border);border-radius:3px;padding:1px 5px;color:var(--ink);}
+
+/* RIGHT */
+.state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+.state-panel::-webkit-scrollbar{width:4px;}.state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+.code-panel{flex-shrink:0;padding:13px 13px 9px;border-bottom:1px solid #2a2a3e;}
+.code-panel-title{font-family:'Space Mono',monospace;font-size:.57rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+.code-tabs{display:flex;gap:0;margin-bottom:8px;border:1px solid #2a2a3e;border-radius:6px;overflow:hidden;}
+.ctab{flex:1;padding:5px 0;text-align:center;font-family:'Space Mono',monospace;font-size:.55rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:#6b6b8a;background:#0d0d18;border:none;transition:all .15s;}
+.ctab.active{background:#1a1a2e;color:var(--accent4);}
+.code-section{padding:9px 13px;border-bottom:1px solid #1a1a2e;}
+.cs-lbl{font-family:'Space Mono',monospace;font-size:.52rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:5px;}
+pre.code-block{font-family:'Space Mono',monospace;font-size:.63rem;line-height:1.9;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:7px;overflow-x:auto;max-height:calc(1.9em*6+14px);overflow-y:auto;}
+pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;}
+.code-line{display:block;padding:0 5px;border-radius:3px;transition:background .2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+.code-line.hl-cur{background:rgba(6,214,160,.18);border-left-color:var(--accent3);color:#e2e8f0;}
+.ck{color:#c084fc;}.cf{color:#67e8f9;}.cc{color:#374151;font-style:italic;}.cn{color:#fda4af;}
+.cf-tag{display:inline-block;background:rgba(255,209,102,.15);border:1px solid rgba(255,209,102,.4);color:#ffd166;
+  font-family:'Space Mono',monospace;font-size:.5rem;padding:2px 6px;border-radius:3px;margin-bottom:4px;}
+
+.vars-panel{flex-shrink:0;padding:12px 13px;}
+.state-title{font-family:'Space Mono',monospace;font-size:.61rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+.var-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;}
+.var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:8px 10px;transition:all .3s;}
+.var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,.08);animation:vflash .4s ease;}
+@keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.var-name{font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;margin-bottom:3px;}
+.var-value{font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:var(--bg);word-break:break-all;}
+.list-repr{font-family:'Space Mono',monospace;font-size:.62rem;color:#9ca3af;padding:7px 9px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:5px;line-height:1.7;word-break:break-all;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Linked List Construction</h1>
+    <div class="sub">DoublyLinkedList · 7 Operations · In-Place Node Binding</div>
+  </div>
+  <div class="family-badge">Linked List · OOP</div>
+</div>
+
+<div class="main">
+<div class="viz-panel">
+
+  <!-- OPERATION BUILDER -->
+  <div class="op-builder">
+    <div class="ob-title">Build your operation sequence</div>
+    <div style="margin-bottom:8px;">
+      <button class="btn btn-secondary" id="btnLoadSample" style="font-size:.62rem;padding:5px 10px;">⚡ Load Sample Sequence</button>
+      <button class="btn btn-secondary" id="btnClearOps" style="font-size:.62rem;padding:5px 10px;margin-left:6px;">✕ Clear</button>
+    </div>
+    <div class="op-row" id="opBtns">
+      <button class="op-btn" data-op="setHead">setHead</button>
+      <button class="op-btn" data-op="setTail">setTail</button>
+      <button class="op-btn" data-op="insertBefore">insertBefore</button>
+      <button class="op-btn" data-op="insertAfter">insertAfter</button>
+      <button class="op-btn" data-op="insertAtPosition">insertAtPosition</button>
+      <button class="op-btn" data-op="remove">remove</button>
+      <button class="op-btn" data-op="removeNodesWithValue">removeNodesWithValue</button>
+      <button class="op-btn" data-op="containsNodeWithValue">containsNodeWithValue</button>
+    </div>
+    <div class="op-inputs" id="opInputs" style="display:none">
+      <div class="field" id="fNodeVal"><label id="lNodeVal">Node Value</label><input type="number" id="iNodeVal" placeholder="e.g. 3"></div>
+      <div class="field" id="fRefVal" style="display:none"><label>Reference Node</label><input type="number" id="iRefVal" placeholder="ref value"></div>
+      <div class="field" id="fPosVal" style="display:none"><label>Position (1-based)</label><input type="number" id="iPosVal" placeholder="e.g. 2"></div>
+      <button class="btn btn-primary" id="btnAddOp" style="align-self:flex-end">+ Add</button>
+    </div>
+    <div id="opQueue" style="margin-top:8px;display:flex;flex-direction:column;gap:4px;max-height:80px;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1400">0.5×</button>
+          <button class="speed-btn active" data-ms="750">1×</button>
+          <button class="speed-btn" data-ms="340">2×</button>
+          <button class="speed-btn" data-ms="130">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" disabled>▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset">↺ RESET</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="ldot" style="background:rgba(33,150,243,.12);border-color:#2196f3;border-radius:3px"></div> head</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(192,84,252,.1);border-color:#c084fc;border-radius:3px"></div> tail</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(255,209,102,.2);border-color:#ffd166;border-radius:3px"></div> target/moving node</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(6,214,160,.12);border-color:#06d6a0;border-radius:3px"></div> affected/inserted</div>
+    <div class="legend-item"><div class="ldot" style="background:rgba(230,57,70,.1);border-color:#e63946;border-radius:3px"></div> removed</div>
+  </div>
+
+  <!-- VISUAL 1: DOUBLY-LINKED LIST STRIP -->
+  <div class="dlist-section">
+    <div class="section-label">Live doubly-linked list — ← prev | next →</div>
+    <div class="dlist-outer" id="dlistOuter">
+      <div class="dlist-header">
+        <div class="dlh-label" id="dlhLabel">empty list — add operations and press RUN</div>
+        <div class="dlh-status" id="dlhStatus">—</div>
+      </div>
+      <div id="dlistStrip"></div>
+    </div>
+  </div>
+
+  <!-- VISUAL 2: OPERATION DETAIL PANEL -->
+  <div class="op-detail-section">
+    <div class="section-label">Operation detail — pointer changes highlighted</div>
+    <div class="op-detail-outer" id="opDetailOuter">
+      <div class="odh">
+        <div class="odh-op" id="odhOp">—</div>
+        <div style="font-family:'Space Mono',monospace;font-size:.65rem;color:var(--muted);" id="odhArgs">—</div>
+      </div>
+      <div class="ptr-table" id="ptrTable">
+        <div class="pt-header">Node</div><div class="pt-header">Before</div><div class="pt-header">After</div>
+      </div>
+      <div class="op-result or-init" id="opResult">add operations and press RUN</div>
+    </div>
+  </div>
+
+  <!-- VISUAL 3: OPERATION LOG -->
+  <div class="op-log-section">
+    <div class="section-label">Operation log</div>
+    <div class="op-log-outer" id="opLogOuter">
+      <div class="olh">
+        <div class="olh-title">sequence of operations</div>
+        <div class="olh-count" id="olhCount">0 ops</div>
+      </div>
+      <div class="op-log-list" id="opLogList"></div>
+    </div>
+  </div>
+
+  <!-- STEP PANEL -->
+  <div class="step-panel sp-op" id="stepPanel">
+    <div class="sp-title" id="spTitle">Build an operation sequence above and press RUN</div>
+    <div class="sp-body" id="spBody"></div>
+  </div>
+
+  <div class="narrative-bar">
+    <div class="nb-label">Plain English</div>
+    <div id="narrativeText">Build operations, then press RUN to animate each step.</div>
+  </div>
+
+  <div class="cx-strip">
+    <div class="cx-card" style="border-color:rgba(33,150,243,.3)">
+      <div class="cx-lbl">List size</div><div class="cx-val" id="cxSize" style="color:var(--accent2)">0</div><div class="cx-sub">nodes</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(192,84,252,.3)">
+      <div class="cx-lbl">Head</div><div class="cx-val" id="cxHead" style="color:var(--pur-dark)">—</div><div class="cx-sub">value</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(6,214,160,.3)">
+      <div class="cx-lbl">Tail</div><div class="cx-val" id="cxTail" style="color:var(--accent3)">—</div><div class="cx-sub">value</div>
+    </div>
+    <div class="cx-card" style="border-color:rgba(255,209,102,.4)">
+      <div class="cx-lbl">Op</div><div class="cx-val" id="cxOp" style="color:#7a5a00;font-size:.7rem">—</div><div class="cx-sub">current</div>
+    </div>
+  </div>
+
+  <div class="explain-panel" id="explainPanel">
+    <div class="ep-tabs">
+      <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+      <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+      <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+    </div>
+    <div class="ep-body">
+      <div class="ep-pane active" id="paneWhat">Add operations and press RUN.</div>
+      <div class="ep-pane"        id="paneWhy">—</div>
+      <div class="ep-pane"        id="paneInv"><div class="ep-inv-block" id="invBlock"></div></div>
+    </div>
+  </div>
+
+  <div class="progress-wrap">
+    <!-- FIX 1: added id="stepIdx" span so renderStep doesn't crash -->
+    <div class="progress-label"><span id="stepCounter">Step <span id="stepIdx">0</span></span><span id="stepTotal">/ 0 steps</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="done-banner" id="doneBanner"></div>
+  <div class="playback">
+    <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+    <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+    <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+  </div>
+  <div class="kbd-hint">
+    <span><kbd class="kbd">←</kbd><kbd class="kbd">→</kbd> step</span>
+    <span><kbd class="kbd">Space</kbd> pause/resume</span>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="state-panel">
+  <div class="code-panel">
+    <div class="code-panel-title">C++ — DoublyLinkedList</div>
+    <div class="code-tabs">
+      <button class="ctab active" id="ctab-clean" onclick="switchCodeTab('clean')">Clean</button>
+      <button class="ctab" id="ctab-cf" onclick="switchCodeTab('cf')">⚡ CF Style</button>
+    </div>
+    <div id="code-clean">
+      <div class="code-section">
+        <div class="cs-lbl">Unbind helper (defensive — used before every insert)</div>
+        <pre class="code-block">
+<span class="code-line"><span class="ck">void</span> <span class="cf">unbind</span>(Node* n){</span>
+<span class="code-line">  <span class="ck">if</span>(n==head) head=head->next;</span>
+<span class="code-line">  <span class="ck">if</span>(n==tail) tail=tail->prev;</span>
+<span class="code-line">  <span class="ck">if</span>(n->prev) n->prev->next=n->next;</span>
+<span class="code-line">  <span class="ck">if</span>(n->next) n->next->prev=n->prev;</span>
+<span class="code-line">  n->prev=n->next=<span class="cn">nullptr</span>; <span class="cc">// isolate</span></span>
+<span class="code-line">}</span></pre>
+      </div>
+      <div class="code-section">
+        <div class="cs-lbl">setHead / setTail</div>
+        <pre class="code-block">
+<span class="code-line"><span class="ck">void</span> <span class="cf">setHead</span>(Node* n){</span>
+<span class="code-line">  <span class="ck">if</span>(!head){head=tail=n;<span class="ck">return</span>;}</span>
+<span class="code-line">  insertBefore(head,n);</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">setTail</span>(Node* n){</span>
+<span class="code-line">  <span class="ck">if</span>(!tail){head=tail=n;<span class="ck">return</span>;}</span>
+<span class="code-line">  insertAfter(tail,n);</span>
+<span class="code-line">}</span></pre>
+      </div>
+      <div class="code-section">
+        <div class="cs-lbl">insertBefore / insertAfter</div>
+        <pre class="code-block">
+<span class="code-line"><span class="ck">void</span> <span class="cf">insertBefore</span>(Node* ref,Node* n){</span>
+<span class="code-line">  unbind(n);</span>
+<span class="code-line">  n->prev=ref->prev; n->next=ref;</span>
+<span class="code-line">  <span class="ck">if</span>(ref->prev) ref->prev->next=n;</span>
+<span class="code-line">  <span class="ck">else</span> head=n;</span>
+<span class="code-line">  ref->prev=n;</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">insertAfter</span>(Node* ref,Node* n){</span>
+<span class="code-line">  unbind(n);</span>
+<span class="code-line">  n->next=ref->next; n->prev=ref;</span>
+<span class="code-line">  <span class="ck">if</span>(ref->next) ref->next->prev=n;</span>
+<span class="code-line">  <span class="ck">else</span> tail=n;</span>
+<span class="code-line">  ref->next=n;</span>
+<span class="code-line">}</span></pre>
+      </div>
+      <div class="code-section">
+        <div class="cs-lbl">insertAtPosition / remove / contains</div>
+        <pre class="code-block">
+<span class="code-line"><span class="ck">void</span> <span class="cf">insertAtPosition</span>(<span class="ck">int</span> pos,Node* n){</span>
+<span class="code-line">  <span class="ck">if</span>(pos==<span class="cn">1</span>){setHead(n);<span class="ck">return</span>;}</span>
+<span class="code-line">  Node*c=head;</span>
+<span class="code-line">  <span class="ck">for</span>(<span class="ck">int</span> i=<span class="cn">1</span>;c&&i&lt;pos-<span class="cn">1</span>;i++)c=c->next;</span>
+<span class="code-line">  c?insertAfter(c,n):setTail(n);</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">remove</span>(Node* n){unbind(n);}</span>
+<span class="code-line"><span class="ck">void</span> <span class="cf">removeNodesWithValue</span>(<span class="ck">int</span> v){</span>
+<span class="code-line">  Node*c=head;</span>
+<span class="code-line">  <span class="ck">while</span>(c){Node*nx=c->next;</span>
+<span class="code-line">    <span class="ck">if</span>(c->val==v)remove(c);c=nx;}</span>
+<span class="code-line">}</span>
+<span class="code-line"><span class="ck">bool</span> <span class="cf">containsNodeWithValue</span>(<span class="ck">int</span> v){</span>
+<span class="code-line">  Node*c=head;</span>
+<span class="code-line">  <span class="ck">while</span>(c){<span class="ck">if</span>(c->val==v)<span class="ck">return true</span>;c=c->next;}</span>
+<span class="code-line">  <span class="ck">return false</span>;}</span></pre>
+      </div>
+    </div>
+    <div id="code-cf" style="display:none">
+      <div class="cf-tag">⚡ CF / COMPACT STYLE</div>
+      <div class="code-section">
+        <pre class="code-block">
+<span class="code-line"><span class="ck">#include</span><span class="cn">&lt;bits/stdc++.h&gt;</span></span>
+<span class="code-line"><span class="ck">using namespace</span> std;</span>
+<span class="code-line"><span class="ck">struct</span> Node{<span class="ck">int</span> v;Node*p,*n;</span>
+<span class="code-line">  Node(<span class="ck">int</span> x):v(x),p(<span class="cn">nullptr</span>),n(<span class="cn">nullptr</span>){};</span>
+<span class="code-line">};</span>
+<span class="code-line"><span class="ck">struct</span> DLL{</span>
+<span class="code-line">  Node*h=<span class="cn">nullptr</span>,*t=<span class="cn">nullptr</span>;</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">ub</span>(Node*x){</span>
+<span class="code-line">    <span class="ck">if</span>(x==h)h=h->n;</span>
+<span class="code-line">    <span class="ck">if</span>(x==t)t=t->p;</span>
+<span class="code-line">    <span class="ck">if</span>(x->p)x->p->n=x->n;</span>
+<span class="code-line">    <span class="ck">if</span>(x->n)x->n->p=x->p;</span>
+<span class="code-line">    x->p=x->n=<span class="cn">nullptr</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">ib</span>(Node*r,Node*x){</span>
+<span class="code-line">    ub(x);x->p=r->p;x->n=r;</span>
+<span class="code-line">    <span class="ck">if</span>(r->p)r->p->n=x;<span class="ck">else</span> h=x;</span>
+<span class="code-line">    r->p=x;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">ia</span>(Node*r,Node*x){</span>
+<span class="code-line">    ub(x);x->n=r->n;x->p=r;</span>
+<span class="code-line">    <span class="ck">if</span>(r->n)r->n->p=x;<span class="ck">else</span> t=x;</span>
+<span class="code-line">    r->n=x;</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">sh</span>(Node*x){!h?h=t=x:ib(h,x);}</span>
+<span class="code-line">  <span class="ck">void</span> <span class="cf">st</span>(Node*x){!t?h=t=x:ia(t,x);}</span>
+<span class="code-line">  <span class="ck">bool</span> <span class="cf">has</span>(<span class="ck">int</span> v){</span>
+<span class="code-line">    <span class="ck">for</span>(<span class="ck">auto</span>*c=h;c;c=c->n)</span>
+<span class="code-line">      <span class="ck">if</span>(c->v==v)<span class="ck">return true</span>;</span>
+<span class="code-line">    <span class="ck">return false</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">};</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="vars-panel">
+    <div class="state-title">Live State</div>
+    <div class="var-grid">
+      <div class="var-card" id="vcHead"><div class="var-name">head</div><div class="var-value" id="vHead" style="color:var(--accent2)">null</div></div>
+      <div class="var-card" id="vcTail"><div class="var-name">tail</div><div class="var-value" id="vTail" style="color:var(--pur)">null</div></div>
+      <div class="var-card" id="vcSize"><div class="var-name">size</div><div class="var-value" id="vSize" style="color:var(--accent3)">0</div></div>
+      <div class="var-card" id="vcOp"><div class="var-name">operation</div><div class="var-value" id="vOp" style="color:var(--accent4);font-size:.72rem">—</div></div>
+    </div>
+    <div class="var-name" style="margin-bottom:4px;font-family:'Space Mono',monospace;font-size:.55rem;color:#6b6b8a;letter-spacing:2px;text-transform:uppercase;">List representation</div>
+    <div class="list-repr" id="listRepr">null ↔ null</div>
+  </div>
+</div>
+</div>
+
+<script>
+// ─── DLL ENGINE ────────────────────────────────────────────────────────────────
+class Node {
+  constructor(val){ this.val=val; this.prev=null; this.next=null; }
+}
+
+class DoublyLinkedList {
+  constructor(){ this.head=null; this.tail=null; }
+
+  _unbind(node){
+    if(!node) return;
+    if(node===this.head) this.head=this.head.next;
+    if(node===this.tail) this.tail=this.tail.prev;
+    if(node.prev) node.prev.next=node.next;
+    if(node.next) node.next.prev=node.prev;
+    node.prev=null; node.next=null;
+  }
+
+  setHead(node){
+    if(!this.head){ this.head=this.tail=node; return; }
+    this.insertBefore(this.head,node);
+  }
+
+  setTail(node){
+    if(!this.tail){ this.head=this.tail=node; return; }
+    this.insertAfter(this.tail,node);
+  }
+
+  insertBefore(ref,node){
+    this._unbind(node);
+    node.prev=ref.prev; node.next=ref;
+    if(ref.prev) ref.prev.next=node; else this.head=node;
+    ref.prev=node;
+  }
+
+  insertAfter(ref,node){
+    this._unbind(node);
+    node.next=ref.next; node.prev=ref;
+    if(ref.next) ref.next.prev=node; else this.tail=node;
+    ref.next=node;
+  }
+
+  insertAtPosition(pos,node){
+    if(pos===1){ this.setHead(node); return; }
+    let cur=this.head;
+    for(let i=1;cur&&i<pos-1;i++) cur=cur.next;
+    if(cur) this.insertAfter(cur,node); else this.setTail(node);
+  }
+
+  remove(node){ this._unbind(node); }
+
+  removeNodesWithValue(val){
+    let cur=this.head;
+    while(cur){ let nx=cur.next; if(cur.val===val) this.remove(cur); cur=nx; }
+  }
+
+  containsNodeWithValue(val){
+    let cur=this.head;
+    while(cur){ if(cur.val===val) return true; cur=cur.next; }
+    return false;
+  }
+
+  toArray(){
+    const arr=[]; let cur=this.head;
+    while(cur){ arr.push(cur.val); cur=cur.next; }
+    return arr;
+  }
+}
+
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let opQueue=[], steps=[], currentStep=0, playing=false, timer=null, speed=750;
+let selectedOp=null;
+
+// ─── OP BUTTON SELECTION ────────────────────────────────────────────────────
+document.querySelectorAll('.op-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.op-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedOp=btn.dataset.op;
+    updateOpInputs();
+  });
+});
+
+function updateOpInputs(){
+  const op=selectedOp; if(!op) return;
+  document.getElementById('opInputs').style.display='flex';
+  const fRef=document.getElementById('fRefVal');
+  const fPos=document.getElementById('fPosVal');
+  const lNode=document.getElementById('lNodeVal');
+  fRef.style.display='none'; fPos.style.display='none';
+  const nodeLabels={
+    setHead:'Node Value',setTail:'Node Value',
+    insertBefore:'Insert Node',insertAfter:'Insert Node',
+    insertAtPosition:'Insert Node',remove:'Node Value',
+    removeNodesWithValue:'Value to Remove',containsNodeWithValue:'Value to Search'
+  };
+  lNode.textContent=nodeLabels[op]||'Node Value';
+  if(op==='insertBefore'||op==='insertAfter') fRef.style.display='flex';
+  if(op==='insertAtPosition') fPos.style.display='flex';
+}
+
+document.getElementById('btnAddOp').addEventListener('click',()=>{
+  if(!selectedOp) return;
+  const nodeVal=parseInt(document.getElementById('iNodeVal').value);
+  if(isNaN(nodeVal)) return;
+  const refVal=parseInt(document.getElementById('iRefVal').value);
+  const posVal=parseInt(document.getElementById('iPosVal').value);
+  const op={op:selectedOp,nodeVal};
+  if(selectedOp==='insertBefore'||selectedOp==='insertAfter'){
+    if(isNaN(refVal)) return;
+    op.refVal=refVal;
+  }
+  if(selectedOp==='insertAtPosition'){
+    if(isNaN(posVal)) return;
+    op.pos=posVal;
+  }
+  opQueue.push(op);
+  renderOpQueue();
+  document.getElementById('btnRun').disabled=false;
+  document.getElementById('iNodeVal').value='';
+  document.getElementById('iRefVal').value='';
+  document.getElementById('iPosVal').value='';
+});
+
+function formatOpArgs(op){
+  if(op.op==='insertBefore'||op.op==='insertAfter') return `node(${op.nodeVal}), ref(${op.refVal})`;
+  if(op.op==='insertAtPosition') return `pos=${op.pos}, node(${op.nodeVal})`;
+  return `val=${op.nodeVal}`;
+}
+
+function renderOpQueue(){
+  const el=document.getElementById('opQueue');
+  el.innerHTML='';
+  opQueue.forEach((op,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;padding:3px 8px;background:rgba(6,214,160,.05);border:1px solid rgba(6,214,160,.15);border-radius:5px;font-family:Space Mono,monospace;font-size:.6rem;';
+    row.innerHTML=`<span style="color:var(--muted)">${i+1}.</span><span style="color:#024d37;font-weight:700">${op.op}</span><span style="color:var(--muted)">(${formatOpArgs(op)})</span>
+      <button onclick="removeOp(${i})" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--accent);font-size:.7rem;">✕</button>`;
+    el.appendChild(row);
+  });
+}
+window.removeOp=(i)=>{ opQueue.splice(i,1); renderOpQueue(); if(!opQueue.length) document.getElementById('btnRun').disabled=true; };
+
+// ─── SAMPLE SEQUENCE ────────────────────────────────────────────────────────
+document.getElementById('btnLoadSample').addEventListener('click',()=>{
+  opQueue=[
+    {op:'setHead',     nodeVal:1},
+    {op:'setTail',     nodeVal:5},
+    {op:'insertAfter', nodeVal:3,refVal:1},
+    {op:'insertBefore',nodeVal:4,refVal:5},
+    {op:'insertAtPosition',nodeVal:2,pos:2},
+    {op:'removeNodesWithValue',nodeVal:3},
+    {op:'remove',      nodeVal:4},
+    {op:'containsNodeWithValue',nodeVal:5},
+  ];
+  renderOpQueue();
+  document.getElementById('btnRun').disabled=false;
+});
+document.getElementById('btnClearOps').addEventListener('click',()=>{
+  opQueue=[]; renderOpQueue(); document.getElementById('btnRun').disabled=true;
+});
+
+// ─── EXPLAIN ────────────────────────────────────────────────────────────────
+function makeExplain(op){
+  const why={
+    setHead:`<div class="ep-why-block">setHead makes node the new head. If the list is empty, also sets tail. If node is already in the list, it is first <strong>unbound</strong> (removed from current position) then inserted at front via insertBefore(head, node).</div>`,
+    setTail:`<div class="ep-why-block">setTail appends node as the new tail. If empty, also sets head. Internally calls insertAfter(tail, node). The node is first unbound if already in the list.</div>`,
+    insertBefore:`<div class="ep-why-block"><strong>Key sequence:</strong> unbind(node) → node.prev=ref.prev → node.next=ref → ref.prev.next=node (or head=node) → ref.prev=node. Four pointer writes, order matters!</div>`,
+    insertAfter:`<div class="ep-why-block"><strong>Key sequence:</strong> unbind(node) → node.next=ref.next → node.prev=ref → ref.next.prev=node (or tail=node) → ref.next=node. Mirror of insertBefore.</div>`,
+    insertAtPosition:`<div class="ep-why-block">Walk to position pos-1 (O(pos)), then insertAfter. If pos=1 → setHead. If pos ≥ length → setTail.</div>`,
+    remove:`<div class="ep-why-block">remove = unbind(node). Updates head/tail if needed, reconnects neighbors, sets node.prev=node.next=null.</div>`,
+    removeNodesWithValue:`<div class="ep-why-block">Linear scan (O(n)). For each node with matching value, calls remove(). Uses a lookahead pointer (nx=cur.next) before removal so traversal is safe.</div>`,
+    containsNodeWithValue:`<div class="ep-why-block">Linear scan O(n) from head. Returns true immediately on first match. No pointer mutations.</div>`,
+  };
+  return {
+    why: why[op]||'—',
+    inv:[
+      {icon:'🔒',cls:'',text:`<strong>Invariant:</strong> head.prev == null, tail.next == null at all times. Every internal node has valid prev and next.`},
+      {icon:'🗺️',cls:'inv-warn',text:`<strong>Always unbind first:</strong> every mutation calls unbind() defensively because the node might already be in the list. Without unbind, moving a node leaves a broken hole.`},
+      {icon:'🔑',cls:'inv-pur',text:`<strong>Order of pointer writes matters:</strong> wire the new node's pointers first, then update neighbors. Reversing this order corrupts the list.`},
+    ]
+  };
+}
+
+// ─── COMPUTE STEPS ──────────────────────────────────────────────────────────
+function computeSteps(ops){
+  const steps=[];
+  // FIX 5: Node pool is separate from list; findInList searches the live list first
+  const nodePool=new Map(); // val → Node (each unique value gets one node object)
+  const dll=new DoublyLinkedList();
+  const opLog=[];
+
+  function getOrCreate(val){
+    if(!nodePool.has(val)) nodePool.set(val,new Node(val));
+    return nodePool.get(val);
+  }
+
+  function findInList(val){
+    let cur=dll.head;
+    while(cur){ if(cur.val===val) return cur; cur=cur.next; }
+    return null;
+  }
+
+  function toArr(){
+    const a=[]; let c=dll.head;
+    while(c){ a.push(c.val); c=c.next; }
+    return a;
+  }
+
+  // FIX 2: standalone = nodePool entries that are not currently in the list
+  function getStandalone(){
+    const inList=new Set();
+    let c=dll.head; while(c){ inList.add(c.val); c=c.next; }
+    const out=[];
+    for(const [val] of nodePool){
+      if(!inList.has(val)) out.push(val);
+    }
+    return out;
+  }
+
+  // Initial step
+  steps.push({
+    type:'init',op:null,desc:'📐 Initial state — empty doubly linked list.',
+    listNodes:[],standalone:[],opLog:[],opIdx:-1,
+    headVal:null,tailVal:null,size:0,ptrChanges:[],result:null,
+    targetVal:null,refVal:null,pos:null,
+    explain:{why:'—',inv:[]}
+  });
+
+  ops.forEach((opObj,opIdx)=>{
+    const{op,nodeVal,refVal,pos}=opObj;
+    const logEntry={op,args:formatOpArgs(opObj),result:null};
+    let ptrChanges=[], result=null, desc='';
+
+    if(op==='setHead'){
+      const node=getOrCreate(nodeVal);
+      const oldHead=dll.head?.val??null;
+      dll.setHead(node);
+      desc=`setHead(${nodeVal}): node(${nodeVal}) is now the head.${oldHead!=null?` Old head was ${oldHead}.`:' List was empty.'}`;
+      ptrChanges=[{node:nodeVal,before:'prev=null, next=null',after:`prev=null, next=${dll.head.next?.val??'null'}`}];
+      if(dll.head.next) ptrChanges.push({node:dll.head.next.val,before:`prev=${oldHead??'null'}`,after:`prev=${nodeVal}`});
+      logEntry.result=`head=${nodeVal}`;
+    }
+    else if(op==='setTail'){
+      const node=getOrCreate(nodeVal);
+      const oldTail=dll.tail?.val??null;
+      dll.setTail(node);
+      desc=`setTail(${nodeVal}): node(${nodeVal}) is now the tail.${oldTail!=null?` Old tail was ${oldTail}.`:' List was empty.'}`;
+      ptrChanges=[{node:nodeVal,before:'prev=null, next=null',after:`prev=${dll.tail.prev?.val??'null'}, next=null`}];
+      if(dll.tail.prev) ptrChanges.push({node:dll.tail.prev.val,before:`next=${oldTail??'null'}`,after:`next=${nodeVal}`});
+      logEntry.result=`tail=${nodeVal}`;
+    }
+    else if(op==='insertBefore'){
+      const node=getOrCreate(nodeVal);
+      // FIX 5: look in list first, then pool, then create
+      const ref=findInList(refVal)||getOrCreate(refVal);
+      const oldRefPrev=ref.prev?.val??null;
+      dll.insertBefore(ref,node);
+      desc=`insertBefore(ref=${refVal}, node=${nodeVal}): inserted ${nodeVal} before ${refVal}.`;
+      ptrChanges=[
+        {node:nodeVal,before:'standalone/elsewhere',after:`prev=${oldRefPrev??'null'}, next=${refVal}`},
+        {node:refVal, before:`prev=${oldRefPrev??'null'}`,after:`prev=${nodeVal}`},
+      ];
+      if(oldRefPrev!=null) ptrChanges.push({node:oldRefPrev,before:`next=${refVal}`,after:`next=${nodeVal}`});
+      logEntry.result='inserted';
+    }
+    else if(op==='insertAfter'){
+      const node=getOrCreate(nodeVal);
+      // FIX 5: look in list first
+      const ref=findInList(refVal)||getOrCreate(refVal);
+      const oldRefNext=ref.next?.val??null;
+      dll.insertAfter(ref,node);
+      desc=`insertAfter(ref=${refVal}, node=${nodeVal}): inserted ${nodeVal} after ${refVal}.`;
+      ptrChanges=[
+        {node:nodeVal,before:'standalone/elsewhere',after:`prev=${refVal}, next=${oldRefNext??'null'}`},
+        {node:refVal, before:`next=${oldRefNext??'null'}`,after:`next=${nodeVal}`},
+      ];
+      if(oldRefNext!=null) ptrChanges.push({node:oldRefNext,before:`prev=${refVal}`,after:`prev=${nodeVal}`});
+      logEntry.result='inserted';
+    }
+    else if(op==='insertAtPosition'){
+      const node=getOrCreate(nodeVal);
+      const listLen=toArr().length;
+      // FIX 3: store pos in step snapshot
+      dll.insertAtPosition(pos,node);
+      desc=`insertAtPosition(pos=${pos}, node=${nodeVal}): inserted at position ${pos} (list had ${listLen} nodes).`;
+      ptrChanges=[{node:nodeVal,before:'standalone/elsewhere',after:`at position ${pos}`}];
+      logEntry.result=`pos ${pos}`;
+    }
+    else if(op==='remove'){
+      const node=findInList(nodeVal)||nodePool.get(nodeVal);
+      if(node){
+        const prevV=node.prev?.val??null, nextV=node.next?.val??null;
+        dll.remove(node);
+        desc=`remove(node=${nodeVal}): node removed, neighbors reconnected.`;
+        ptrChanges=[{node:nodeVal,before:`prev=${prevV??'null'}, next=${nextV??'null'}`,after:'removed (standalone)',isRemove:true}];
+        if(prevV!=null) ptrChanges.push({node:prevV,before:`next=${nodeVal}`,after:`next=${nextV??'null'}`});
+        if(nextV!=null) ptrChanges.push({node:nextV,before:`prev=${nodeVal}`,after:`prev=${prevV??'null'}`});
+        logEntry.result='removed';
+      } else {
+        desc=`remove(${nodeVal}): node not found in list.`;
+      }
+    }
+    else if(op==='removeNodesWithValue'){
+      const before=toArr();
+      dll.removeNodesWithValue(nodeVal);
+      const removed=before.filter(v=>v===nodeVal);
+      desc=`removeNodesWithValue(${nodeVal}): removed ${removed.length} node(s) with value ${nodeVal}.`;
+      ptrChanges=removed.map(v=>({node:v,before:'in list',after:'removed',isRemove:true}));
+      logEntry.result=`${removed.length} removed`;
+    }
+    else if(op==='containsNodeWithValue'){
+      result=dll.containsNodeWithValue(nodeVal);
+      desc=`containsNodeWithValue(${nodeVal}): ${result?'✓ FOUND':'✗ NOT FOUND'}.`;
+      logEntry.result=String(result);
+    }
+
+    opLog.push(logEntry);
+    steps.push({
+      type:op.startsWith('remove')?'remove':op==='containsNodeWithValue'?'search':'op',
+      op,opIdx,desc,
+      listNodes:toArr(),
+      standalone:getStandalone(),
+      opLog:opLog.map(x=>({...x})),
+      headVal:dll.head?.val??null,
+      tailVal:dll.tail?.val??null,
+      size:toArr().length,
+      ptrChanges,result,
+      targetVal:nodeVal,
+      // FIX 4: always store refVal and pos
+      refVal:refVal??null,
+      pos:pos??null,
+      explain:makeExplain(op),
+    });
+  });
+
+  return steps;
+}
+
+// ─── RENDER DLL STRIP ───────────────────────────────────────────────────────
+function renderDListStrip(st){
+  const strip=document.getElementById('dlistStrip');
+  strip.innerHTML='';
+
+  if(!st.listNodes.length){
+    const msg=document.createElement('div');
+    msg.style.cssText="font-family:'Space Mono',monospace;font-size:.7rem;color:var(--muted);padding:10px 0";
+    msg.textContent='empty list → null ↔ null';
+    strip.appendChild(msg);
+    if(st.standalone?.length){
+      const sl=document.createElement('div'); sl.className='standalone-label'; sl.textContent='standalone nodes:';
+      strip.appendChild(sl);
+      const srow=document.createElement('div'); srow.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+      st.standalone.forEach(v=>{ const b=document.createElement('div'); b.className='dnode-box dns-standalone'; b.textContent=v; srow.appendChild(b); });
+      strip.appendChild(srow);
+    }
+    return;
+  }
+
+  const row=document.createElement('div'); row.className='nodes-strip';
+
+  // null left
+  const nl=document.createElement('div'); nl.className='null-sentinel'; nl.textContent='null'; row.appendChild(nl);
+  const al=document.createElement('div'); al.className='dnode-arrows';
+  al.innerHTML=`<div class="dna-fwd"><div class="dna-line"></div><span>►</span></div><div class="dna-bwd"><span>◄</span><div class="dna-line"></div></div>`;
+  row.appendChild(al);
+
+  st.listNodes.forEach((val,i)=>{
+    const isHead=val===st.headVal&&i===0;
+    const isTail=val===st.tailVal&&i===st.listNodes.length-1;
+    const isTarget=st.targetVal===val;
+    const isRemoved=st.ptrChanges?.some(c=>c.node===val&&c.isRemove);
+    const isAffected=st.ptrChanges?.some(c=>c.node===val&&!c.isRemove);
+
+    const wrap=document.createElement('div'); wrap.className='dnode-wrap';
+
+    // badges
+    const badges=document.createElement('div'); badges.className='dnode-badges';
+    if(isHead){const b=document.createElement('div');b.className='dnode-badge ddb-head';b.textContent='HEAD';badges.appendChild(b);}
+    if(isTail){const b=document.createElement('div');b.className='dnode-badge ddb-tail';b.textContent='TAIL';badges.appendChild(b);}
+    if(isTarget&&!isHead&&!isTail){const b=document.createElement('div');b.className='dnode-badge ddb-target';b.textContent='node';badges.appendChild(b);}
+    if(isAffected&&!isTarget){const b=document.createElement('div');b.className='dnode-badge ddb-result';b.textContent='↕';badges.appendChild(b);}
+    wrap.appendChild(badges);
+
+    // box
+    const box=document.createElement('div');
+    const state=isRemoved?'dns-removed':
+      isAffected&&!isTarget?'dns-affected':
+      isTarget?'dns-target':
+      isHead&&isTail?'dns-headtail':
+      isHead?'dns-head':isTail?'dns-tail':'dns-normal';
+    box.className=`dnode-box ${state}`;
+    box.textContent=val;
+    wrap.appendChild(box);
+    row.appendChild(wrap);
+
+    // arrow to next
+    if(i<st.listNodes.length-1){
+      const aw=document.createElement('div'); aw.className='dnode-arrows';
+      const nextVal=st.listNodes[i+1];
+      const highlight=isAffected||st.ptrChanges?.some(c=>c.node===nextVal&&!c.isRemove);
+      const cls=highlight?'dna-green':'';
+      aw.innerHTML=`<div class="dna-fwd ${cls}"><div class="dna-line"></div><span>►</span></div>
+        <div class="dna-bwd ${cls}"><span>◄</span><div class="dna-line"></div></div>`;
+      row.appendChild(aw);
+    }
+  });
+
+  // null right
+  const ar=document.createElement('div'); ar.className='dnode-arrows';
+  ar.innerHTML=`<div class="dna-fwd"><div class="dna-line"></div><span>►</span></div><div class="dna-bwd"><span>◄</span><div class="dna-line"></div></div>`;
+  const nr=document.createElement('div'); nr.className='null-sentinel'; nr.textContent='null';
+  row.appendChild(ar); row.appendChild(nr);
+  strip.appendChild(row);
+
+  // standalone
+  if(st.standalone?.length){
+    const sl=document.createElement('div'); sl.className='standalone-label'; sl.textContent='standalone nodes (not in list):';
+    strip.appendChild(sl);
+    const srow=document.createElement('div'); srow.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+    st.standalone.forEach(v=>{ const b=document.createElement('div'); b.className='dnode-box dns-standalone'; b.textContent=v; srow.appendChild(b); });
+    strip.appendChild(srow);
+  }
+}
+
+// ─── RENDER OP DETAIL ───────────────────────────────────────────────────────
+function renderOpDetail(st){
+  const outer=document.getElementById('opDetailOuter');
+  const odOp=document.getElementById('odhOp');
+  const odArgs=document.getElementById('odhArgs');
+  const tbl=document.getElementById('ptrTable');
+  const res=document.getElementById('opResult');
+
+  if(!st.op){
+    outer.className='op-detail-outer';
+    odOp.className='odh-op'; odOp.textContent='—'; odArgs.textContent='—';
+    tbl.innerHTML=`<div class="pt-header">Node</div><div class="pt-header">Before</div><div class="pt-header">After</div>`;
+    res.className='op-result or-init'; res.textContent='add operations and press RUN';
+    return;
+  }
+
+  const isRemove=st.type==='remove', isSearch=st.type==='search';
+  outer.className=`op-detail-outer ${isRemove?'odo-remove':'odo-active'}`;
+  odOp.className=`odh-op ${isRemove?'odh-remove':''}`;
+  odOp.textContent=st.op;
+  // FIX 4: use stored refVal/pos for display
+  odArgs.textContent=`(${formatOpArgsFromStep(st)})`;
+
+  tbl.innerHTML=`<div class="pt-header">Node</div><div class="pt-header">Before</div><div class="pt-header">After</div>`;
+  (st.ptrChanges||[]).forEach(c=>{
+    const d1=document.createElement('div'); d1.className='pt-node'; d1.textContent=`node(${c.node})`;
+    const d2=document.createElement('div'); d2.className='pt-before'; d2.textContent=c.before;
+    const d3=document.createElement('div'); d3.className=`pt-after ${c.isRemove?'pta-remove':''}`; d3.textContent=c.after;
+    tbl.appendChild(d1); tbl.appendChild(d2); tbl.appendChild(d3);
+  });
+
+  if(isSearch){
+    res.className='op-result or-search';
+    res.textContent=`containsNodeWithValue(${st.targetVal}) → ${st.result}`;
+  } else if(isRemove){
+    res.className='op-result or-remove';
+    res.textContent=`${st.op}(${st.targetVal}) — node(s) removed`;
+  } else {
+    res.className='op-result or-ok';
+    res.textContent=`List: ${st.listNodes.length?st.listNodes.join(' ↔ '):'(empty)'}`;
+  }
+}
+
+// FIX 3+4: use step's own stored refVal / pos
+function formatOpArgsFromStep(st){
+  if(!st.op) return '';
+  if(st.op==='insertBefore'||st.op==='insertAfter') return `node=${st.targetVal}, ref=${st.refVal??'?'}`;
+  if(st.op==='insertAtPosition') return `pos=${st.pos??'?'}, node=${st.targetVal}`;
+  return `val=${st.targetVal}`;
+}
+
+function renderOpLog(st){
+  const list=document.getElementById('opLogList');
+  list.innerHTML='';
+  document.getElementById('olhCount').textContent=`${(st.opLog||[]).length} op${(st.opLog||[]).length!==1?'s':''}`;
+  (st.opLog||[]).forEach((log,i)=>{
+    const row=document.createElement('div');
+    const isCurrent=i===st.opIdx;
+    row.className=`op-log-row ${isCurrent?'olr-current':'olr-done'}`;
+    const opClass=['setHead','setTail'].includes(log.op)?'oln-set':
+      log.op.startsWith('insert')?'oln-insert':
+      log.op.startsWith('remove')?'oln-remove':'oln-search';
+    row.innerHTML=`<span class="ol-num">${i+1}.</span><span class="ol-name ${opClass}">${log.op}</span>
+      <span class="ol-args">(${log.args})</span>
+      ${log.result?`<span class="ol-result" style="color:var(--accent3)">${log.result}</span>`:''}`;
+    list.appendChild(row);
+    if(isCurrent) setTimeout(()=>row.scrollIntoView({block:'nearest'}),0);
+  });
+  document.getElementById('opLogOuter').className=`op-log-outer ${(st.opLog||[]).length?'olo-active':''}`;
+}
+
+// ─── VAR FLASH ──────────────────────────────────────────────────────────────
+let prevVars={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card) return;
+  const s=String(val); el.textContent=s;
+  if(prevVars[elId]!==undefined&&prevVars[elId]!==s){
+    card.classList.remove('changed'); void card.offsetWidth; card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVars[elId]=s;
+}
+
+// ─── RENDER STEP ────────────────────────────────────────────────────────────
+function renderStep(idx){
+  if(idx<0||idx>=steps.length) return;
+  const st=steps[idx]; currentStep=idx;
+
+  // list
+  document.getElementById('dlistOuter').className=`dlist-outer ${st.type==='remove'?'dlo-remove':st.op?'dlo-op':''}`;
+  document.getElementById('dlhLabel').textContent=st.op||'empty list';
+  document.getElementById('dlhStatus').textContent=st.listNodes.length?st.listNodes.join(' ↔ '):'(empty)';
+  renderDListStrip(st);
+  renderOpDetail(st);
+  renderOpLog(st);
+
+  // narrative
+  const nb=document.querySelector('.narrative-bar');
+  nb.style.borderLeftColor=st.type==='remove'?'var(--accent)':st.type==='search'?'var(--pur)':'var(--accent3)';
+  document.getElementById('narrativeText').innerHTML=st.desc||'Initializing…';
+
+  // step panel
+  document.getElementById('stepPanel').className=`step-panel ${st.type==='remove'?'sp-remove':'sp-op'}`;
+  document.getElementById('spTitle').textContent=(st.desc||'').replace(/<[^>]+>/g,'');
+  const mkBox=(lbl,val,cls)=>
+    `<div class="spbox ${cls}"><div class="spb-lbl">${lbl}</div><div class="spb-val">${val}</div></div>`;
+  document.getElementById('spBody').innerHTML=
+    mkBox('size',st.size,'spbox sb-blue')+
+    mkBox('head',st.headVal??'null','spbox sb-pur')+
+    mkBox('tail',st.tailVal??'null','spbox sb-grn')+
+    (st.result!==null?mkBox('result',String(st.result),'spbox sb-yel'):'');
+
+  // 3-tab
+  document.getElementById('paneWhat').innerHTML=st.desc||'';
+  document.getElementById('paneWhy').innerHTML=st.explain?.why||'—';
+  document.getElementById('invBlock').innerHTML=(st.explain?.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}"><div class="inv-icon">${r.icon}</div><div class="inv-text">${r.text}</div></div>`).join('');
+
+  // right vars
+  setVar('vHead','vcHead',st.headVal??'null');
+  setVar('vTail','vcTail',st.tailVal??'null');
+  setVar('vSize','vcSize',st.size);
+  setVar('vOp','vcOp',st.op||'—');
+  document.getElementById('listRepr').textContent=st.listNodes.length?`null ↔ ${st.listNodes.join(' ↔ ')} ↔ null`:'null ↔ null';
+  document.getElementById('cxSize').textContent=st.size;
+  document.getElementById('cxHead').textContent=st.headVal??'null';
+  document.getElementById('cxTail').textContent=st.tailVal??'null';
+  document.getElementById('cxOp').textContent=st.op||'—';
+
+  // progress — FIX 1: stepIdx element now exists in HTML
+  document.getElementById('stepIdx').textContent=idx+1;
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+
+  // done
+  if(idx===steps.length-1&&steps.length>1){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBanner').textContent=`★ Done! Final list: ${st.listNodes.length?st.listNodes.join(' ↔ '):'empty'}`;
+  }
+}
+
+// ─── TABS ───────────────────────────────────────────────────────────────────
+function switchTab(tab){
+  ['what','why','inv'].forEach(t=>{
+    const c=t[0].toUpperCase()+t.slice(1);
+    document.getElementById('tab'+c).classList.toggle('active',t===tab);
+    document.getElementById('pane'+c).classList.toggle('active',t===tab);
+  });
+}
+
+// ─── PLAYBACK ───────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){ if(!playing)return; if(currentStep>=steps.length-1){stopPlay();return;} renderStep(currentStep+1); timer=setTimeout(tick,speed); }
+function stopPlay(){ playing=false; clearTimeout(timer); document.getElementById('btnPause').textContent='▶ Resume'; document.getElementById('btnRun').disabled=false; }
+
+document.getElementById('btnRun').addEventListener('click',()=>{
+  steps=computeSteps(opQueue);
+  currentStep=0;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=false;
+  renderStep(0);
+  setTimeout(play,200);
+});
+
+document.getElementById('btnReset').addEventListener('click',()=>{
+  stopPlay();
+  steps=[]; currentStep=0;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=true;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('progressFill').style.width='0%';
+  document.getElementById('dlistStrip').innerHTML='';
+  document.getElementById('listRepr').textContent='null ↔ null';
+  document.getElementById('narrativeText').textContent='Build operations, then press RUN.';
+  ['vHead','vTail','vSize','vOp'].forEach((id,i)=>document.getElementById(id).textContent=['null','null','0','—'][i]);
+  ['cxSize','cxHead','cxTail','cxOp'].forEach((id,i)=>document.getElementById(id).textContent=['0','—','—','—'][i]);
+  document.getElementById('opLogList').innerHTML='';
+  document.getElementById('olhCount').textContent='0 ops';
+  document.getElementById('odhOp').textContent='—';
+  document.getElementById('opResult').className='op-result or-init';
+  document.getElementById('opResult').textContent='add operations and press RUN';
+  document.getElementById('ptrTable').innerHTML=`<div class="pt-header">Node</div><div class="pt-header">Before</div><div class="pt-header">After</div>`;
+  document.getElementById('stepIdx').textContent='0';
+  document.getElementById('stepTotal').textContent='/ 0 steps';
+});
+
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); speed=parseInt(b.dataset.ms);
+}));
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowRight'){stopPlay();renderStep(currentStep+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'){stopPlay();renderStep(currentStep-1);e.preventDefault();}
+  else if(e.key===' '){e.preventDefault();playing?stopPlay():play();}
+});
+
+let activeCodeTab='clean';
+function switchCodeTab(tab){
+  activeCodeTab=tab;
+  document.getElementById('code-clean').style.display=tab==='clean'?'block':'none';
+  document.getElementById('code-cf').style.display=tab==='cf'?'block':'none';
+  document.getElementById('ctab-clean').classList.toggle('active',tab==='clean');
+  document.getElementById('ctab-cf').classList.toggle('active',tab==='cf');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peak Element Finder — Binary Search</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#f5f0e8; --ink:#1a1a2e; --surface:#fffdf7; --border:#d4ccb8;
+    --accent:#e63946; --accent2:#2196f3; --accent3:#06d6a0; --accent4:#ffd166;
+    --muted:#8a8070;
+    --active-bg:rgba(33,150,243,0.08);   --active-border:#2196f3;
+    --mid-bg:rgba(255,209,102,0.18);     --mid-border:#ffd166;
+    --peak-bg:rgba(6,214,160,0.14);      --peak-border:#06d6a0;
+    --elim-bg:rgba(0,0,0,0.04);
+    --slope-up:rgba(6,214,160,0.12);
+    --slope-dn:rgba(230,57,70,0.10);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.5;}
+
+  .header{background:var(--ink);color:var(--bg);padding:22px 40px;display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--accent4);}
+  .header h1{font-family:'Space Mono',monospace;font-size:clamp(0.85rem,2.2vw,1.3rem);font-weight:700;letter-spacing:-0.5px;}
+  .header .sub{font-size:0.75rem;color:#8a8a9a;letter-spacing:2px;text-transform:uppercase;}
+  .family-badge{margin-left:auto;background:var(--accent4);color:#3a2800;font-family:'Space Mono',monospace;font-size:0.65rem;padding:4px 10px;border-radius:2px;letter-spacing:1px;font-weight:700;}
+
+  .main{display:grid;grid-template-columns:1fr 360px;height:calc(100vh - 76px);overflow:hidden;}
+  .viz-panel{padding:24px 32px;border-right:1px solid var(--border);overflow-y:auto;}
+
+  .controls{display:flex;gap:10px;margin-bottom:16px;align-items:flex-end;flex-wrap:wrap;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .field input{background:var(--surface);border:1.5px solid var(--border);border-radius:4px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:0.88rem;color:var(--ink);outline:none;transition:border-color 0.2s;width:300px;}
+  .field input:focus{border-color:var(--accent4);}
+  .btn{padding:7px 16px;border:none;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+  .btn-primary{background:var(--ink);color:var(--bg);}
+  .btn-primary:hover{background:var(--accent4);color:#3a2800;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1.5px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--ink);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .speed-wrap{display:flex;flex-direction:column;gap:5px;}
+  .speed-wrap label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .speed-btns{display:flex;gap:3px;}
+  .speed-btn{padding:6px 10px;border:1.5px solid var(--border);background:var(--surface);border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;cursor:pointer;transition:all 0.15s;color:var(--ink);}
+  .speed-btn.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+
+  .legend{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .leg-item{display:flex;align-items:center;gap:6px;font-size:0.78rem;}
+  .leg-dot{width:13px;height:13px;border-radius:3px;border:2px solid;flex-shrink:0;}
+  .section-label{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+
+  /* ── MOUNTAIN CHART ── */
+  .mountain-wrap{position:relative;margin-bottom:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
+  canvas#mountainChart{display:block;width:100%;height:180px;}
+
+  /* ── ARRAY BLOCKS ── */
+  .array-outer{position:relative;padding-bottom:54px;margin-bottom:14px;overflow-x:auto;}
+  .array-blocks{display:flex;gap:5px;flex-wrap:nowrap;}
+  .blk{
+    position:relative;width:52px;height:52px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;
+    border-radius:8px;border:2px solid var(--border);
+    background:var(--surface);color:var(--ink);
+    transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .blk .bidx{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:0.52rem;color:var(--muted);}
+  .blk.active    {background:var(--active-bg);border-color:var(--active-border);color:var(--accent2);transform:translateY(-3px);}
+  .blk.is-mid    {background:var(--mid-bg);   border-color:var(--mid-border);   color:#7a5a00;transform:translateY(-7px);box-shadow:0 8px 18px rgba(255,209,102,0.3);}
+  .blk.is-peak   {background:var(--peak-bg);  border-color:var(--peak-border);  color:#028a5b;transform:translateY(-10px);box-shadow:0 10px 24px rgba(6,214,160,0.3);animation:peakPop 0.4s ease;}
+  .blk.eliminated{opacity:0.28;transform:scale(0.9);border-color:transparent;background:var(--elim-bg);color:var(--muted);}
+  .blk.slope-up  {background:var(--slope-up); border-color:var(--peak-border);}
+  .blk.slope-dn  {background:var(--slope-dn); border-color:var(--accent);}
+  @keyframes peakPop{0%{transform:translateY(-4px) scale(0.9)}60%{transform:translateY(-13px) scale(1.08)}100%{transform:translateY(-10px) scale(1)}}
+
+  /* pointer labels */
+  .ptr-labels{position:absolute;bottom:0;left:0;right:0;height:48px;pointer-events:none;}
+  .ptr{position:absolute;font-family:'Space Mono',monospace;font-size:0.62rem;font-weight:700;padding:2px 7px;border-radius:3px;transform:translateX(-50%);transition:left 0.4s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;}
+  .ptr-L  {background:var(--accent); color:white;top:4px;}
+  .ptr-R  {background:var(--accent2);color:white;top:4px;}
+  .ptr-mid{background:var(--accent4);color:#3a2800;top:26px;}
+
+  /* ── SLOPE INDICATOR ── */
+  .slope-row{display:flex;gap:10px;margin-bottom:14px;}
+  .slope-card{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;transition:all 0.3s;text-align:center;}
+  .slope-card.up  {border-color:var(--peak-border); background:var(--slope-up);}
+  .slope-card.down{border-color:var(--accent);       background:var(--slope-dn);}
+  .slope-card.peak{border-color:var(--peak-border);  background:var(--peak-bg);}
+  .slope-card.neutral{border-color:var(--border);}
+  .slope-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+  .slope-val  {font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--ink);}
+  .slope-arrow{font-size:1.4rem;margin-bottom:2px;}
+  .slope-decision{font-size:0.75rem;color:var(--muted);margin-top:3px;}
+
+  /* ── ITER LOG ── */
+  .iter-log{margin-bottom:14px;}
+  .il-rows{display:flex;flex-direction:column;gap:3px;max-height:110px;overflow-y:auto;}
+  .il-rows::-webkit-scrollbar{width:3px;}
+  .il-rows::-webkit-scrollbar-thumb{background:var(--border);}
+  .il-row{display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--border);border-radius:5px;padding:5px 10px;font-family:'Space Mono',monospace;font-size:0.65rem;transition:all 0.3s;}
+  .il-row.active{border-color:var(--accent4);background:rgba(255,209,102,0.07);}
+  .il-row.il-up  {border-color:var(--peak-border);}
+  .il-row.il-dn  {border-color:var(--accent);}
+  .il-row.il-peak{border-color:var(--peak-border);background:var(--peak-bg);}
+  .il-iter{color:var(--muted);width:20px;}
+  .il-range{color:var(--accent2);width:70px;}
+  .il-mid  {color:#7a5a00;width:50px;}
+  .il-cmp  {flex:1;color:var(--ink);}
+  .il-dec  {font-weight:700;}
+  .il-dec.up  {color:#028a5b;}
+  .il-dec.dn  {color:var(--accent);}
+  .il-dec.peak{color:#028a5b;}
+
+  /* ── 3-TAB EXPLANATION PANEL ── */
+  .explain-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;overflow:hidden;transition:border-color 0.3s;}
+  .explain-panel.ep-up  {border-color:var(--peak-border);}
+  .explain-panel.ep-down{border-color:var(--accent);}
+  .explain-panel.ep-peak{border-color:var(--peak-border);}
+  .explain-panel.ep-done{border-color:var(--accent3);}
+  .ep-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .ep-tab{flex:1;padding:7px 0;text-align:center;font-family:'Space Mono',monospace;font-size:0.58rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:var(--muted);background:transparent;border:none;transition:all 0.15s;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .ep-tab:hover{color:var(--ink);}
+  .ep-tab.active      {color:var(--ink);  border-bottom-color:var(--accent2);}
+  .ep-tab.active.t-why{color:#7a3fc0;     border-bottom-color:#c084fc;}
+  .ep-tab.active.t-inv{color:#028a5b;     border-bottom-color:var(--accent3);}
+  .ep-body{padding:13px 17px;min-height:88px;}
+  .ep-pane{display:none;font-size:0.84rem;line-height:1.72;color:var(--ink);}
+  .ep-pane.active{display:block;animation:epFade 0.2s ease;}
+  @keyframes epFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ep-pane strong{font-weight:700;}
+  .ep-pane .grn{color:#028a5b;font-weight:600;}
+  .ep-pane .yel{color:#7a5a00;font-weight:600;}
+  .ep-pane .red{color:var(--accent);font-weight:600;}
+  .ep-pane .blu{color:var(--accent2);font-weight:600;}
+  .ep-why-block{border-left:3px solid #c084fc;border-radius:0 6px 6px 0;padding:10px 14px;font-size:0.82rem;line-height:1.72;background:rgba(192,84,252,0.06);}
+  .ep-why-block.why-up  {border-left-color:var(--accent3);background:rgba(6,214,160,0.05);}
+  .ep-why-block.why-dn  {border-left-color:var(--accent);  background:rgba(230,57,70,0.05);}
+  .ep-why-block.why-peak{border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-why-block.why-done{border-left-color:var(--accent3);background:rgba(6,214,160,0.06);}
+  .ep-inv-block{display:flex;flex-direction:column;gap:7px;}
+  .inv-row{display:flex;align-items:flex-start;gap:10px;background:rgba(6,214,160,0.05);border:1px solid rgba(6,214,160,0.18);border-radius:6px;padding:8px 11px;}
+  .inv-icon{font-size:1rem;flex-shrink:0;margin-top:1px;}
+  .inv-text{font-size:0.8rem;line-height:1.6;color:var(--ink);}
+  .inv-text strong{color:#028a5b;}
+  .inv-row.inv-warn{background:rgba(255,209,102,0.07);border-color:rgba(255,209,102,0.25);}
+  .inv-row.inv-warn .inv-text strong{color:#7a5a00;}
+  .inv-row.inv-key {background:rgba(230,57,70,0.05);border-color:rgba(230,57,70,0.18);}
+  .inv-row.inv-key  .inv-text strong{color:var(--accent);}
+
+  .progress-wrap{margin-bottom:10px;}
+  .progress-label{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--muted);margin-bottom:4px;}
+  .progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+  .progress-fill{height:100%;background:var(--accent4);border-radius:2px;transition:width 0.3s;}
+  .done-banner{display:none;background:var(--accent3);color:#0a2e22;text-align:center;padding:9px;font-family:'Space Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:2px;border-radius:6px;margin-bottom:10px;animation:fadeUp 0.4s ease;}
+  .done-banner.show{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .playback{display:flex;gap:8px;}
+
+  /* ── RIGHT PANEL ── */
+  .state-panel{background:var(--ink);color:var(--bg);display:flex;flex-direction:column;overflow-y:auto;height:calc(100vh - 76px);}
+  .state-panel::-webkit-scrollbar{width:4px;}
+  .state-panel::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-panel{flex-shrink:0;padding:14px 14px 8px;border-bottom:1px solid #2a2a3e;}
+  .code-panel-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:8px;}
+  pre.code-block{font-family:'Space Mono',monospace;font-size:0.65rem;line-height:1.85;background:#060610;border:1px solid #1e1e2e;border-radius:6px;padding:8px;overflow-x:auto;max-height:calc(1.85em*4+16px);overflow-y:auto;}
+  pre.code-block::-webkit-scrollbar{width:3px;height:3px;}
+  pre.code-block::-webkit-scrollbar-thumb{background:#2a2a3e;border-radius:2px;}
+  .code-line{display:block;padding:0 6px;border-radius:3px;transition:background 0.2s;white-space:pre;border-left:3px solid transparent;color:#6b7280;}
+  .code-line.hl-init{background:rgba(255,209,102,0.16);border-left-color:#ffd166;color:#e2e8f0;}
+  .code-line.hl-up  {background:rgba(6,214,160,0.16); border-left-color:#06d6a0;color:#e2e8f0;}
+  .code-line.hl-down{background:rgba(230,57,70,0.16); border-left-color:#e63946;color:#e2e8f0;}
+  .code-line.hl-peak{background:rgba(255,209,102,0.2); border-left-color:#ffd166;color:#e2e8f0;}
+  .code-line.hl-done{background:rgba(6,214,160,0.18); border-left-color:#06d6a0;color:#e2e8f0;}
+  .ck{color:#c084fc;} .cf{color:#67e8f9;} .cc{color:#374151;font-style:italic;} .cn{color:#fda4af;}
+
+  .vars-panel{flex-shrink:0;padding:12px 14px;}
+  .state-title{font-family:'Space Mono',monospace;font-size:0.6rem;letter-spacing:3px;text-transform:uppercase;color:#6b6b8a;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #2a2a3e;}
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;}
+  .var-card{background:#0d0d18;border:1px solid #2a2a3e;border-radius:6px;padding:9px 11px;transition:all 0.3s;}
+  .var-card.changed{border-color:var(--accent4);background:rgba(255,209,102,0.08);animation:vflash 0.4s ease;}
+  @keyframes vflash{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  .var-name{font-family:'Space Mono',monospace;font-size:0.55rem;color:#6b6b8a;margin-bottom:3px;}
+  .var-value{font-family:'Space Mono',monospace;font-size:0.95rem;font-weight:700;color:var(--bg);}
+  .var-value.red{color:#ff6b6b;} .var-value.yel{color:var(--accent4);} .var-value.grn{color:var(--accent3);} .var-value.blu{color:#4fc3f7;}
+
+  /* slope compare right */
+  .slope-cmp{margin-bottom:12px;}
+  .sc-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .sc-row{display:flex;align-items:center;gap:6px;background:#0d0d18;border:1px solid #2a2a3e;border-radius:5px;padding:7px 10px;font-family:'Space Mono',monospace;font-size:0.72rem;transition:all 0.3s;}
+  .sc-row.sc-up  {border-color:rgba(6,214,160,0.4);background:rgba(6,214,160,0.08);}
+  .sc-row.sc-down{border-color:rgba(230,57,70,0.4); background:rgba(230,57,70,0.07);}
+  .sc-row.sc-peak{border-color:#ffd166;             background:rgba(255,209,102,0.1);}
+  .sc-lbl{color:#6b6b8a;flex:1;}
+  .sc-val{font-weight:700;}
+  .sc-val.up  {color:var(--accent3);}
+  .sc-val.down{color:#ff6b6b;}
+  .sc-val.peak{color:var(--accent4);}
+
+  /* rlog */
+  .rlog{margin-bottom:12px;}
+  .rl-title{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:#6b6b8a;margin-bottom:7px;}
+  .rl-rows{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto;}
+  .rl-rows::-webkit-scrollbar{width:3px;}
+  .rl-rows::-webkit-scrollbar-thumb{background:#2a2a3e;}
+  .rl-row{display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:4px;background:#0d0d18;border:1px solid #2a2a3e;font-family:'Space Mono',monospace;font-size:0.62rem;transition:all 0.3s;}
+  .rl-row.rl-up  {border-color:rgba(6,214,160,0.35);background:rgba(6,214,160,0.07);}
+  .rl-row.rl-dn  {border-color:rgba(230,57,70,0.35); background:rgba(230,57,70,0.06);}
+  .rl-row.rl-peak{border-color:#ffd166;              background:rgba(255,209,102,0.09);}
+  .rl-row.rl-new {border-color:#ffd166;}
+  .rl-n{color:#6b6b8a;width:18px;}
+  .rl-mid{color:var(--accent4);width:42px;}
+  .rl-cmp{flex:1;color:var(--bg);font-size:0.6rem;}
+  .rl-dec{font-weight:700;font-size:0.65rem;}
+  .rl-dec.up  {color:var(--accent3);}
+  .rl-dec.dn  {color:#ff6b6b;}
+  .rl-dec.peak{color:var(--accent4);}
+
+  .best-box{margin:0 14px 12px;padding:9px 11px;background:rgba(6,214,160,0.06);border:1px solid rgba(6,214,160,0.2);border-radius:5px;opacity:0.4;transition:opacity 0.4s;}
+  .best-box.show{opacity:1;}
+  .best-label{font-family:'Space Mono',monospace;font-size:0.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--accent3);margin-bottom:5px;}
+  .best-val{font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--bg);}
+  .best-meta{font-size:0.62rem;color:#6b6b8a;margin-top:3px;}
+  .done-bar{display:none;margin:0 14px 10px;background:var(--accent3);color:#0a2e22;text-align:center;padding:7px;border-radius:4px;font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:800;letter-spacing:2px;animation:fadeUp 0.4s ease;}
+  .done-bar.show{display:block;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Peak Element Finder</h1>
+    <div class="sub">Binary Search · Local Maximum · Slope Direction</div>
+  </div>
+  <div class="family-badge">03 · Binary Search</div>
+</div>
+
+<div class="main">
+  <!-- LEFT -->
+  <div class="viz-panel">
+
+    <div class="controls">
+      <div class="field">
+        <label>Array (any integers)</label>
+        <input type="text" id="inputArr" value="1,3,7,4,9,2,6,8,3,5,2">
+      </div>
+      <div class="speed-wrap">
+        <label>Speed</label>
+        <div class="speed-btns">
+          <button class="speed-btn" data-ms="1600">0.5×</button>
+          <button class="speed-btn active" data-ms="900">1×</button>
+          <button class="speed-btn" data-ms="450">2×</button>
+          <button class="speed-btn" data-ms="180">4×</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnRun" style="align-self:flex-end">▶ RUN</button>
+      <button class="btn btn-secondary" id="btnReset" style="align-self:flex-end">↺ RESET</button>
+    </div>
+
+    <div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--active-bg);border-color:var(--active-border)"></div>Active search space</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--mid-bg);border-color:var(--mid-border)"></div>mid (candidate)</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--slope-up);border-color:var(--peak-border)"></div>Upward slope → go right</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--slope-dn);border-color:var(--accent)"></div>Downward slope → go left</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--peak-bg);border-color:var(--peak-border)"></div>Peak found!</div>
+      <div class="leg-item"><div class="leg-dot" style="background:rgba(6,214,160,0.06);border-color:rgba(6,214,160,0.4)"></div>All valid peaks (faint circles)</div>
+    </div>
+
+    <!-- MOUNTAIN CHART -->
+    <div class="section-label">Mountain View</div>
+    <div class="mountain-wrap">
+      <canvas id="mountainChart"></canvas>
+    </div>
+
+    <!-- ARRAY BLOCKS -->
+    <div class="section-label" style="margin-top:10px">Array</div>
+    <div class="array-outer">
+      <div class="array-blocks" id="arrayBlocks"></div>
+      <div class="ptr-labels" id="ptrLabels"></div>
+    </div>
+
+    <!-- SLOPE INDICATOR -->
+    <div class="slope-row" id="slopeRow">
+      <div class="slope-card neutral" id="scLeft">
+        <div class="slope-label">a[mid−1]</div>
+        <div class="slope-arrow" id="scLeftArrow">—</div>
+        <div class="slope-val"  id="scLeftVal">—</div>
+      </div>
+      <div class="slope-card neutral" id="scMid">
+        <div class="slope-label">a[mid]</div>
+        <div class="slope-arrow">⬆</div>
+        <div class="slope-val"  id="scMidVal">—</div>
+        <div class="slope-decision" id="scMidDecision">—</div>
+      </div>
+      <div class="slope-card neutral" id="scRight">
+        <div class="slope-label">a[mid+1]</div>
+        <div class="slope-arrow" id="scRightArrow">—</div>
+        <div class="slope-val"  id="scRightVal">—</div>
+      </div>
+    </div>
+
+    <!-- ITER LOG -->
+    <div class="iter-log">
+      <div class="section-label">Iteration Log</div>
+      <div class="il-rows" id="ilRows"></div>
+    </div>
+
+    <!-- 3-TAB EXPLANATION PANEL -->
+    <div class="explain-panel" id="explainPanel">
+      <div class="ep-tabs">
+        <button class="ep-tab active" id="tabWhat" onclick="switchTab('what')">What</button>
+        <button class="ep-tab t-why"  id="tabWhy"  onclick="switchTab('why')">Why</button>
+        <button class="ep-tab t-inv"  id="tabInv"  onclick="switchTab('inv')">Invariant</button>
+      </div>
+      <div class="ep-body">
+        <div class="ep-pane active" id="paneWhat">Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneWhy" >Press <strong>RUN</strong> to start.</div>
+        <div class="ep-pane"        id="paneInv" ><div class="ep-inv-block" id="invBlock"></div></div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="stepCounter">Step 0</span>
+        <span id="stepTotal"></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="done-banner" id="doneBanner">⛰ PEAK FOUND</div>
+
+    <div class="playback">
+      <button class="btn btn-secondary" id="btnPrev" disabled>← Prev</button>
+      <button class="btn btn-secondary" id="btnNext" disabled>Next →</button>
+      <button class="btn btn-secondary" id="btnPause" disabled>⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="state-panel">
+    <div class="code-panel">
+      <div class="code-panel-title">C++ — Executing Line</div>
+      <pre class="code-block">
+<span class="code-line" id="cl-sig"><span class="ck">int</span> <span class="cf">findPeak</span>(vector&lt;<span class="ck">int</span>&gt;&amp; a) {</span>
+<span class="code-line" id="cl-init">  <span class="ck">int</span> L=<span class="cn">0</span>, R=n-<span class="cn">1</span>;</span>
+<span class="code-line" id="cl-whl">  <span class="ck">while</span> (L &lt; R) {</span>
+<span class="code-line" id="cl-mid">    <span class="ck">int</span> mid = L+(R-L)/<span class="cn">2</span>;</span>
+<span class="code-line" id="cl-if">    <span class="ck">if</span> (a[mid] &lt; a[mid+<span class="cn">1</span>])</span>
+<span class="code-line" id="cl-up">      L = mid+<span class="cn">1</span>; <span class="cc">// upslope → peak is right</span></span>
+<span class="code-line" id="cl-dn">    <span class="ck">else</span> R = mid; <span class="cc">// downslope → peak is here or left</span></span>
+<span class="code-line" id="cl-ret">  } <span class="ck">return</span> L; <span class="cc">// L==R, peak found</span></span>
+<span class="code-line" id="cl-close">}</span></pre>
+    </div>
+
+    <div class="vars-panel">
+      <div class="state-title">Live Variables</div>
+      <div class="var-grid">
+        <div class="var-card" id="vcL">
+          <div class="var-name">L</div>
+          <div class="var-value red" id="vL">—</div>
+        </div>
+        <div class="var-card" id="vcR">
+          <div class="var-name">R</div>
+          <div class="var-value blu" id="vR">—</div>
+        </div>
+        <div class="var-card" id="vcMid">
+          <div class="var-name">mid</div>
+          <div class="var-value yel" id="vMid">—</div>
+        </div>
+        <div class="var-card" id="vcAMid">
+          <div class="var-name">a[mid]</div>
+          <div class="var-value yel" id="vAMid">—</div>
+        </div>
+        <div class="var-card" id="vcAMid1">
+          <div class="var-name">a[mid+1]</div>
+          <div class="var-value grn" id="vAMid1">—</div>
+        </div>
+        <div class="var-card" id="vcIter">
+          <div class="var-name">iteration</div>
+          <div class="var-value blu" id="vIter">0</div>
+        </div>
+      </div>
+
+      <!-- SLOPE COMPARE RIGHT -->
+      <div class="slope-cmp">
+        <div class="sc-title">Slope comparison</div>
+        <div class="sc-row" id="scRowRight">
+          <div class="sc-lbl">a[mid] vs a[mid+1]</div>
+          <div class="sc-val" id="scCompareVal">—</div>
+        </div>
+        <div class="sc-row" id="scRowDecision" style="margin-top:4px">
+          <div class="sc-lbl">Decision</div>
+          <div class="sc-val" id="scDecisionVal">—</div>
+        </div>
+      </div>
+
+      <!-- RLOG -->
+      <div class="rlog">
+        <div class="rl-title">Iteration log</div>
+        <div class="rl-rows" id="rlRows"></div>
+      </div>
+
+      <div class="best-box" id="bestBox">
+        <div class="best-label">Peak Found</div>
+        <div class="best-val" id="bestVal">—</div>
+        <div class="best-meta" id="bestMeta"></div>
+      </div>
+    </div>
+
+    <div class="done-bar" id="doneBar">⛰ O(LOG N) · PEAK FOUND</div>
+  </div>
+</div>
+
+<script>
+// ── CODE HIGHLIGHT ─────────────────────────────────────────────────────────
+const TYPE_LINES = {
+  init: {ids:['cl-sig','cl-init','cl-whl','cl-mid','cl-if'], cls:'hl-init'},
+  up:   {ids:['cl-if','cl-up'],                              cls:'hl-up'  },
+  down: {ids:['cl-if','cl-dn'],                              cls:'hl-down'},
+  peak: {ids:['cl-ret'],                                     cls:'hl-peak'},
+  done: {ids:['cl-ret','cl-close'],                          cls:'hl-done'},
+};
+function highlightCode(type){
+  document.querySelectorAll('.code-line').forEach(el=>el.className='code-line');
+  const e=TYPE_LINES[type]; if(!e) return;
+  e.ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add(e.cls);});
+  document.getElementById(e.ids[0])?.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+// ── EXPLANATION LIBRARY ────────────────────────────────────────────────────
+function makeExplain(type, mid, aMid, aMid1, L, R, n, iter){
+  if(type==='init') return {
+    why:`<div class="ep-why-block">A peak element is any element greater than its neighbours. The array isn't sorted, so classic binary search doesn't directly apply. The trick: compare <strong>a[mid]</strong> with <strong>a[mid+1]</strong>. The slope direction tells us which half is guaranteed to contain a peak — we don't need to know where the peak is, just which half it's in.</div>`,
+    inv:[
+      {icon:'🔒', cls:'', text:`<strong>Core invariant:</strong> A peak always exists in [L..R]. We start with [0..n−1] — guaranteed because the array boundaries are treated as −∞, so the global maximum is always a peak.`},
+      {icon:'🗺️', cls:'inv-warn', text:`<strong>Definition used:</strong> a[i] is a peak if a[i] > a[i−1] and a[i] > a[i+1] (boundaries treated as −∞). This problem has at least one peak in any non-empty array.`},
+    ]
+  };
+  if(type==='up') return {
+    why:`<div class="ep-why-block why-up">a[mid]=${aMid} &lt; a[mid+1]=${aMid1} — we're on an <strong>upward slope</strong>. The slope is climbing to the right. Either a[mid+1] itself is a peak, or the slope continues upward further right and we'll find a peak there. Either way, <strong>no peak can be at mid or to its left</strong> — mid is smaller than its right neighbour. So we set L=mid+1.</div>`,
+    inv:[
+      {icon:'🔒', cls:'', text:`<strong>Invariant maintained:</strong> a peak exists in [${mid+1}..${R}]. Proof: a[mid+1] > a[mid]. Either a[mid+1] > a[mid+2] (it's a peak), or we continue upward and must eventually come down — that turning point is a peak.`},
+      {icon:'⬆️', cls:'inv-warn', text:`<strong>Why mid is safely eliminated:</strong> a[mid] &lt; a[mid+1], so mid fails the peak condition (a peak must be greater than both neighbours). It cannot be the answer.`},
+    ]
+  };
+  if(type==='down') return {
+    why:`<div class="ep-why-block why-dn">a[mid]=${aMid} ≥ a[mid+1]=${aMid1} — we're on a <strong>downward slope</strong> (or flat). a[mid+1] is strictly smaller, so the peak is at mid or to its left. We set R=mid (<strong>not mid−1</strong>) because mid itself could be the peak — it's larger than mid+1, and we haven't checked its left neighbour yet.</div>`,
+    inv:[
+      {icon:'🔒', cls:'', text:`<strong>Invariant maintained:</strong> a peak exists in [${L}..${mid}]. a[mid] > a[mid+1], so either a[mid] > a[mid−1] (it's a peak), or we go further left and find the turning point.`},
+      {icon:'⚠️', cls:'inv-warn', text:`<strong>Why R=mid (not mid−1):</strong> mid is a candidate — it beats its right neighbour. If it also beats its left neighbour, it's the peak. We must keep it in the search space.`},
+    ]
+  };
+  if(type==='peak'||type==='done') return {
+    why:`<div class="ep-why-block why-peak">L equals R — the search space has collapsed to a single element. By the invariant, this element is guaranteed to be a peak. We return L (which equals R). No need to verify: the invariant guarantees it at every step.</div>`,
+    inv:[
+      {icon:'✅', cls:'', text:`<strong>Invariant fully converged:</strong> [L..R] = [${L}..${R}] = single element. The invariant "a peak exists in [L..R]" combined with L=R means a[L] is a peak.`},
+      {icon:'📐', cls:'inv-warn', text:`<strong>Complexity:</strong> O(log n) — each step halves the search space by eliminating one half based purely on slope direction. Only 1 comparison per iteration (a[mid] vs a[mid+1]).`},
+      {icon:'🔑', cls:'inv-key', text:`<strong>The key insight:</strong> We never need to check both neighbours of mid. The single comparison a[mid] vs a[mid+1] tells us which half contains a peak. This is what makes O(log n) possible for an unsorted array.`},
+    ]
+  };
+  return {why:'',inv:[]};
+}
+
+// ── ALGORITHM ──────────────────────────────────────────────────────────────
+function computeSteps(arr){
+  const n=arr.length, steps=[];
+  let L=0, R=n-1, iter=0, log=[];
+
+  const s=(type,desc,mid,explain)=>steps.push({
+    L,R,mid,type,desc,explain,
+    log:[...log],iter,n
+  });
+
+  s('init',
+    `🚀 <strong>Starting.</strong> Array has <strong>${n}</strong> elements. We find any local peak (element greater than both neighbours). Boundaries treated as −∞ so edges can be peaks. Key: compare a[mid] with a[mid+1] — the slope direction tells us which half to search.`,
+    -1, makeExplain('init',-1,null,null,L,R,n,0));
+
+  while(L < R){
+    iter++;
+    const mid = L + Math.floor((R-L)/2);
+    const aMid  = arr[mid];
+    const aMid1 = arr[mid+1];
+    const goUp  = aMid < aMid1;
+    log.push({iter, L, R, mid, aMid, aMid1, goUp});
+
+    if(goUp){
+      s('up',
+        `⬆️ Iteration <strong>${iter}</strong>: mid=<span class="yel">${mid}</span>, a[mid]=<span class="yel">${aMid}</span> <strong>&lt;</strong> a[mid+1]=<span class="grn">${aMid1}</span>. Upward slope. Peak must be in right half. <span class="grn">L → ${mid+1}</span>. Eliminated [${L}..${mid}].`,
+        mid, makeExplain('up',mid,aMid,aMid1,L,R,n,iter));
+      L = mid+1;
+    } else {
+      s('down',
+        `⬇️ Iteration <strong>${iter}</strong>: mid=<span class="yel">${mid}</span>, a[mid]=<span class="yel">${aMid}</span> <strong>≥</strong> a[mid+1]=<span class="red">${aMid1}</span>. Downward slope. Peak is at mid or left. <span class="red">R → ${mid}</span>. Eliminated [${mid+1}..${R}].`,
+        mid, makeExplain('down',mid,aMid,aMid1,L,R,n,iter));
+      R = mid;
+    }
+  }
+
+  // L === R → peak found
+  log.push({iter:iter+1,L,R,mid:L,aMid:arr[L],aMid1:arr[L+1]??null,goUp:null,isPeak:true});
+  s('peak',
+    `⛰ <span class="grn"><strong>Peak found!</strong></span> L = R = <strong>${L}</strong>. a[${L}] = <span class="grn"><strong>${arr[L]}</strong></span>. ${L>0?`a[${L-1}]=${arr[L-1]} < a[${L}]`:'left edge (−∞)'} and ${L<n-1?`a[${L+1}]=${arr[L+1]} < a[${L}]`:'right edge (−∞)'}. Confirmed peak in <strong>${iter}</strong> iteration${iter!==1?'s':''}. O(log n).`,
+    L, makeExplain('peak',L,arr[L],arr[L+1],L,R,n,iter));
+
+  return steps;
+}
+
+function drawChart(arr, st){
+  const canvas=document.getElementById('mountainChart');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.offsetWidth, H=canvas.offsetHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  ctx.scale(dpr,dpr);
+  const n=arr.length;
+  const pad={t:24,r:20,b:14,l:32};
+  const cw=W-pad.l-pad.r, ch=H-pad.t-pad.b;
+  // Fix: use 0 as min floor so bars scale correctly from zero baseline
+  const minV=0;
+  const maxV=Math.max(...arr)*1.12;
+  const colW=cw/n;
+  const px=i=>pad.l+i*colW+colW/2;
+  const py=v=>pad.t+ch-(v-minV)/(maxV-minV)*ch;
+
+  // find all valid peaks for reference markers
+  const allPeaks=arr.reduce((acc,v,i)=>{
+    const left =i===0   ?-Infinity:arr[i-1];
+    const right=i===n-1 ?-Infinity:arr[i+1];
+    if(v>left&&v>right) acc.push(i);
+    return acc;
+  },[]);
+
+  // grid
+  ctx.strokeStyle='rgba(180,170,155,0.25)'; ctx.lineWidth=0.5;
+  for(let g=0;g<=3;g++){
+    const y=pad.t+(ch/3)*g;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    const val=Math.round(maxV-(maxV/3)*g);
+    ctx.fillStyle='#8a8070'; ctx.font='9px Space Mono,monospace';
+    ctx.textAlign='right'; ctx.fillText(val,pad.l-3,y+3);
+  }
+
+  // eliminated zones
+  if(st.L>0){
+    ctx.fillStyle='rgba(230,57,70,0.07)';
+    ctx.fillRect(pad.l,pad.t,st.L*colW,ch);
+  }
+  if(st.R<n-1&&st.type!=='peak'&&st.type!=='done'){
+    ctx.fillStyle='rgba(230,57,70,0.07)';
+    ctx.fillRect(pad.l+(st.R+1)*colW,pad.t,(n-1-st.R)*colW,ch);
+  }
+
+  // active zone fill
+  if(st.L<=st.R){
+    ctx.fillStyle='rgba(33,150,243,0.06)';
+    ctx.fillRect(pad.l+st.L*colW,pad.t,(st.R-st.L+1)*colW,ch);
+  }
+
+  // all-peaks ghost markers (faint diamonds)
+  allPeaks.forEach(i=>{
+    if(st.type==='peak'&&i===st.mid) return; // skip final highlight — drawn below
+    ctx.beginPath();
+    ctx.arc(px(i),py(arr[i]),3.5,0,Math.PI*2);
+    ctx.strokeStyle='rgba(6,214,160,0.35)'; ctx.lineWidth=1.5;
+    ctx.stroke();
+  });
+
+  // mountain fill path
+  ctx.beginPath();
+  ctx.moveTo(px(0),py(arr[0]));
+  arr.forEach((v,i)=>ctx.lineTo(px(i),py(v)));
+  ctx.lineTo(px(n-1),H-pad.b);
+  ctx.lineTo(pad.l,H-pad.b);
+  ctx.closePath();
+  ctx.fillStyle='rgba(33,150,243,0.07)';
+  ctx.fill();
+
+  // mountain line
+  ctx.beginPath();
+  arr.forEach((v,i)=>i===0?ctx.moveTo(px(i),py(v)):ctx.lineTo(px(i),py(v)));
+  ctx.strokeStyle='rgba(33,150,243,0.5)'; ctx.lineWidth=2;
+  ctx.stroke();
+
+  // slope colouring (mid and mid+1 segment)
+  if(st.mid>=0&&st.mid<n-1&&st.type!=='peak'&&st.type!=='done'){
+    const goUp=arr[st.mid]<arr[st.mid+1];
+    ctx.beginPath();
+    ctx.moveTo(px(st.mid),py(arr[st.mid]));
+    ctx.lineTo(px(st.mid+1),py(arr[st.mid+1]));
+    ctx.strokeStyle=goUp?'#06d6a0':'#e63946';
+    ctx.lineWidth=3; ctx.stroke();
+  }
+
+  // dots
+  arr.forEach((v,i)=>{
+    const isPeak=st.type==='peak'&&i===st.mid;
+    const isMid=i===st.mid&&st.type!=='peak';
+    const inActive=i>=st.L&&i<=st.R;
+    const isElim=!inActive;
+    ctx.beginPath();
+    ctx.arc(px(i),py(v),isPeak?7:isMid?5.5:isElim?2.5:3.5,0,Math.PI*2);
+    ctx.fillStyle=isPeak?'#06d6a0':isMid?'#ffd166':isElim?'rgba(180,170,155,0.5)':'rgba(33,150,243,0.6)';
+    ctx.fill();
+    if(isPeak){
+      ctx.strokeStyle='#028a5b'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#028a5b';
+      ctx.font=`700 11px Space Mono, monospace`;
+      ctx.textAlign='center';
+      ctx.fillText(`★ ${v}`,px(i),py(v)-14);
+    }
+    if(isMid){
+      ctx.strokeStyle='#a07800'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+  });
+
+  // L / R / mid labels
+  if(st.L>=0&&st.type!=='peak'){
+    ctx.fillStyle='#e63946'; ctx.font='700 9px Space Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText('L',px(st.L),H-2);
+    ctx.fillStyle='#2196f3';
+    ctx.fillText('R',px(st.R),H-2);
+  }
+  if(st.mid>=0&&st.type!=='peak'){
+    ctx.fillStyle='#a07800'; ctx.font='700 9px Space Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText('M',px(st.mid),py(arr[st.mid])-9);
+  }
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+let arr=[], steps=[], currentStep=0, playing=false, timer=null, speed=900;
+let activeTab='what';
+
+function switchTab(tab){
+  activeTab=tab;
+  ['what','why','inv'].forEach(t=>{
+    const cap=t.charAt(0).toUpperCase()+t.slice(1);
+    document.getElementById('tab'+cap).classList.toggle('active',t===tab);
+    document.getElementById('pane'+cap).classList.toggle('active',t===tab);
+  });
+  if(steps.length) updateExplain(steps[currentStep]);
+}
+
+function updateExplain(st){
+  if(!st||!st.explain) return;
+  const ex=st.explain;
+  const ep=document.getElementById('explainPanel');
+  ep.className='explain-panel '+
+    (st.type==='up'?'ep-up':st.type==='down'?'ep-down':
+     st.type==='peak'||st.type==='done'?'ep-peak':'');
+  document.getElementById('paneWhat').innerHTML=st.desc;
+  document.getElementById('paneWhy').innerHTML=ex.why||
+    '<em style="color:var(--muted)">No extra explanation.</em>';
+  document.getElementById('invBlock').innerHTML=(ex.inv||[]).map(r=>
+    `<div class="inv-row ${r.cls||''}">
+       <div class="inv-icon">${r.icon}</div>
+       <div class="inv-text">${r.text}</div>
+     </div>`).join('');
+}
+
+function parseArr(){
+  return document.getElementById('inputArr').value
+    .split(',').map(x=>parseInt(x.trim())).filter(x=>!isNaN(x));
+}
+
+function buildUI(){
+  arr=parseArr();
+  steps=computeSteps(arr);
+  currentStep=0;
+  const n=arr.length;
+
+  // array blocks
+  const ab=document.getElementById('arrayBlocks');
+  ab.innerHTML='';
+  arr.forEach((v,i)=>{
+    ab.innerHTML+=`<div class="blk active" id="blk-${i}">${v}<span class="bidx">${i}</span></div>`;
+  });
+
+  document.getElementById('stepTotal').textContent=`/ ${steps.length} steps`;
+  document.getElementById('doneBanner').classList.remove('show');
+  document.getElementById('doneBar').classList.remove('show');
+  document.getElementById('bestBox').classList.remove('show');
+  document.getElementById('rlRows').innerHTML='';
+  document.getElementById('btnPrev').disabled=true;
+  document.getElementById('btnNext').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+
+  renderStep(0);
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+let prevVals={};
+function setVar(elId,cardId,val){
+  const el=document.getElementById(elId),card=document.getElementById(cardId);
+  if(!el||!card)return;
+  const s=String(val);
+  el.textContent=s;
+  if(prevVals[elId]!==undefined&&prevVals[elId]!==s){
+    card.classList.remove('changed');void card.offsetWidth;card.classList.add('changed');
+    setTimeout(()=>card.classList.remove('changed'),500);
+  }
+  prevVals[elId]=s;
+}
+
+function renderStep(idx){
+  if(idx<0||idx>=steps.length)return;
+  const st=steps[idx];
+  currentStep=idx;
+  const n=arr.length;
+
+  // canvas
+  drawChart(arr,st);
+
+  // array blocks
+  arr.forEach((_,i)=>{
+    const b=document.getElementById(`blk-${i}`);
+    if(!b)return;
+    b.className='blk';
+    const inActive=i>=st.L&&i<=st.R;
+    if(st.type==='peak'&&i===st.mid){ b.classList.add('is-peak'); return; }
+    if(!inActive){ b.classList.add('eliminated'); return; }
+    if(i===st.mid){ b.classList.add('is-mid'); return; }
+    if(st.mid>=0&&i===st.mid+1&&st.type==='up')  b.classList.add('slope-up');
+    else if(st.mid>=0&&i===st.mid+1&&st.type==='down') b.classList.add('slope-dn');
+    else b.classList.add('active');
+  });
+
+  // pointer labels
+  const BW=57;
+  const pl=document.getElementById('ptrLabels');
+  if(st.type==='peak'){
+    pl.innerHTML=`<span class="ptr" style="left:${st.mid*BW+26}px;background:var(--accent3);color:#0a2e22;top:4px">⛰ PEAK</span>`;
+  } else if(st.mid>=0){
+    pl.innerHTML=`
+      <span class="ptr ptr-L"   style="left:${st.L*BW+26}px">L</span>
+      <span class="ptr ptr-R"   style="left:${st.R*BW+26}px">R</span>
+      <span class="ptr ptr-mid" style="left:${st.mid*BW+26}px">mid</span>`;
+  } else { pl.innerHTML=''; }
+
+  // slope cards
+  if(st.mid>=0&&st.mid<n){
+    const aMid  = arr[st.mid];
+    const aMid1 = st.mid+1<n ? arr[st.mid+1] : null;
+    const aMidM = st.mid-1>=0? arr[st.mid-1] : null;
+
+    document.getElementById('scMidVal').textContent=aMid;
+    document.getElementById('scLeftVal').textContent=aMidM!==null?aMidM:'−∞';
+    document.getElementById('scRightVal').textContent=aMid1!==null?aMid1:'−∞';
+
+    if(st.type==='peak'){
+      document.getElementById('scMid').className='slope-card peak';
+      document.getElementById('scLeft').className='slope-card up';
+      document.getElementById('scRight').className='slope-card up';
+      document.getElementById('scLeftArrow').textContent=aMidM!==null&&aMid>aMidM?'✓':'';
+      document.getElementById('scRightArrow').textContent=aMid1!==null&&aMid>aMid1?'✓':'';
+      document.getElementById('scMidDecision').textContent='⛰ PEAK';
+    } else if(st.type==='up'){
+      document.getElementById('scMid').className='slope-card neutral';
+      document.getElementById('scRight').className='slope-card up';
+      document.getElementById('scLeft').className='slope-card neutral';
+      document.getElementById('scRightArrow').textContent='⬆';
+      document.getElementById('scLeftArrow').textContent='—';
+      document.getElementById('scMidDecision').textContent='go right →';
+    } else if(st.type==='down'){
+      document.getElementById('scMid').className='slope-card down';
+      document.getElementById('scRight').className='slope-card neutral';
+      document.getElementById('scLeft').className='slope-card neutral';
+      document.getElementById('scRightArrow').textContent='⬇';
+      document.getElementById('scLeftArrow').textContent='—';
+      document.getElementById('scMidDecision').textContent='← go left';
+    } else {
+      document.getElementById('scMid').className='slope-card neutral';
+      document.getElementById('scLeft').className='slope-card neutral';
+      document.getElementById('scRight').className='slope-card neutral';
+      document.getElementById('scMidDecision').textContent='—';
+    }
+
+    // slope compare right
+    if(aMid1!==null&&st.type!=='peak'){
+      const goUp=aMid<aMid1;
+      document.getElementById('scRowRight').className='sc-row '+(goUp?'sc-up':'sc-down');
+      document.getElementById('scCompareVal').className='sc-val '+(goUp?'up':'down');
+      document.getElementById('scCompareVal').textContent=`${aMid} ${goUp?'<':'≥'} ${aMid1}`;
+      document.getElementById('scRowDecision').className='sc-row '+(goUp?'sc-up':'sc-down');
+      document.getElementById('scDecisionVal').className='sc-val '+(goUp?'up':'down');
+      document.getElementById('scDecisionVal').textContent=goUp?'L=mid+1 (go right)':'R=mid (go left)';
+    } else if(st.type==='peak'){
+      document.getElementById('scRowRight').className='sc-row sc-peak';
+      document.getElementById('scCompareVal').className='sc-val peak';
+      document.getElementById('scCompareVal').textContent=`a[${st.mid}]=${arr[st.mid]}`;
+      document.getElementById('scRowDecision').className='sc-row sc-peak';
+      document.getElementById('scDecisionVal').className='sc-val peak';
+      document.getElementById('scDecisionVal').textContent='⛰ L=R → peak!';
+    }
+  }
+
+  // iter log (left)
+  const ilR=document.getElementById('ilRows');
+  ilR.innerHTML='';
+  st.log.forEach((e,i)=>{
+    const isLatest=i===st.log.length-1;
+    const cls=e.isPeak?'il-peak':e.goUp?'il-up':'il-dn';
+    const decCls=e.isPeak?'peak':e.goUp?'up':'dn';
+    const decText=e.isPeak?'⛰ peak':e.goUp?'→ right':'← left';
+    ilR.innerHTML+=`<div class="il-row ${isLatest?'active':''} ${cls}">
+      <div class="il-iter">#${e.iter}</div>
+      <div class="il-range">[${e.L}..${e.R}]</div>
+      <div class="il-mid">mid=${e.mid}</div>
+      <div class="il-cmp">${e.isPeak?`a[${e.mid}]=${e.aMid} is peak`:`${e.aMid} ${e.goUp?'<':'≥'} ${e.aMid1}`}</div>
+      <div class="il-dec ${decCls}">${decText}</div>
+    </div>`;
+  });
+
+  // iter log (right)
+  const rlR=document.getElementById('rlRows');
+  rlR.innerHTML='';
+  [...st.log].reverse().forEach((e,ri)=>{
+    const isLatest=ri===0;
+    const cls=e.isPeak?'rl-peak':e.goUp?'rl-up':'rl-dn';
+    const decCls=e.isPeak?'peak':e.goUp?'up':'dn';
+    rlR.innerHTML+=`<div class="rl-row ${cls} ${isLatest?'rl-new':''}">
+      <div class="rl-n">#${e.iter}</div>
+      <div class="rl-mid">m=${e.mid}</div>
+      <div class="rl-cmp">${e.isPeak?'L=R':e.goUp?`${e.aMid}<${e.aMid1}`:`${e.aMid}≥${e.aMid1}`}</div>
+      <div class="rl-dec ${decCls}">${e.isPeak?'⛰':'→'+((e.goUp)?'R':'L')}</div>
+    </div>`;
+  });
+
+  // vars
+  setVar('vL','vcL',st.L);
+  setVar('vR','vcR',st.R);
+  setVar('vMid','vcMid',st.mid>=0?st.mid:'—');
+  setVar('vAMid','vcAMid',st.mid>=0&&st.mid<n?arr[st.mid]:'—');
+  setVar('vAMid1','vcAMid1',st.mid>=0&&st.mid+1<n?arr[st.mid+1]:'—');
+  setVar('vIter','vcIter',st.iter);
+
+  // explain tabs
+  updateExplain(st);
+  highlightCode(st.type==='init'?'init':st.type==='up'?'up':st.type==='down'?'down':st.type==='peak'?'peak':'done');
+
+  // done
+  if(st.type==='peak'){
+    document.getElementById('doneBanner').classList.add('show');
+    document.getElementById('doneBar').classList.add('show');
+    const bb=document.getElementById('bestBox');bb.classList.add('show');
+    document.getElementById('bestVal').textContent=`index ${st.mid} → value ${arr[st.mid]}`;
+    const left=st.mid>0?`a[${st.mid-1}]=${arr[st.mid-1]}`:'left edge';
+    const right=st.mid<n-1?`a[${st.mid+1}]=${arr[st.mid+1]}`:'right edge';
+    document.getElementById('bestMeta').textContent=`${left} < ${arr[st.mid]} > ${right} · ${st.iter} iter${st.iter!==1?'s':''}`;
+  }
+
+  document.getElementById('stepCounter').textContent=`Step ${idx+1}`;
+  document.getElementById('progressFill').style.width=((idx+1)/steps.length*100)+'%';
+  document.getElementById('btnPrev').disabled=idx===0;
+  document.getElementById('btnNext').disabled=idx===steps.length-1;
+}
+
+// ── PLAYBACK ───────────────────────────────────────────────────────────────
+function play(){
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  playing=true;
+  document.getElementById('btnPause').disabled=false;
+  document.getElementById('btnPause').textContent='⏸ Pause';
+  document.getElementById('btnRun').disabled=true;
+  tick();
+}
+function tick(){
+  if(!playing)return;
+  if(currentStep>=steps.length-1){stopPlay();return;}
+  renderStep(currentStep+1);
+  timer=setTimeout(tick,speed);
+}
+function stopPlay(){
+  playing=false;clearTimeout(timer);
+  document.getElementById('btnPause').textContent='▶ Resume';
+  document.getElementById('btnRun').disabled=false;
+}
+
+document.getElementById('btnRun').addEventListener('click',()=>{buildUI();setTimeout(play,200);});
+document.getElementById('btnReset').addEventListener('click',()=>{stopPlay();buildUI();});
+document.getElementById('btnPrev').addEventListener('click',()=>{stopPlay();renderStep(currentStep-1);});
+document.getElementById('btnNext').addEventListener('click',()=>{stopPlay();renderStep(currentStep+1);});
+document.getElementById('btnPause').addEventListener('click',()=>playing?stopPlay():play());
+document.querySelectorAll('.speed-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.speed-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');speed=parseInt(b.dataset.ms);
+  });
+});
+window.addEventListener('resize',()=>{ if(steps.length) drawChart(arr,steps[currentStep]); });
+
+buildUI();
+</script>
+</body>
+</html>
