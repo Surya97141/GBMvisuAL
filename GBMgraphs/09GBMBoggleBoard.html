@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Boggle Board — Live Visualizer</title>
+<title>Grid Word Discovery — Live Visualizer</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -589,7 +589,7 @@ function getNarrative(st){
   if(type==='enter') return {color:'var(--pur-dark)',
     text:`DFS at cell (${r},${c}) = "<strong>${letter}</strong>". Building word: "<strong>${pathWord}</strong>". Trie says this prefix is valid ✓. Exploring all 8 neighbours.`};
   if(type==='word-found') return {color:'var(--accent3)',
-    text:`🎉 Found "<strong>${pathWord}</strong>"! The Trie node has this marked as a complete word. Adding to results. Continuing DFS — longer words might extend from here.`};
+    text:` Found "<strong>${pathWord}</strong>"! The Trie node has this marked as a complete word. Adding to results. Continuing DFS — longer words might extend from here.`};
   if(type==='dead') return {color:'var(--muted)',
     text:`Dead end: "<strong>${letter}</strong>" not in Trie at this prefix. No word can start with "...${(pathWord||'').slice(0,-1)}${letter}". Pruning entire subtree — backtrack now.`};
   if(type==='backtrack') return {color:'var(--accent2)',
@@ -666,7 +666,7 @@ function computeSteps(board, words){
     for(let c=0;c<cols&&steps.length<MAX_STEPS;c++)
       dfs(r,c,root,[],'' );
 
-  snap('done',`🎉 <strong>Done!</strong> Found: [${foundWords.join(', ')||'none'}]`,
+  snap('done',` <strong>Done!</strong> Found: [${foundWords.join(', ')||'none'}]`,
     {r:null,c:null,letter:'',pathWord:'',result:{foundWords:[...foundWords]}});
   steps[steps.length-1].result={foundWords:[...foundWords]};
   return steps;
