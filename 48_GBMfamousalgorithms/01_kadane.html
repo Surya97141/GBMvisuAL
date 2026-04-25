@@ -465,9 +465,9 @@ function getNarrative(st){
   if(type==='reset') return {color:'var(--accent)',
     text:`Index ${i}: value is <strong>${ai}</strong> but the running total was negative — it would only drag us down. <strong>Drop the old window</strong> and start fresh here. New running sum: <strong>${cur}</strong>.`};
   if(type==='update') return {color:'var(--accent3)',
-    text:`📈 Running sum <strong>${cur}</strong> beats the previous best of ${best===cur?best-ai:best}! New global best = <strong>${cur}</strong>. Best subarray so far: [${arr?.slice(ts,i+1).join(', ')}].`};
+    text:` Running sum <strong>${cur}</strong> beats the previous best of ${best===cur?best-ai:best}! New global best = <strong>${cur}</strong>. Best subarray so far: [${arr?.slice(ts,i+1).join(', ')}].`};
   if(type==='done') return {color:'var(--accent3)',
-    text:`✅ Done! Maximum subarray sum = <strong>${best}</strong>. The subarray [${arr?.slice(s,e+1).join(', ')}] gives this sum. Found in one pass — O(n) time, O(1) space!`};
+    text:` Done! Maximum subarray sum = <strong>${best}</strong>. The subarray [${arr?.slice(s,e+1).join(', ')}] gives this sum. Found in one pass — O(n) time, O(1) space!`};
   return {text:'',color:'var(--accent4)'};
 }
 
@@ -484,7 +484,7 @@ function computeSteps(arr){
     explain:makeExplain(type,{arr,cur,best,ts,s,e,...extra})
   });
 
-  snap('init',`🚀 <strong>Start.</strong> curSum=bestSum=a[0]=${arr[0]}. Scan from index 1.`,
+  snap('init',` <strong>Start.</strong> curSum=bestSum=a[0]=${arr[0]}. Scan from index 1.`,
     {i:0,ai:arr[0]});
 
   for(let i=1;i<n;i++){
